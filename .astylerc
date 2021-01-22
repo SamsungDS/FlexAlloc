@@ -1,0 +1,7 @@
+--mode=c
+--style=allman
+--indent=spaces=2
+--max-code-length=100
+--min-conditional-indent=0
+--suffix=none 
+--break-return-type
