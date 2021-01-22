@@ -1,0 +1,7 @@
+import subprocess
+import os
+
+def test_@flex_alloc_test_executable_name@():
+    d = os.path.dirname(__file__)
+    ret_val = subprocess.call([os.path.join(d, "@flex_alloc_test_executable_name@")])
+    assert ret_val == 0
