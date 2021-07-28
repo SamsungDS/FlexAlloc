@@ -285,6 +285,15 @@ fla_pool_get_root_object(struct flexalloc const * const fs,
 uint32_t
 fla_pool_obj_nlb(struct flexalloc const *const fs, struct fla_pool const *pool_handle);
 
+/**
+ * @brief Return the number of sectors in a zone device zone
+ *
+ * @param fs !FS system handle
+ * @return number of sectors in each zone
+ */
+uint64_t
+fla_fs_nzsect(struct flexalloc const * const fs);
+
 #ifdef __cplusplus
 }
 #endif
