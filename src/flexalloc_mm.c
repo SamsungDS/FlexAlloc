@@ -1496,6 +1496,12 @@ fla_pool_obj_nlb(struct flexalloc const * const fs, struct fla_pool const *pool_
   return pool_entry->obj_nlb;
 }
 
+uint64_t
+fla_fs_nzsect(struct flexalloc const *fs)
+{
+  return fs->geo.nzsect;
+}
+
 int
 fla_open_common(const char *dev_uri, struct flexalloc *fs)
 {
