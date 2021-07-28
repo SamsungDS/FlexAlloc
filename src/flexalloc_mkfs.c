@@ -42,6 +42,11 @@ static struct cli_option options[] =
     .arg_ex = NULL
   },
   {
+    .base = {"md_dev", optional_argument, NULL, 'm'},
+    .description = "MD device to use\n",
+    .arg_ex = "/path/to/md_device"
+  },
+  {
     .base = {NULL, 0, NULL, 0}
   }
 };
@@ -71,7 +76,7 @@ fla_mkfs_parse_args(int argc, char ** argv, struct fla_mkfs_p * p)
     memcpy(long_options+i, &options[i].base, sizeof(struct option));
   }
 
-  while ((c = getopt_long(argc, argv, "vhs:p:", long_options, &opt_idx)) != -1)
+  while ((c = getopt_long(argc, argv, "vhs:p:m:", long_options, &opt_idx)) != -1)
   {
     switch (c)
     {
@@ -99,6 +104,9 @@ fla_mkfs_parse_args(int argc, char ** argv, struct fla_mkfs_p * p)
         err = -1;
       }
       p->npools = (int)arg_long;
+      break;
+    case 'm':
+      p->md_dev_uri = optarg;
       break;
     default:
       break;
@@ -155,6 +163,7 @@ main(int argc, char ** argv)
   struct fla_mkfs_p mkfs_params =
   {
     .dev_uri = NULL,
+    .md_dev_uri = NULL,
     .slab_nlb = 0,
     .verbose = 0,
   };
@@ -173,6 +182,9 @@ main(int argc, char ** argv)
   fprintf(stderr, "  dev_uri: %s\n", mkfs_params.dev_uri);
   fprintf(stderr, "  slab_nlb: %"PRIu32"\n", mkfs_params.slab_nlb);
   fprintf(stderr, "  verbose: %"PRIu8"\n", mkfs_params.verbose);
+  if (mkfs_params.md_dev_uri)
+    fprintf(stderr, "  md_dev_uri: %s\n", mkfs_params.md_dev_uri);
+
   fla_mkfs(&mkfs_params);
 
 exit:
