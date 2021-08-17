@@ -275,6 +275,15 @@ int
 fla_pool_get_root_object(struct flexalloc const * const fs,
                          struct fla_pool const * pool,
                          struct fla_object *object);
+/**
+ * @brief Return size of objects in terms of nlb with the pool
+ *
+ * @param fs !FS system handle
+ * @param pool_handle !FS pool handle to associate obj with
+ * @return Zero on failure, obj nlb for the pool otherwise
+ */
+uint32_t
+fla_pool_obj_nlb(struct flexalloc const *const fs, struct fla_pool const *pool_handle);
 
 #ifdef __cplusplus
 }
