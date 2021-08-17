@@ -1487,6 +1487,15 @@ fla_fs_lb_nbytes(struct flexalloc const * const fs)
   return fs->dev.lb_nbytes;
 }
 
+uint32_t
+fla_pool_obj_nlb(struct flexalloc const * const fs, struct fla_pool const *pool_handle)
+{
+  struct fla_pool_entry * pool_entry;
+
+  pool_entry = &fs->pools.entries[pool_handle->ndx];
+  return pool_entry->obj_nlb;
+}
+
 int
 fla_open_common(const char *dev_uri, struct flexalloc *fs)
 {
