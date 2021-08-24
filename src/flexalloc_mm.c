@@ -347,13 +347,19 @@ fla_geo_slabs_lb_off(struct fla_geo const *geo)
 }
 
 uint64_t
-fla_geo_slab_lb_off(struct fla_geo const *geo, uint32_t slab_id)
+fla_geo_slab_lb_off(struct flexalloc const *fs, uint32_t slab_id)
 {
-  uint64_t slabs_base = fla_geo_slabs_lb_off(geo);
-  uint64_t slab_base = slabs_base + (slab_id * geo->slab_nlb);
+  uint64_t slabs_base = fla_geo_slabs_lb_off(&fs->geo);
+  uint64_t slab_base;
 
-  if (geo->type == XNVME_GEO_ZONED)
-    slab_base += geo->nzsect - slabs_base;
+  if (fs->dev.md_dev)
+    slabs_base = 0;
+
+  slab_base = slabs_base + (slab_id * fs->geo.slab_nlb);
+  if (fs->geo.type == XNVME_GEO_ZONED && slab_base % fs->geo.nzsect)
+  {
+    slab_base += fs->geo.nzsect - slabs_base;
+  }
 
   return slab_base;
 }
@@ -1091,7 +1097,7 @@ fla_object_slba(struct flexalloc const * fs, struct fla_object const * obj,
                 const struct fla_pool * pool_handle)
 {
   const struct fla_pool_entry * pool_entry = &fs->pools.entries[pool_handle->ndx];
-  return fla_geo_slab_lb_off(&fs->geo, obj->slab_id) + (pool_entry->obj_nlb * obj->entry_ndx);
+  return fla_geo_slab_lb_off(fs, obj->slab_id) + (pool_entry->obj_nlb * obj->entry_ndx);
 }
 
 uint64_t
@@ -1308,8 +1314,7 @@ fla_object_elba(struct flexalloc const * fs, struct fla_object const * obj,
                 const struct fla_pool * pool_handle)
 {
   const struct fla_pool_entry * pool_entry = &fs->pools.entries[pool_handle->ndx];
-  return fla_geo_slab_lb_off(&fs->geo,
-                             obj->slab_id) + (pool_entry->obj_nlb * (obj->entry_ndx+1));
+  return fla_geo_slab_lb_off(fs, obj->slab_id) + (pool_entry->obj_nlb * (obj->entry_ndx+1));
 }
 
 uint64_t
