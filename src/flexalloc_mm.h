@@ -137,7 +137,7 @@ struct fla_super
  * @return The logical block offset of the slab.
  */
 uint64_t
-fla_geo_slab_lb_off(struct fla_geo const *geo, uint32_t slab_id);
+fla_geo_slab_lb_off(struct flexalloc const *fs, uint32_t slab_id);
 
 uint64_t
 fla_geo_slab_sgmt_lb_off(struct fla_geo const *geo);

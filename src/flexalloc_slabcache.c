@@ -33,8 +33,7 @@ cache_entry_lb_slba(struct fla_slab_flist_cache const * cache, const uint32_t sl
   if (cache->_fs->dev.md_dev)
     return fla_geo_slabs_lb_off(&cache->_fs->geo) + slab_id;
   else
-    return fla_geo_slab_lb_off(&cache->_fs->geo, slab_id) + cache->_fs->super->slab_nlb
-           - flist_nlb;
+    return fla_geo_slab_lb_off(cache->_fs, slab_id) + cache->_fs->super->slab_nlb - flist_nlb;
 }
 
 int
