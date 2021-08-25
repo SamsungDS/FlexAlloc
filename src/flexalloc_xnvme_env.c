@@ -44,8 +44,8 @@ fla_xne_dev_mkfs_prepare(struct xnvme_dev *dev, char *md_dev_uri, struct xnvme_d
   {
     if (fla_xne_dev_type(dev) == XNVME_GEO_ZONED)
     {
-      err = fla_xne_dev_znd_reset(dev, 0, true);
-      if (FLA_ERR(err, "fla_xne_dev_znd_reset()"))
+      err = fla_xne_dev_znd_send_mgmt(dev, 0, XNVME_SPEC_ZND_CMD_MGMT_SEND_RESET, true);
+      if (FLA_ERR(err, "flexalloc_xne_dev_znd_reset()"))
         return err;
     }
 
@@ -58,7 +58,8 @@ fla_xne_dev_mkfs_prepare(struct xnvme_dev *dev, char *md_dev_uri, struct xnvme_d
 }
 
 int
-fla_xne_dev_znd_reset(struct xnvme_dev *dev, uint64_t slba, bool all)
+fla_xne_dev_znd_send_mgmt(struct xnvme_dev *dev, uint64_t slba,
+                          enum xnvme_spec_znd_cmd_mgmt_send_action act, bool all)
 {
   int err = 0;
   uint32_t nsid;
@@ -71,7 +72,7 @@ fla_xne_dev_znd_reset(struct xnvme_dev *dev, uint64_t slba, bool all)
     return -EINVAL;
   }
 
-  err = xnvme_znd_mgmt_send(&ctx, nsid, slba, all, XNVME_SPEC_ZND_CMD_MGMT_SEND_RESET, 0, NULL);
+  err = xnvme_znd_mgmt_send(&ctx, nsid, slba, all, act, 0, NULL);
   if (err || xnvme_cmd_ctx_cpl_status(&ctx))
   {
     xnvmec_perr("xnvme_nvme_znd_mgmt_send", err);
@@ -80,6 +81,20 @@ fla_xne_dev_znd_reset(struct xnvme_dev *dev, uint64_t slba, bool all)
   }
 
   return err;
+}
+
+uint32_t
+fla_xne_dev_get_znd_mar(struct xnvme_dev *dev)
+{
+  const struct xnvme_spec_znd_idfy_ns *zns = (void *)xnvme_dev_get_ns_css(dev);
+  return zns->mar;
+}
+
+uint32_t
+fla_xne_dev_get_znd_mor(struct xnvme_dev *dev)
+{
+  const struct xnvme_spec_znd_idfy_ns *zns = (void *)xnvme_dev_get_ns_css(dev);
+  return zns->mor;
 }
 
 int

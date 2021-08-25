@@ -220,7 +220,7 @@ fla_object_read(struct flexalloc const * fs, struct fla_pool const * pool,
  * @return Zero on success. non zero otherwise
  */
 int
-fla_object_write(struct flexalloc const * fs, struct fla_pool const * pool,
+fla_object_write(struct flexalloc * fs, struct fla_pool const * pool,
                  struct fla_object const * object, void const * buf, size_t offset, size_t len);
 
 /**
@@ -235,19 +235,10 @@ fla_object_write(struct flexalloc const * fs, struct fla_pool const * pool,
  * @return Zero on success. non zero otherwise
  */
 int
-fla_object_unaligned_write(struct flexalloc const * fs,
+fla_object_unaligned_write(struct flexalloc * fs,
                            struct fla_pool const * pool,
                            struct fla_object const * object, void const * buf, size_t offset,
                            size_t len);
-
-/**
- * @brief Return the number of bytes in a block in fs
- *
- * @param fs flexalloc system handl
- * @return number of bytes in a block
- */
-int32_t
-fla_fs_lb_nbytes(struct flexalloc const * const fs);
 
 /**
  * @brief Associate object with pool
