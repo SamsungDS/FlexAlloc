@@ -11,9 +11,18 @@
 #define __FLEXALLOC_H_
 #include <stdint.h>
 #include <libxnvme.h>
+#include <sys/queue.h>
 #include "flexalloc_shared.h"
 #include "flexalloc_freelist.h"
 #include "flexalloc_hash.h"
+
+struct fla_zs_entry
+{
+  int zone_number;
+  TAILQ_ENTRY(fla_zs_entry) entries;
+};
+
+TAILQ_HEAD(zs_thead, fla_zs_entry);
 
 /// flexalloc device handle
 struct fla_dev
@@ -115,6 +124,8 @@ struct flexalloc
   struct fla_super *super;
   struct fla_pools pools;
   struct fla_slabs slabs;
+  struct zs_thead zs_thead;
+  uint32_t zs_size;
 };
 
 struct fla_pool

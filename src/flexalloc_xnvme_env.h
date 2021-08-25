@@ -127,7 +127,14 @@ void
 fla_xne_dev_close(struct xnvme_dev *dev);
 
 int
-fla_xne_dev_znd_reset(struct xnvme_dev *dev, uint64_t slba, bool all);
+fla_xne_dev_znd_send_mgmt(struct xnvme_dev *dev, uint64_t slba,
+                          enum xnvme_spec_znd_cmd_mgmt_send_action act, bool);
+
+uint32_t
+fla_xne_dev_get_znd_mar(struct xnvme_dev *dev);
+
+uint32_t
+fla_xne_dev_get_znd_mor(struct xnvme_dev *dev);
 
 int
 fla_xne_dev_mkfs_prepare(struct xnvme_dev *dev, char *md_dev_uri, struct xnvme_dev **md_dev);

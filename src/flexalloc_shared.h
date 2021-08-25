@@ -10,6 +10,7 @@ extern "C" {
 #define FLA_ERR_ALL_SLABS_USED 2001
 
 struct fla_pool;
+struct flexalloc;
 
 /// flexalloc object handle
 ///
@@ -29,6 +30,15 @@ typedef enum
   ROOT_OBJ_SET_FORCE = 1 << 0,
   ROOT_OBJ_SET_CLEAR = 1 << 1
 } fla_root_object_set_action;
+
+/**
+ * @brief Return the number of bytes in a block in fs
+ *
+ * @param fs flexalloc system handl
+ * @return number of bytes in a block
+ */
+int32_t
+fla_fs_lb_nbytes(struct flexalloc const * const fs);
 
 #ifdef __cplusplus
 }
