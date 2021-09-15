@@ -11,6 +11,7 @@
 #define __LIBFLEXALLOC_H_
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include "flexalloc_shared.h"
 
 #ifdef __cplusplus
@@ -284,6 +285,8 @@ fla_pool_obj_nlb(struct flexalloc const *const fs, struct fla_pool const *pool_h
  */
 uint64_t
 fla_fs_nzsect(struct flexalloc const * const fs);
+
+bool fla_fs_zns(struct flexalloc const *const fs);
 
 #ifdef __cplusplus
 }
