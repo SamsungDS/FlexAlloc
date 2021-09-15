@@ -1616,6 +1616,12 @@ fla_fs_nzsect(struct flexalloc const *fs)
   return fs->geo.nzsect;
 }
 
+bool
+fla_fs_zns(struct flexalloc const *fs)
+{
+  return fs->geo.type == XNVME_GEO_ZONED;
+}
+
 int
 fla_open_common(const char *dev_uri, struct flexalloc *fs)
 {
