@@ -201,6 +201,10 @@ fla_zone_full(struct flexalloc *fs, uint32_t zone)
       break;
   }
 
+  // We should probably warn here
+  if (!z_entry)
+    return;
+
   TAILQ_REMOVE(&fs->zs_thead, z_entry, entries);
   fs->zs_size--;
 }
@@ -1473,6 +1477,21 @@ fla_object_write(struct flexalloc * fs,
 
 exit:
   return err;
+}
+
+bool
+fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct fla_object *obj)
+{
+
+  uint64_t obj_slba = fla_object_slba(fs, obj, pool_handle);
+  uint32_t obj_zn = obj_slba / fs->geo.nzsect;
+  int err = fla_xne_dev_znd_send_mgmt(fs->dev.dev, obj_slba, XNVME_SPEC_ZND_CMD_MGMT_SEND_FINISH,
+                                      false);
+  if (FLA_ERR(err, "fla_xne_dev_znd_reset()"))
+    return false;
+
+  fla_zone_full(fs, obj_zn);
+  return true;
 }
 
 int
