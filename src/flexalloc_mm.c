@@ -806,7 +806,7 @@ fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_num, 
 
 int
 fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
-                struct fla_pool **handle)
+                     struct fla_pool **handle)
 {
   int err;
   struct fla_pool_entry *pool_entry;
@@ -1035,7 +1035,7 @@ fla_pool_best_slab_list(const struct fla_slab_header* slab,
 
 int
 fla_base_object_open(struct flexalloc * fs, struct fla_pool * pool_handle,
-                struct fla_object * obj)
+                     struct fla_object * obj)
 {
   int err;
   struct fla_slab_header * slab;
@@ -1062,7 +1062,7 @@ exit:
 
 int
 fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
-                  struct fla_object * obj)
+                       struct fla_object * obj)
 {
   int err;
   struct fla_slab_header * slab;
@@ -1138,7 +1138,7 @@ fla_object_soffset(struct flexalloc const * fs, struct fla_object const * obj,
 
 int
 fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
-                   struct fla_object * obj)
+                        struct fla_object * obj)
 {
 
   int err = 0;
@@ -1515,8 +1515,8 @@ fla_pool_lookup_root_object(struct flexalloc const * const fs,
 
 int
 fla_base_pool_set_root_object(struct flexalloc const * const fs,
-                         struct fla_pool const * pool_handle,
-                         struct fla_object const *obj, fla_root_object_set_action act)
+                              struct fla_pool const * pool_handle,
+                              struct fla_object const *obj, fla_root_object_set_action act)
 {
   struct fla_object *pool_root;
   int ret = 0;
@@ -1542,8 +1542,8 @@ out:
 
 int
 fla_base_pool_get_root_object(struct flexalloc const * const fs,
-                         struct fla_pool const * pool_handle,
-                         struct fla_object *obj)
+                              struct fla_pool const * pool_handle,
+                              struct fla_object *obj)
 {
   struct fla_object *pool_root;
   int ret = 0;
