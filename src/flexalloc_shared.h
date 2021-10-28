@@ -9,6 +9,8 @@ extern "C" {
 #define FLA_ERR_ERROR 1001
 #define FLA_ERR_ALL_SLABS_USED 2001
 
+struct flexalloc;
+
 struct fla_pool;
 struct flexalloc;
 
@@ -39,6 +41,24 @@ typedef enum
  */
 int32_t
 fla_fs_lb_nbytes(struct flexalloc const * const fs);
+
+struct fla_fns
+{
+  int (*close)(struct flexalloc *fs);
+  int (*sync)(struct flexalloc *fs);
+  int (*pool_open)(struct flexalloc *fs, const char *name, struct fla_pool **pool);
+  void (*pool_close)(struct flexalloc *fs, struct fla_pool *pool);
+  int (*pool_create)(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
+                     struct fla_pool **pool);
+  int (*pool_destroy)(struct flexalloc *fs, struct fla_pool *pool);
+  int (*object_open)(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *object);
+  int (*object_create)(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *object);
+  int (*object_destroy)(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *object);
+  int (*pool_set_root_object)(struct flexalloc const * const fs, struct fla_pool const * pool,
+                              struct fla_object const *object, fla_root_object_set_action act);
+  int (*pool_get_root_object)(struct flexalloc const * const fs, struct fla_pool const * pool,
+                              struct fla_object *object);
+};
 
 #ifdef __cplusplus
 }

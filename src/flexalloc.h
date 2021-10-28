@@ -125,6 +125,8 @@ struct flexalloc
   struct fla_slabs slabs;
   struct zs_thead zs_thead;
   uint32_t zs_size;
+
+  struct fla_fns fns;
 };
 
 struct fla_pool
