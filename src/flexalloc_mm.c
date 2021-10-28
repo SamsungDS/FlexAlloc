@@ -696,7 +696,7 @@ fla_close_noflush(struct flexalloc *fs)
 }
 
 int
-fla_close(struct flexalloc *fs)
+fla_base_close(struct flexalloc *fs)
 {
   int err = 0;
 
@@ -719,7 +719,7 @@ exit:
 }
 
 int
-fla_sync(struct flexalloc *fs)
+fla_base_sync(struct flexalloc *fs)
 {
   return fla_flush(fs);
 }
@@ -772,7 +772,7 @@ exit:
 }
 
 int
-fla_pool_open(struct flexalloc *fs, const char *name, struct fla_pool **handle)
+fla_base_pool_open(struct flexalloc *fs, const char *name, struct fla_pool **handle)
 {
   struct fla_htbl_entry *htbl_entry;
 
@@ -805,7 +805,7 @@ fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_num, 
 }
 
 int
-fla_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
+fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
                 struct fla_pool **handle)
 {
   int err;
@@ -813,7 +813,7 @@ fla_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t o
   int entry_ndx = 0;
 
   // Return pool if it exists
-  err = fla_pool_open(fs, name, handle);
+  err = fla_base_pool_open(fs, name, handle);
   if(!err)
   {
     pool_entry = &fs->pools.entries[(*handle)->ndx];
@@ -883,7 +883,7 @@ exit:
 }
 
 int
-fla_pool_destroy(struct flexalloc *fs, struct fla_pool * handle)
+fla_base_pool_destroy(struct flexalloc *fs, struct fla_pool * handle)
 {
   struct fla_pool_entry *pool_entry;
   struct fla_htbl_entry *htbl_entry;
@@ -938,7 +938,7 @@ exit:
 }
 
 void
-fla_pool_close(struct flexalloc *fs, struct fla_pool * handle)
+fla_base_pool_close(struct flexalloc *fs, struct fla_pool * handle)
 {
   free(handle);
 }
@@ -1034,7 +1034,7 @@ fla_pool_best_slab_list(const struct fla_slab_header* slab,
 
 
 int
-fla_object_open(struct flexalloc * fs, struct fla_pool * pool_handle,
+fla_base_object_open(struct flexalloc * fs, struct fla_pool * pool_handle,
                 struct fla_object * obj)
 {
   int err;
@@ -1061,7 +1061,7 @@ exit:
 }
 
 int
-fla_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
+fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
                   struct fla_object * obj)
 {
   int err;
@@ -1137,7 +1137,7 @@ fla_object_soffset(struct flexalloc const * fs, struct fla_object const * obj,
 }
 
 int
-fla_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
+fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
                    struct fla_object * obj)
 {
 
@@ -1514,7 +1514,7 @@ fla_pool_lookup_root_object(struct flexalloc const * const fs,
 }
 
 int
-fla_pool_set_root_object(struct flexalloc const * const fs,
+fla_base_pool_set_root_object(struct flexalloc const * const fs,
                          struct fla_pool const * pool_handle,
                          struct fla_object const *obj, fla_root_object_set_action act)
 {
@@ -1541,7 +1541,7 @@ out:
 }
 
 int
-fla_pool_get_root_object(struct flexalloc const * const fs,
+fla_base_pool_get_root_object(struct flexalloc const * const fs,
                          struct fla_pool const * pool_handle,
                          struct fla_object *obj)
 {
@@ -1590,6 +1590,21 @@ fla_fs_zns(struct flexalloc const *fs)
 {
   return fla_geo_zoned(&fs->geo);
 }
+
+struct fla_fns base_fns =
+{
+  .close = &fla_base_close,
+  .sync = &fla_base_sync,
+  .pool_open = &fla_base_pool_open,
+  .pool_close = &fla_base_pool_close,
+  .pool_create = &fla_base_pool_create,
+  .pool_destroy = &fla_base_pool_destroy,
+  .object_open = &fla_base_object_open,
+  .object_create = &fla_base_object_create,
+  .object_destroy = &fla_base_object_destroy,
+  .pool_set_root_object = &fla_base_pool_set_root_object,
+  .pool_get_root_object = &fla_base_pool_get_root_object,
+};
 
 int
 fla_open_common(const char *dev_uri, struct flexalloc *fs)
@@ -1649,6 +1664,7 @@ fla_open_common(const char *dev_uri, struct flexalloc *fs)
   free(super);
 
   fs->state |= FLA_STATE_OPEN;
+  fs->fns = base_fns;
   return 0;
 
 free_md:
