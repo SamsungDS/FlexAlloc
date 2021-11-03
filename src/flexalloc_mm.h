@@ -19,7 +19,7 @@
 #define FLA_STATE_OPEN 1U
 
 #define FLA_NAME_SIZE 128
-#define FLA_NAME_SIZE_POOL 120
+#define FLA_NAME_SIZE_POOL 112
 
 // -------------------------------
 #define FLA_ROOT_OBJ_NONE UINT64_MAX
@@ -95,6 +95,14 @@ struct fla_pool_entry
   ///
   /// Pools can have any valid flexalloc object set as a root object
   uint64_t root_obj_hndl;
+  /// Num of objects to stripe across
+  ///
+  /// Pools may optionally hand out striped objects
+  uint32_t strp_num;
+  /// Size of each stripe chunk
+  ///
+  /// Must be set if we ste strp_num
+  uint32_t strp_sz;
   /// Human-readable cache identifier
   ///
   /// The cache name is primarily used for debugging statistics

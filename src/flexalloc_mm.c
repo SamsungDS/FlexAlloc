@@ -861,6 +861,21 @@ fla_pool_open(struct flexalloc *fs, const char *name, struct fla_pool **handle)
 }
 
 int
+fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_num, uint32_t strp_sz)
+{
+  struct fla_pool_entry *pool_entry = &fs->pools.entries[ph->ndx];
+  const struct xnvme_geo * geo = xnvme_dev_get_geo(fs->dev.dev);
+
+  if (FLA_ERR(strp_sz > geo->mdts_nbytes, "Strp sz > mdts for device"))
+    return -1;
+
+  pool_entry->strp_num = strp_num;
+  pool_entry->strp_sz = strp_sz;
+
+  return 0;
+}
+
+int
 fla_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
                 struct fla_pool **handle)
 {
@@ -906,7 +921,7 @@ fla_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t o
     goto exit;
   }
 
-  entry_ndx = fla_flist_entry_alloc(fs->pools.freelist);
+  entry_ndx = fla_flist_entries_alloc(fs->pools.freelist, 1);
   if ((err = FLA_ERR(entry_ndx < 0, "failed to allocate pool entry")))
     goto free_handle;
 
@@ -921,6 +936,7 @@ fla_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t o
   pool_entry->full_slabs = FLA_LINKED_LIST_NULL;
   pool_entry->partial_slabs = FLA_LINKED_LIST_NULL;
   pool_entry->root_obj_hndl = FLA_ROOT_OBJ_NONE;
+  pool_entry->strp_num = 1; // By default we don't stripe across objects
 
   (*handle)->ndx = entry_ndx;
   (*handle)->h2 = FLA_HTBL_H2(name);
@@ -1057,7 +1073,7 @@ exit:
 
 int
 fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab,
-                            struct fla_object * obj)
+                            struct fla_object * obj, uint32_t num_objs)
 {
   int err = 0;
   uint32_t slab_id;
@@ -1068,7 +1084,7 @@ fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab
     return err;
   }
 
-  err = fla_slab_cache_obj_alloc(&fs->slab_cache, slab_id, obj);
+  err = fla_slab_cache_obj_alloc(&fs->slab_cache, slab_id, obj, num_objs);
   if(FLA_ERR(err, "fla_slab_cache_obj_alloc()"))
   {
     return err;
@@ -1148,7 +1164,7 @@ fla_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
 
   from_head = fla_pool_best_slab_list(slab, pool_entry);
 
-  err = fla_slab_next_available_obj(fs, slab, obj);
+  err = fla_slab_next_available_obj(fs, slab, obj, pool_entry->strp_num);
   if(FLA_ERR(err, "fla_slab_next_available_obj()"))
   {
     goto exit;
@@ -1429,16 +1445,26 @@ fla_object_read(const struct flexalloc * fs,
                 struct fla_object const * obj, void * buf, size_t offset, size_t len)
 {
   int err;
-  uint64_t obj_eoffset, r_soffset, r_eoffset;
+  uint64_t obj_eoffset, r_soffset, r_eoffset, obj_len;
+  struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
+  struct fla_sync_strp_params sp;
 
-  obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
-  r_soffset = fla_object_soffset(fs, obj, pool_handle) + offset;
+  obj_len = fla_object_eoffset(fs, obj, pool_handle) - fla_object_soffset(fs, obj, pool_handle);
+  obj_eoffset = fla_object_eoffset(fs, obj, pool_handle) + (obj_len * (pool_entry->strp_num -1 ));
+  r_soffset = fla_object_soffset(fs, obj, pool_handle) + offset / pool_entry->strp_num;
   r_eoffset = r_soffset + len;
+  sp.strp_num = pool_entry->strp_num;
+  sp.strp_sz = pool_entry->strp_sz;
+  sp.obj_len = obj_len;
 
   if((err = FLA_ERR(obj_eoffset < r_eoffset, "Read outside of an object")))
     goto exit;
 
-  err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, r_soffset, len, buf);
+  if (pool_entry->strp_num == 1)
+    err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, r_soffset, len, buf);
+  else
+    err = fla_xne_sync_strp_seq_x(fs->dev.dev, r_soffset, len, buf, &sp, false);
+
   if(FLA_ERR(err, "fla_xne_sync_seq_r_nbytes()"))
     goto exit;
 
@@ -1454,13 +1480,19 @@ fla_object_write(struct flexalloc * fs,
                  struct fla_object const * obj, void const * buf, size_t offset, size_t len)
 {
   int err = 0;
-  uint64_t obj_eoffset, w_soffset, w_eoffset;
+  uint64_t obj_eoffset, w_soffset, w_eoffset, obj_len;
   uint32_t obj_zn;
+  struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
+  struct fla_sync_strp_params sp;
 
-  obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
-  w_soffset = fla_object_soffset(fs, obj, pool_handle) + offset;
+  obj_len = fla_object_eoffset(fs, obj, pool_handle) - fla_object_soffset(fs, obj, pool_handle);
+  obj_eoffset = fla_object_eoffset(fs, obj, pool_handle) + (obj_len * (pool_entry->strp_num - 1));
+  w_soffset = fla_object_soffset(fs, obj, pool_handle) + offset / pool_entry->strp_num;
   w_eoffset = w_soffset + len;
   obj_zn = w_soffset / (fs->geo.nzsect * fla_fs_lb_nbytes(fs));
+  sp.strp_num = pool_entry->strp_num;
+  sp.strp_sz = pool_entry->strp_sz;
+  sp.obj_len = obj_len;
 
   if (fs->geo.type == XNVME_GEO_ZONED)
     fla_manage_zones(fs, obj_zn);
@@ -1468,7 +1500,11 @@ fla_object_write(struct flexalloc * fs,
   if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
     goto exit;
 
-  err = fla_xne_sync_seq_w_nbytes(fs->dev.dev, w_soffset, len, buf);
+  if (pool_entry->strp_num == 1)
+    err = fla_xne_sync_seq_w_nbytes(fs->dev.dev, w_soffset, len, buf);
+  else
+    err = fla_xne_sync_strp_seq_x(fs->dev.dev, w_soffset, len, buf, &sp, true);
+
   if(FLA_ERR(err, "fla_xne_sync_seq_w_nbytes()"))
     goto exit;
 
@@ -1485,11 +1521,18 @@ fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct
 
   uint64_t obj_slba = fla_object_slba(fs, obj, pool_handle);
   uint32_t obj_zn = obj_slba / fs->geo.nzsect;
-  int err = fla_xne_dev_znd_send_mgmt(fs->dev.dev, obj_slba, XNVME_SPEC_ZND_CMD_MGMT_SEND_FINISH,
-                                      false);
-  if (FLA_ERR(err, "fla_xne_dev_znd_reset()"))
-    return false;
+  struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
+  uint32_t strps = pool_entry->strp_num;
 
+  for (uint32_t strp = 0; strp < strps; strp++)
+  {
+    int err = fla_xne_dev_znd_send_mgmt(fs->dev.dev, obj_slba + (fs->geo.nzsect * strp),
+                                        XNVME_SPEC_ZND_CMD_MGMT_SEND_FINISH, false);
+    if (FLA_ERR(err, "fla_xne_dev_znd_send_mgmt_finish()"))
+      return false;
+  }
+
+  // Update me for striping
   fla_zone_full(fs, obj_zn);
   return true;
 }

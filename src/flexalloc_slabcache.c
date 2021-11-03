@@ -213,7 +213,7 @@ fla_slab_cache_elem_drop(struct fla_slab_flist_cache *cache, uint32_t slab_id)
 
 int
 fla_slab_cache_obj_alloc(struct fla_slab_flist_cache *cache, uint32_t slab_id,
-                         struct fla_object *obj_id)
+                         struct fla_object *obj_id, uint32_t num_objs)
 {
   struct fla_slab_flist_cache_elem *e = &cache->_head[slab_id];
   int err, entry_ndx;
@@ -221,7 +221,7 @@ fla_slab_cache_obj_alloc(struct fla_slab_flist_cache *cache, uint32_t slab_id,
   if (e->state == FLA_SLAB_CACHE_ELEM_STALE)
     return FLA_SLAB_CACHE_INVALID_STATE;
 
-  entry_ndx = fla_flist_entry_alloc(e->freelist);
+  entry_ndx = fla_flist_entries_alloc(e->freelist, num_objs);
   if ((err = FLA_ERR(entry_ndx < 0,
                      "fla_flist_entry_alloc() - failed to allocate an object in freelist")))
     return err;
