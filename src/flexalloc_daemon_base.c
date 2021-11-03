@@ -169,7 +169,6 @@ fla_daemon_loop(struct fla_daemon *d,
   for (i = 1; i < d->max_clients; i++)
   {
     clients[i].fd = FLA_DAEMON_FD_FREE;
-
   }
 
   while (*keep_running || active_clients)
