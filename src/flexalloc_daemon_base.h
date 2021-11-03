@@ -62,14 +62,14 @@ fla_daemon_destroy(struct fla_daemon *d);
 /**
  * Send n bytes of data from buffer buf over provided socket.
  *
- * @param socket_fd the socket file descriptor
+ * @param sock_fd the socket file descriptor
  * @param buf the data buffer
  * @param n the number of bytes to send.
  *
  * @return number of bytes sent - thus success is when the return value matches n.
  */
 ssize_t
-fla_daemon_send_bytes(int socket_fd, char *buf, size_t n);
+fla_sock_send_bytes(int sock_fd, char *buf, size_t n);
 
 
 /**

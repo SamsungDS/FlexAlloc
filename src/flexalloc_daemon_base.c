@@ -109,17 +109,17 @@ exit:
 }
 
 ssize_t
-fla_daemon_send_bytes(int socket_fd, char *buf, size_t n)
+fla_sock_send_bytes(int sock_fd, char *buf, size_t n)
 {
   ssize_t nleft = n, nwritten;
 
   while (nleft > 0)
   {
-    if ((nwritten = send(socket_fd, buf, nleft, MSG_NOSIGNAL)) <= 0)
+    if ((nwritten = send(sock_fd, buf, nleft, MSG_NOSIGNAL)) <= 0)
     {
       if (nwritten < 0 && errno == EINTR)
       {
-        nwritten = 0;   /* and call write() again */
+        nwritten = 0;   /* and retry */
       }
       else
       {
