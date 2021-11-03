@@ -286,7 +286,8 @@ fla_pool_obj_nlb(struct flexalloc const *const fs, struct fla_pool const *pool_h
 uint64_t
 fla_fs_nzsect(struct flexalloc const * const fs);
 
-bool fla_fs_zns(struct flexalloc const *const fs);
+bool
+fla_fs_zns(struct flexalloc const *const fs);
 
 /**
  *
@@ -297,8 +298,22 @@ bool fla_fs_zns(struct flexalloc const *const fs);
  * @param obj flexalloc object handle to seal
  * @return bool indicating object was successfully sealed
  */
-bool fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle,
-                     struct fla_object *obj);
+bool
+fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct fla_object *obj);
+
+/**
+ *
+ * @brief Indicate that a pool should hand out striped objects
+ *
+ * @param fs flexalloc system handle
+ * @param pool_handle flexalloc pool handle to set as being striped
+ * @param strp_num number of objects to stripe across
+ * @param strp_sz size of each stripe chunk in bytes
+ * @return int indicating if pool striping parameters were applied
+ */
+int
+fla_pool_set_strp(struct flexalloc *fs, struct fla_pool const *pool_handle, uint32_t strp_num,
+                  uint32_t strp_sz);
 
 #ifdef __cplusplus
 }

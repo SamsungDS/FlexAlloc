@@ -92,9 +92,8 @@ fla_flist_load(void *data)
 
 // find and take a spot in the freelist, returning its index
 int
-fla_flist_entry_alloc(freelist_t flist)
+fla_flist_entry_alloc(freelist_t flist, uint32_t elems)
 {
-  uint32_t elems = FLA_FREELIST_U32_ELEMS(*flist);
   uint32_t *elem;
   uint32_t wndx = 0;
 
@@ -112,6 +111,28 @@ fla_flist_entry_alloc(freelist_t flist)
     return i * sizeof(uint32_t) * 8 + ntz(wndx);
   }
   return -1;
+}
+
+int
+fla_flist_entries_alloc(freelist_t flist, unsigned int num)
+{
+  uint32_t elems = FLA_FREELIST_U32_ELEMS(*flist);
+  uint32_t alloc_count = 0;
+  int alloc_ret;
+
+  if (num == 1)
+    return fla_flist_entry_alloc(flist, elems);
+
+  while (alloc_count != num)
+  {
+    alloc_ret = fla_flist_entry_alloc(flist, elems);
+    if (alloc_ret != -1)
+      alloc_count++;
+    else
+      return alloc_ret;
+  }
+
+  return alloc_ret;
 }
 
 // release a taken element from freelist

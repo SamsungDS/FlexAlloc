@@ -10,6 +10,13 @@
 #include <libxnvme.h>
 #include <libxnvme_lba.h>
 
+struct fla_sync_strp_params
+{
+  uint32_t strp_num;
+  uint32_t strp_sz;
+  uint64_t obj_len;
+};
+
 /**
  * @brief Synchronous sequential write defined by lbs
  *
@@ -22,6 +29,10 @@
 int
 fla_xne_sync_seq_w_naddrs(struct xnvme_dev * dev, const uint64_t slba, const uint64_t naddrs,
                           void const * buf);
+
+int
+fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t nbytes,
+                        void const *buf, struct fla_sync_strp_params *sp, bool write);
 
 int
 /**
