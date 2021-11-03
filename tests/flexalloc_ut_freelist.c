@@ -172,7 +172,7 @@ test_flist_reset(uint32_t len)
 
   for (unsigned int i = 0; i < len; i++)
   {
-    if ((err = FLA_ASSERTF(fla_flist_entry_alloc(f2) == i,
+    if ((err = FLA_ASSERTF(fla_flist_entries_alloc(f2, 1) == i,
                            "expected allocation %u to succeed", i)))
       goto exit;
   }
@@ -217,9 +217,9 @@ test_flist_37_alloc_free_max()
 
   // allocate all spaces
   for (unsigned int i = 0; i < 37; i++)
-    err |= FLA_ASSERTF(fla_flist_entry_alloc(f) == i, "alloc failed for i=%u", i);
+    err |= FLA_ASSERTF(fla_flist_entries_alloc(f, 1) == i, "alloc failed for i=%u", i);
 
-  FLA_ASSERT(fla_flist_entry_alloc(f) == -1, "expected failure to allocate");
+  FLA_ASSERT(fla_flist_entries_alloc(f, 1) == -1, "expected failure to allocate");
 
   FLA_ASSERT(fla_flist_entry_free(f, 0) == 0, "expected free to work");
   FLA_ASSERT(fla_flist_entry_free(f, 1) == 0, "expected free to work");
@@ -253,9 +253,9 @@ test_alloc_free_deep()
 
   // allocate all spaces
   for (unsigned int i = 0; i < 8; i++)
-    err |= FLA_ASSERTF(fla_flist_entry_alloc(f) == i, "alloc failed for i=%u", i);
+    err |= FLA_ASSERTF(fla_flist_entries_alloc(f, 1) == i, "alloc failed for i=%u", i);
 
-  err |= FLA_ASSERT(fla_flist_entry_alloc(f) == -1, "expected failure to allocate");
+  err |= FLA_ASSERT(fla_flist_entries_alloc(f, 1) == -1, "expected failure to allocate");
   err |= FLA_ASSERT(*FLIST_ENTRY(f, 0) == 0, "expected all entries taken");
 
   err |= FLA_ASSERT(fla_flist_entry_free(f, 0) == 0, "expected free to work");
@@ -272,10 +272,10 @@ test_alloc_free_deep()
                      0));
 
   // re-alloc the free entries
-  err |= FLA_ASSERT(fla_flist_entry_alloc(f) == 0, "unexpected alloc");
-  err |= FLA_ASSERT(fla_flist_entry_alloc(f) == 1, "unexpected alloc");
-  err |= FLA_ASSERT(fla_flist_entry_alloc(f) == 5, "unexpected alloc");
-  err |= FLA_ASSERT(fla_flist_entry_alloc(f) == 7, "unexpected alloc");
+  err |= FLA_ASSERT(fla_flist_entries_alloc(f, 1) == 0, "unexpected alloc");
+  err |= FLA_ASSERT(fla_flist_entries_alloc(f, 1) == 1, "unexpected alloc");
+  err |= FLA_ASSERT(fla_flist_entries_alloc(f, 1) == 5, "unexpected alloc");
+  err |= FLA_ASSERT(fla_flist_entries_alloc(f, 1) == 7, "unexpected alloc");
 
 exit:
   if (f) free(f);

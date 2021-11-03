@@ -120,12 +120,13 @@ fla_flist_load(void *data);
  * case -1 is returned.
  *
  * @param flist freelist handle
+ * @param unsigned int num of entries to allocate
  * @return On success, a value between 0 and `len` (the freelist length)
  * indicating which element of the freelist has been reserved. On error,
  * -1, in which case no allocation was made.
  */
 int
-fla_flist_entry_alloc(freelist_t flist);
+fla_flist_entries_alloc(freelist_t flist, unsigned int num);
 
 /**
  * Free an entry from the freelist.

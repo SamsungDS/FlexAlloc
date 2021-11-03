@@ -174,6 +174,7 @@ fla_slab_cache_elem_drop(struct fla_slab_flist_cache *cache, uint32_t slab_id);
  * @param cache slab freelist cache
  * @param slab_id id of the slab to reserve an entry from
  * @param obj_id pointer to a object id struct - to be populated if operation is successful
+ * @parm strp_num Number of objects to stripe across
  *
  * @return On success 0, with obj_id set to uniquely identify the reserved object.
  * Non-zero return values indicate an error. FLA_SLAB_CACHE_INVALID_STATE means
@@ -182,7 +183,7 @@ fla_slab_cache_elem_drop(struct fla_slab_flist_cache *cache, uint32_t slab_id);
  */
 int
 fla_slab_cache_obj_alloc(struct fla_slab_flist_cache *cache, uint32_t slab_id,
-                         struct fla_object *obj_id);
+                         struct fla_object *obj_id, uint32_t strp_num);
 
 /**
  * Release object entry reservation.
