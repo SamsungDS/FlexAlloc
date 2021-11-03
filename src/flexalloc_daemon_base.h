@@ -11,6 +11,7 @@
 #include <sys/un.h>
 #include <sys/types.h>
 #include <signal.h>
+#include "flexalloc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +31,26 @@ struct fla_daemon
   struct sockaddr_un server;
   int max_clients;
   fla_daemon_msg_handler_t on_msg;
+};
+
+// maximum amount of data in a message
+#define FLA_MSG_DATA_MAX 2048
+// message buffer size - protocol mandates all messages fit within a buffer this size
+#define FLA_MSG_BUFSIZ (sizeof(struct msg_header) + FLA_MSG_DATA_MAX)
+
+/// get pointer to the message header struct
+#define FLA_MSG_HDR(x) ((struct msg_header *)*(&x))
+/// get pointer to the beginning of the data
+#define FLA_MSG_DATA(x) ( ((char *)(*(&x))) + sizeof(struct msg_header) )
+
+struct fla_daemon_client
+{
+  struct flexalloc base;
+  int sock_fd;
+  /// packed message buffer
+  char snd_buf[FLA_MSG_BUFSIZ];
+  /// packed message buffer
+  char rcv_buf[FLA_MSG_BUFSIZ];
 };
 
 
