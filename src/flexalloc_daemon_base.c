@@ -30,6 +30,17 @@ fla_max_open_files()
 }
 
 int
+fla_sock_sockaddr_init(struct sockaddr_un *socket, const char * socket_path)
+{
+  socket->sun_family = AF_UNIX;
+  if (FLA_ERR(strlen(socket_path) > sizeof(socket->sun_path) -1, "socket path too long"))
+    return -1;
+
+  strncpy(socket->sun_path, socket_path, sizeof(socket->sun_path) - 1);
+  return 0;
+}
+
+int
 fla_daemon_create(struct fla_daemon *d, char *socket_path, fla_daemon_msg_handler_t on_msg,
                   int max_clients, int conn_queue_length)
 {
@@ -43,14 +54,11 @@ fla_daemon_create(struct fla_daemon *d, char *socket_path, fla_daemon_msg_handle
   if (FLA_ERR_ERRNO(err = d->listen_fd < 0, "socket()"))
     goto exit;
 
-  d->server.sun_family = AF_UNIX;
-  if (FLA_ERR(strlen(socket_path) > sizeof(d->server.sun_path) -1, "socket path too long"))
+  if (FLA_ERR(fla_sock_sockaddr_init(&d->server, socket_path), "fla_sock_sockaddr_init()"))
   {
     err = -1;
     goto exit;
   }
-
-  strncpy(d->server.sun_path, socket_path, sizeof(d->server.sun_path) - 1);
 
   // bind socket to address
   err = bind(d->listen_fd, (struct sockaddr *)&d->server, sizeof(d->server));
