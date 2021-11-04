@@ -140,7 +140,7 @@ fla_pool_close(struct flexalloc *fs, struct fla_pool * pool);
  *
  * @param fs flexalloc system handle
  * @param pool Pool that will contain object
- * @param object Will point to created object
+ * @param object Object handle to initialize
  * @return 0 on success. non zero otherwise
  */
 int
@@ -213,7 +213,7 @@ fla_object_read(struct flexalloc const * fs, struct fla_pool const * pool,
  *
  * @param fs flexalloc system handle
  * @param pool Handle to the pool containing the obj
- * @param object Write from this object
+ * @param object Write to this object
  * @param buf Write from this buffer
  * @param offset Number of bytes from the beginning of the object where the write begins
  * @param len Number of bytes to write
