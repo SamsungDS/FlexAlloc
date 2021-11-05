@@ -19,11 +19,16 @@ extern "C" {
 
 struct msg_header
 {
-  uint32_t oplen;
-  uint32_t opcode;
+  uint32_t len;
+  uint32_t tag;
 };
 
-typedef int (*fla_daemon_msg_handler_t)(int client_fd, struct msg_header *hdr, char *msg_buf);
+#define FLA_MSG_TAG_IDENTIFY_RQ 1
+#define FLA_MSG_TAG_IDENTIFY_RSP 2
+
+struct fla_daemon;
+typedef int (*fla_daemon_msg_handler_t)(struct fla_daemon *daemon, int client_fd,
+                                        struct msg_header *hdr, char *msg_buf);
 
 struct fla_daemon
 {
@@ -91,6 +96,36 @@ fla_daemon_destroy(struct fla_daemon *d);
  */
 ssize_t
 fla_sock_send_bytes(int sock_fd, char *buf, size_t n);
+
+/**
+ * Send message to recipient over socket identified by sock_fd.
+ *
+ * Note: A message is a byte array organized as
+ * [<op code: uint32_t>, <op length: uint32_t>, <data>], and the 'op code'
+ * value corresponds to the exact byte length of the 'data' byte array.
+ *
+ * @param sock_fd the socket file descriptor of the receiving party
+ * @param msg the buffer containing the message to send
+ *
+ * @return on success 0, -1 otherwise.
+ */
+int
+fla_sock_send_msg(int sock_fd, char *msg);
+
+/**
+ * Receive message from socket identified by sock_fd.
+ *
+ * Note: A message is a byte array organized as
+ * [<op code: uint32_t>, <op length: uint32_t>, <data>], and the 'op code'
+ * value corresponds to the exact byte length of the 'data' byte array.
+ *
+ * @param sock_fd the socket file descriptor or the sender
+ * @param msg the message buffer to receive the message contents
+ *
+ * @return on success 0, -1 otherwise.
+ */
+int
+fla_sock_recv_msg(int sock_fd, char *msg);
 
 
 /**

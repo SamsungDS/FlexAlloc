@@ -19,9 +19,9 @@ sigint_handler(int _)
 }
 
 int
-echo_handler(int client_fd, struct msg_header *hdr, char *msg_buf)
+echo_handler(struct fla_daemon *d, int client_fd, struct msg_header *hdr, char *msg_buf)
 {
-  if (FLA_ERR(fla_sock_send_bytes(client_fd, msg_buf, hdr->oplen) != hdr->oplen,
+  if (FLA_ERR(fla_sock_send_bytes(client_fd, msg_buf, hdr->len) != hdr->len,
               "fla_sock_send_bytes() - failed to send message"))
     return -1;
   return 0;

@@ -10,18 +10,12 @@
 #include <stdlib.h>
 #include "flexalloc_util.h"
 #include "flexalloc_daemon_base.h"
-// TODO: remove after debugging
 #include <inttypes.h>
 
 #define BUF_SIZE 1024 * 10
 #define POLL_TIMEOUT_MS 1000
 #define FLA_DAEMON_FD_FREE -1
 #define FLA_DAEMON_POLL_INF -1
-
-// TODO: handle CTRL-C, close down properly...
-// TODO: handler fn - to make extensible
-// TODO: test with str handler, start implementing REAL handler too (real msgs, real calls, real returns.)
-// TODO: extra calls -- get pool obj nlb dimensions for read/write, probably cache on client side. (open/close pool...?)
 
 int
 fla_max_open_files()
@@ -142,6 +136,68 @@ fla_sock_send_bytes(int sock_fd, char *buf, size_t n)
   return n;
 }
 
+int
+fla_sock_send_msg(int sock_fd, char *msg)
+{
+  size_t msg_size = sizeof(struct msg_header) + FLA_MSG_HDR(msg)->len;
+  size_t sent = fla_sock_send_bytes(sock_fd, msg, msg_size);
+  if (FLA_ERR(sent != msg_size, "fla_sock_send_bytes() - sent bytes differs from msg length"))
+    return -1;
+  return 0;
+}
+
+int
+fla_sock_recv_msg(int sock_fd, char *msg)
+{
+  unsigned int retries = 3;
+  ssize_t n, nleft;
+
+retry_hdr:
+  n = recv(sock_fd, msg, sizeof(struct msg_header), MSG_PEEK | MSG_WAITALL);
+  if (n != sizeof(struct msg_header))
+  {
+    if (n > 0 || (n == -1 && errno == EINTR))
+    {
+      if (retries == 0)
+        return -1;
+      retries--;
+      goto retry_hdr;
+    }
+
+    // TODO: errno reporting
+    if (FLA_ERR_ERRNO(n == -1, "recv() - failed to receive msg header"))
+      return -errno;
+  }
+
+  // ensure message data length is not exceeding protocol limits
+  if ((FLA_MSG_HDR(msg)->len) > FLA_MSG_DATA_MAX)
+  {
+    struct msg_header *hdr = FLA_MSG_HDR(msg);
+    FLA_ERR_PRINTF("invalid msg from socket %d, hdr{tag: %"PRIu32", len: %"PRIu32"}, max len is: %d\n",
+                   sock_fd, hdr->tag, hdr->len, FLA_MSG_DATA_MAX);
+    return -2; // TODO: document, this warrants dropping the client.
+  }
+
+  nleft = sizeof(struct msg_header) + FLA_MSG_HDR(msg)->len;
+retry_data:
+  while (nleft > 0)
+  {
+    if ((n = recv(sock_fd, msg, nleft, MSG_WAITALL)) <= 0)
+    {
+      if (errno == EINTR && retries != 0)
+        goto retry_data;
+
+      return -errno; // TODO: errno reporting
+    }
+    else
+    {
+      nleft -= n;
+      msg += n;
+    }
+  }
+  return 0;
+}
+
 void
 fla_daemon_client_disconnect(struct pollfd *client, int *active_clients)
 {
@@ -158,7 +214,7 @@ fla_daemon_loop(struct fla_daemon *d,
   int max_clients_ndx, i, nready, sockfd, connfd;
   int active_clients = 0;
   struct pollfd clients[d->max_clients];
-  char buf[BUF_SIZE];
+  char buf[FLA_MSG_BUFSIZ];
   socklen_t clilen;
   struct sockaddr_un cliaddr;
   struct msg_header hdr;
@@ -252,7 +308,7 @@ fla_daemon_loop(struct fla_daemon *d,
       if (clients[i].revents & (POLLIN | POLLERR))
       {
         // read msg in two stages
-        // 1: header (length and opcode)
+        // 1: header (length and tag)
         // 2: message
         n = read(sockfd, buf, sizeof(struct msg_header));
 
@@ -280,9 +336,9 @@ fla_daemon_loop(struct fla_daemon *d,
         hdr = *((struct msg_header *)&buf);
 
         // 2: read message body
-        n = read(sockfd, buf, hdr.oplen);
+        n = read(sockfd, buf, hdr.len);
 
-        if (n != hdr.oplen)
+        if (n != hdr.len)
         {
           if (n < 0)
           {
@@ -296,13 +352,13 @@ fla_daemon_loop(struct fla_daemon *d,
           else
           {
             FLA_ERR_PRINTF("invalid message received, header indicated %"PRIu32" bytes, got %zu bytes\n",
-                           hdr.oplen, n);
+                           hdr.len, n);
           }
           fla_daemon_client_disconnect(&clients[i], &active_clients);
         }
         else
         {
-          if (FLA_ERR(d->on_msg(sockfd, &hdr, buf), "on_msg handler in fla_daemon_loop"))
+          if (FLA_ERR(d->on_msg(d, sockfd, &hdr, buf), "on_msg handler in fla_daemon_loop"))
           {
             fla_daemon_client_disconnect(&clients[i], &active_clients);
           }
@@ -317,4 +373,79 @@ fla_daemon_loop(struct fla_daemon *d,
     }
   }
   return 0;
+}
+
+// int
+// fla_get_proto(struct fla_daemon_client *client)
+// {
+//   int err;
+//   struct msg_header *hdr = FLA_MSG_HDR(client->snd_buf);
+//   //char *data = FLA_MSG_DATA(client->snd_buf);
+//
+//   hdr->tag = 1;
+//   hdr->len = 0;
+//
+//   if (FLA_ERR((err = fla_sock_send_msg(client->sock_fd, client->snd_buf)), "fla_sock_send_msg()"))
+//     return -1;
+//
+//
+// }
+
+int
+fla_daemon_identify_req(struct fla_daemon_client *client, int sock_fd)
+{
+  struct msg_header *hdr = FLA_MSG_HDR(client->snd_buf);
+  hdr->len = 0;
+  hdr->tag = FLA_MSG_TAG_IDENTIFY_RQ;
+  if (FLA_ERR(fla_sock_send_msg(sock_fd, client->snd_buf), "fla_daemon_msg_identify_req()"))
+    return -1;
+  return 0;
+}
+
+int
+fla_daemon_identify_rsp(int client_fd, char *rcv_buf, char *snd_buf)
+{
+  struct msg_header *snd_hdr = FLA_MSG_HDR(snd_buf);
+  char *data = FLA_MSG_DATA(snd_buf);
+  snd_hdr->tag = FLA_MSG_TAG_IDENTIFY_RSP;
+  snd_hdr->len = 1332323; // TODO change
+  fla_sock_send_msg(client_fd, snd_buf);
+}
+
+int
+fla_socket_open(const char *socket_path, struct fla_daemon_client *client)
+{
+  int err;
+  struct sockaddr_un server;
+
+  client->sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (FLA_ERR_ERRNO(err = client->sock_fd < 0, "socket()"))
+    goto exit;
+
+  if (FLA_ERR(err = fla_sock_sockaddr_init(&server, socket_path), "fla_sock_sockaddr_init()"))
+    goto exit;
+
+  if (FLA_ERR(err = connect(client->sock_fd, (struct sockaddr *)&server, sizeof(server)),
+              "connect()"))
+    goto exit;
+
+  FLA_DBG_PRINT("connected to server\n");
+
+  // MAYBE reset snd/rcv bufs.
+  // get version msg
+//   struct sockaddr_un server;
+//
+//   err = fla_fs_alloc(fs);
+//   if (err)
+//     return err;
+//
+//
+//   err = fla_xne_dev_open(dev_uri, NULL, &dev);
+//   if (FLA_ERR(err, "fla_xne_dev_open()"))
+//   {
+//     err = FLA_ERR_ERROR;
+//     return err;
+//   }
+exit:
+  return err;
 }
