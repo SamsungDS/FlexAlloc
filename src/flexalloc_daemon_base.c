@@ -214,10 +214,12 @@ fla_daemon_loop(struct fla_daemon *d,
   int max_clients_ndx, i, nready, sockfd, connfd;
   int active_clients = 0;
   struct pollfd clients[d->max_clients];
-  char buf[FLA_MSG_BUFSIZ];
+  char rcv_buf[FLA_MSG_BUFSIZ];
+  char snd_buf[FLA_MSG_BUFSIZ];
+  struct msg_header * const rcv_buf_hdr = FLA_MSG_HDR(rcv_buf);
+  char * const rcv_buf_data = FLA_MSG_DATA(rcv_buf);
   socklen_t clilen;
   struct sockaddr_un cliaddr;
-  struct msg_header hdr;
   size_t n;
 
   if (FLA_ERR(keep_running == NULL, "fla_daemon_loop(): keep_running argument cannot be null"))
@@ -310,7 +312,7 @@ fla_daemon_loop(struct fla_daemon *d,
         // read msg in two stages
         // 1: header (length and tag)
         // 2: message
-        n = read(sockfd, buf, sizeof(struct msg_header));
+        n = read(sockfd, rcv_buf_hdr, sizeof(struct msg_header));
 
         if (n != sizeof(struct msg_header))
         {
@@ -333,12 +335,10 @@ fla_daemon_loop(struct fla_daemon *d,
           continue;
         }
 
-        hdr = *((struct msg_header *)&buf);
-
         // 2: read message body
-        n = read(sockfd, buf, hdr.len);
+        n = read(sockfd, rcv_buf_data, rcv_buf_hdr->len);
 
-        if (n != hdr.len)
+        if (n != rcv_buf_hdr->len)
         {
           if (n < 0)
           {
@@ -352,13 +352,13 @@ fla_daemon_loop(struct fla_daemon *d,
           else
           {
             FLA_ERR_PRINTF("invalid message received, header indicated %"PRIu32" bytes, got %zu bytes\n",
-                           hdr.len, n);
+                           rcv_buf_hdr->len, n);
           }
           fla_daemon_client_disconnect(&clients[i], &active_clients);
         }
         else
         {
-          if (FLA_ERR(d->on_msg(d, sockfd, &hdr, buf), "on_msg handler in fla_daemon_loop"))
+          if (FLA_ERR(d->on_msg(d, sockfd, rcv_buf, snd_buf), "on_msg handler in fla_daemon_loop"))
           {
             fla_daemon_client_disconnect(&clients[i], &active_clients);
           }

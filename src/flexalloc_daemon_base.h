@@ -28,7 +28,7 @@ struct msg_header
 
 struct fla_daemon;
 typedef int (*fla_daemon_msg_handler_t)(struct fla_daemon *daemon, int client_fd,
-                                        struct msg_header *hdr, char *msg_buf);
+                                        char *recv_buf, char *send_buf);
 
 struct fla_daemon
 {

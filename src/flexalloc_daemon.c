@@ -19,10 +19,10 @@ sigint_handler(int _)
 }
 
 int
-echo_handler(struct fla_daemon *d, int client_fd, struct msg_header *hdr, char *msg_buf)
+echo_handler(struct fla_daemon *d, int client_fd, char *recv_buf, char *send_buf)
 {
-  if (FLA_ERR(fla_sock_send_bytes(client_fd, msg_buf, hdr->len) != hdr->len,
-              "fla_sock_send_bytes() - failed to send message"))
+  // echo, thus use recv buf directly
+  if (FLA_ERR(fla_sock_send_msg(client_fd, recv_buf), "fla_sock_send_msg()"))
     return -1;
   return 0;
 }
