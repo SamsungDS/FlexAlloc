@@ -17,21 +17,55 @@
 extern "C" {
 #endif
 
-struct msg_header
+struct fla_msg_header
 {
+  /// byte-length of the *data* segment of the message
   uint32_t len;
-  uint32_t tag;
+  /// the code identifying the type of command
+  uint16_t cmd;
+  /// a (optional) tag the client may use to correlate specific requests and replies.
+  uint16_t tag;
 };
 
-#define FLA_MSG_TAG_IDENTIFY_RQ 1
-#define FLA_MSG_TAG_IDENTIFY_RSP 2
+struct fla_msg
+{
+  /// header-portion of the message buffer
+  struct fla_msg_header *hdr;
+  /// data-portion of the message buffer
+  char *data;
+};
+
+#define FLA_MSG_CMD_IDENTIFY 1
+#define FLA_MSG_CMD_SYNC 2
+
+#define FLA_MSG_CMD_POOL_OPEN 3
+#define FLA_MSG_CMD_POOL_CLOSE 4
+#define FLA_MSG_CMD_POOL_CREATE 5
+#define FLA_MSG_CMD_POOL_DESTROY 6
+#define FLA_MSG_CMD_POOL_SET_ROOT_OBJECT 7
+#define FLA_MSG_CMD_POOL_GET_ROOT_OBJECT 8
+
+#define FLA_MSG_CMD_OBJECT_OPEN 9
+#define FLA_MSG_CMD_OBJECT_CREATE 10
+#define FLA_MSG_CMD_OBJECT_DESTROY 11
 
 struct fla_daemon;
 typedef int (*fla_daemon_msg_handler_t)(struct fla_daemon *daemon, int client_fd,
-                                        char *recv_buf, char *send_buf);
+                                        struct fla_msg const * const recv, struct fla_msg const * const send);
+
+struct fla_sys_identity
+{
+  uint32_t type;
+  uint32_t version;
+};
+
+#define FLA_SYS_FLEXALLOC_TYPE 1000
+#define FLA_SYS_FLEXALLOC_V1 1
 
 struct fla_daemon
 {
+  struct flexalloc base;
+  struct fla_sys_identity identity;
   int listen_fd;
   struct sockaddr_un server;
   int max_clients;
@@ -41,21 +75,26 @@ struct fla_daemon
 // maximum amount of data in a message
 #define FLA_MSG_DATA_MAX 2048
 // message buffer size - protocol mandates all messages fit within a buffer this size
-#define FLA_MSG_BUFSIZ (sizeof(struct msg_header) + FLA_MSG_DATA_MAX)
+#define FLA_MSG_BUFSIZ (sizeof(struct fla_msg_header) + FLA_MSG_DATA_MAX)
 
 /// get pointer to the message header struct
-#define FLA_MSG_HDR(x) ((struct msg_header *)*(&x))
+#define FLA_MSG_HDR(x) ((struct fla_msg_header *)*(&x))
 /// get pointer to the beginning of the data
-#define FLA_MSG_DATA(x) ( ((char *)(*(&x))) + sizeof(struct msg_header) )
+#define FLA_MSG_DATA(x) ( ((char *)(*(&x))) + sizeof(struct fla_msg_header) )
 
 struct fla_daemon_client
 {
   struct flexalloc base;
+  struct fla_sys_identity server_version;
   int sock_fd;
+  /// view into send buffer
+  struct fla_msg send;
+  /// view into recv buffer
+  struct fla_msg recv;
   /// packed message buffer
-  char snd_buf[FLA_MSG_BUFSIZ];
+  char send_buf[FLA_MSG_BUFSIZ];
   /// packed message buffer
-  char rcv_buf[FLA_MSG_BUFSIZ];
+  char recv_buf[FLA_MSG_BUFSIZ];
 };
 
 
@@ -92,9 +131,10 @@ fla_daemon_destroy(struct fla_daemon *d);
  * @param buf the data buffer
  * @param n the number of bytes to send.
  *
- * @return number of bytes sent - thus success is when the return value matches n.
+ * @return 0 on success, positive values are application-specific, negative
+ *         values are negated errno codes.
  */
-ssize_t
+int
 fla_sock_send_bytes(int sock_fd, char *buf, size_t n);
 
 /**
@@ -110,7 +150,7 @@ fla_sock_send_bytes(int sock_fd, char *buf, size_t n);
  * @return on success 0, -1 otherwise.
  */
 int
-fla_sock_send_msg(int sock_fd, char *msg);
+fla_sock_send_msg(int sock_fd, struct fla_msg const * const msg);
 
 /**
  * Receive message from socket identified by sock_fd.
@@ -125,7 +165,7 @@ fla_sock_send_msg(int sock_fd, char *msg);
  * @return on success 0, -1 otherwise.
  */
 int
-fla_sock_recv_msg(int sock_fd, char *msg);
+fla_sock_recv_msg(int sock_fd, struct fla_msg const * const msg);
 
 
 /**
@@ -143,6 +183,45 @@ fla_sock_recv_msg(int sock_fd, char *msg);
 int
 fla_daemon_loop(struct fla_daemon *d,
                 volatile sig_atomic_t *keep_running);
+
+
+int
+fla_daemon_identify_rq(struct fla_daemon_client *client, int sock_fd,
+                       struct fla_sys_identity **identity);
+
+int
+fla_daemon_identify_rsp(struct fla_daemon *daemon, int client_fd,
+                        struct fla_msg const * const recv,
+                        struct fla_msg const * const send);
+
+int
+fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, uint32_t obj_nlb,
+                          struct fla_pool **handle);
+
+int
+fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
+                           struct fla_msg const * const recv,
+                           struct fla_msg const * const send);
+
+int
+fla_socket_open(const char * socket_path, struct fla_daemon_client * client);
+
+int
+fla_daemon_sync_rq(struct flexalloc *fs);
+
+int
+fla_daemon_sync_rsp(struct fla_daemon *daemon, int client_fd,
+                    struct fla_msg const * const recv,
+                    struct fla_msg const * const send);
+
+int
+fla_daemon_close_rq(struct flexalloc *fs);
+
+int
+fla_daemon_close_rsp(struct fla_daemon *daemon, int client_fd,
+                     struct fla_msg const * const recv,
+                     struct fla_msg const * const send);
+
 
 #ifdef __cplusplus
 }
