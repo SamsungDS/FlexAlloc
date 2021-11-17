@@ -256,5 +256,15 @@ uint64_t
 fla_object_slba(struct flexalloc const * fs, struct fla_object const * obj,
                 const struct fla_pool * pool_handle);
 
+/**
+ * @brief Opens a flexalloc device
+ *
+ * @param dev_uri path of the device to open
+ * @param fs (uninitialized) flexalloc system handle
+ * @return on success, 0 with *fs being initialized, non-zero otherwise.
+ */
+int
+fla_open_common(char const *dev_uri, struct flexalloc *fs);
+
 #endif // __FLEXALLOC_MM_H_
 
