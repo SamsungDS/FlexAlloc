@@ -39,7 +39,9 @@ executable('mkfs.flexalloc', ['src/flexalloc_mkfs.c', 'src/flexalloc_cli_common.
   dependencies: xnvme_deps, install : true)
 executable('flexalloc_inspect', ['src/flexalloc_inspect.c', 'src/flexalloc_cli_common.c',
   flexalloc_introspect, flexalloc_common], dependencies: xnvme_deps)
-executable('flexalloc_daemon', ['src/flexalloc_daemon.c', flexalloc_common, 'src/flexalloc_daemon_base.c'], dependencies: xnvme_deps)
+executable('flexalloc_daemon', ['src/flexalloc_daemon.c', flexalloc_common, 'src/flexalloc_daemon_base.c', libflexalloc_files], dependencies: xnvme_deps)
+executable('flexalloc_daemon_echo', ['src/flexalloc_daemon_echo.c', flexalloc_common, 'src/flexalloc_daemon_base.c'], dependencies: xnvme_deps)
+executable('flexalloc_client', ['src/flexalloc_test_client.c', flexalloc_common, 'src/flexalloc_daemon_base.c', libflexalloc_files], dependencies: [xnvme_deps])
 
 ### Libraries ###
 library = both_libraries('flexalloc', [libflexalloc_files],
