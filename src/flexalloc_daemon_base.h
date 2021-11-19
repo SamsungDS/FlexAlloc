@@ -97,6 +97,12 @@ struct fla_daemon_client
   char recv_buf[FLA_MSG_BUFSIZ];
 };
 
+/// get fla_daemon_client reference from flexalloc struct
+static inline struct fla_daemon_client *fla_get_client(struct flexalloc const * const fs)
+{
+  return (struct fla_daemon_client *)fs;
+}
+
 
 int
 fla_max_open_files();
@@ -187,7 +193,7 @@ fla_daemon_loop(struct fla_daemon *d,
 
 int
 fla_daemon_identify_rq(struct fla_daemon_client *client, int sock_fd,
-                       struct fla_sys_identity **identity);
+                       struct fla_sys_identity *identity);
 
 int
 fla_daemon_identify_rsp(struct fla_daemon *daemon, int client_fd,

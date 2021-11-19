@@ -11,6 +11,9 @@
 #include <stdlib.h>
 #include "flexalloc_util.h"
 #include "flexalloc_daemon_base.h"
+#include "src/flexalloc.h"
+#include "src/flexalloc_mm.h"
+#include "src/flexalloc_shared.h"
 #include <inttypes.h>
 
 #define BUF_SIZE 1024 * 10
@@ -141,16 +144,24 @@ fla_sock_send_bytes(int sock_fd, char *buf, size_t n)
 int
 fla_sock_send_msg(int sock_fd, struct fla_msg const * const msg)
 {
+  int err;
   size_t msg_size = sizeof(struct fla_msg_header) + msg->hdr->len;
-  ssize_t sent = fla_sock_send_bytes(sock_fd, (char *)msg->hdr, msg_size);
+  err = fla_sock_send_bytes(sock_fd, (char *)msg->hdr, msg_size);
   FLA_DBG_PRINTF("fla_sock_send_msg {len: %"PRIu32" cmd: %"PRIu16", tag: %"PRIu16"}\n", msg->hdr->len,
                  msg->hdr->cmd, msg->hdr->tag);
-  if (FLA_ERR(sent != msg_size, "fla_sock_send_bytes() - sent bytes differs from msg length"))
+  if (err)
   {
-    FLA_ERR_PRINTF("  sent(%zu), msg_size(%zu)\n", sent, msg_size);
-    return 1;
+    if (err < 0)
+    {
+      FLA_ERR_PRINTF("fla_sock_send_msg() - error sending message, errno code: %d\n", -err);
+    }
+    else
+    {
+      FLA_ERR_PRINT("fla_sock_send_msg() - error sending message\n")
+    }
   }
-  return 0;
+
+  return err;
 }
 
 int
@@ -172,9 +183,11 @@ retry_hdr:
       goto retry_hdr;
     }
 
-    // TODO: errno reporting
-    if (FLA_ERR_ERRNO(n == -1, "recv() - failed to receive msg header"))
+    if (n == -1)
+    {
+      FLA_ERR_PRINTF("recv() - error receiving message header (errno: %d)\n", errno);
       return -errno;
+    }
   }
   FLA_DBG_PRINTF("fla_sock_recv_msg {len: %"PRIu32" cmd: %"PRIu16", tag: %"PRIu16"}\n", msg->hdr->len,
                  msg->hdr->cmd, msg->hdr->tag);
@@ -194,9 +207,13 @@ retry_data:
     if ((n = recv(sock_fd, (char *)msg->hdr, nleft, MSG_WAITALL)) <= 0)
     {
       if (errno == EINTR && retries != 0)
+      {
+        retries--;
         goto retry_data;
+      }
 
-      return -errno; // TODO: errno reporting
+      FLA_ERR_PRINTF("recv() - error receiving message payload (errno: %d)\n", errno);
+      return -errno;
     }
     else
     {
@@ -398,23 +415,36 @@ fla_daemon_loop(struct fla_daemon *d,
   return 0;
 }
 
+
+int
+fla_send_recv(struct fla_daemon_client *client)
+{
+  int err;
+  err = fla_sock_send_msg(client->sock_fd, &client->send);
+  if (FLA_ERR(err, "fla_sock_send_msg()"))
+    goto exit;
+
+  err = fla_sock_recv_msg(client->sock_fd, &client->recv);
+  if (FLA_ERR(err, "fla_sock_recv_msg()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
 int
 fla_daemon_identify_rq(struct fla_daemon_client *client, int sock_fd,
-                       struct fla_sys_identity **identity)
+                       struct fla_sys_identity *identity)
 {
   int err;
   client->send.hdr->len = 0;
   client->send.hdr->cmd = FLA_MSG_CMD_IDENTIFY;
 
-  err = fla_sock_send_msg(sock_fd, &client->send);
-  if (FLA_ERR(err, "fla_sock_send_msg()"))
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
     return err;
 
-  err = fla_sock_recv_msg(sock_fd, &client->recv);
-  if (FLA_ERR(err, "fla_sock_recv_msg()"))
-    return err;
-
-  *identity = (struct fla_sys_identity *)client->recv.data;
+  memcpy(identity, client->recv.data, sizeof(struct fla_sys_identity));
 
   return 0;
 }
@@ -436,30 +466,87 @@ fla_daemon_identify_rsp(struct fla_daemon *daemon, int client_fd,
 }
 
 int
-fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, uint32_t obj_nlb,
-                          struct fla_pool **handle)
+fla_daemon_close_rq(struct flexalloc *fs)
+{
+  int err;
+  struct fla_daemon_client *client = (struct fla_daemon_client *)fs;
+  struct fla_msg_header *send_hdr = FLA_MSG_HDR(client->send_buf);
+
+  if (client->sock_fd == 0)
+    return 0; /* ensure operation idempotency */
+
+  send_hdr->cmd = FLA_MSG_CMD_SYNC;
+  send_hdr->len = 0;
+  err = fla_sock_send_msg(client->sock_fd, &client->send);
+  if (FLA_ERR(err, "fla_sock_send_msg()"))
+    return err;
+
+  close(client->sock_fd);
+  client->sock_fd = 0;
+  return 0;
+}
+
+int
+fla_daemon_close_rsp(struct fla_daemon *daemon, int client_fd,
+                     struct fla_msg const * const recv,
+                     struct fla_msg const * const send)
+{
+  int err;
+  err = daemon->base.fns.close(&daemon->base);
+  *((int *)send->data) = err;
+
+  send->hdr->len = sizeof(int);
+  err = fla_sock_send_msg(client_fd, send);
+  if (FLA_ERR(err, "fla_sock_send_msg()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_sync_rq(struct flexalloc *fs)
 {
   int err;
   struct fla_daemon_client *client = (struct fla_daemon_client *)fs;
 
-  // write message to buffer
-  *((uint32_t *)client->send.data) = obj_nlb;
-  memcpy((client->send.data + sizeof(obj_nlb)), name, name_len);
-  client->send.hdr->len = sizeof(uint32_t) + name_len;
-  client->send.hdr->cmd = FLA_MSG_CMD_POOL_CREATE;
+  client->send.hdr->len = 0;
+  client->send.hdr->cmd = FLA_MSG_CMD_SYNC;
 
-  err = fla_sock_send_msg(client->sock_fd, &client->send);
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    return err;
+
+  return 0;
+}
+
+int
+fla_daemon_sync_rsp(struct fla_daemon *daemon, int client_fd,
+                    struct fla_msg const * const recv,
+                    struct fla_msg const * const send)
+{
+  int err;
+  err = daemon->base.fns.sync(&daemon->base);
+  *((int *)send->data) = err;
+
+  send->hdr->len = sizeof(int);
+  err = fla_sock_send_msg(client_fd, send);
   if (FLA_ERR(err, "fla_sock_send_msg()"))
     goto exit;
 
-  err = fla_sock_recv_msg(client->sock_fd, &client->recv);
-  if (FLA_ERR(err, "fla_sock_recv_msg()"))
-    goto exit;
+exit:
+  return err;
+}
 
-  // did operation succeed ?
-  err = *((int *)client->recv.data);
-  if (FLA_ERR(err, "pool_create()"))
-    goto exit;
+int
+fla_daemon_pool_open_rq(struct flexalloc *fs, char const *name, struct fla_pool **handle)
+{
+  int err;
+  struct fla_daemon_client *client = fla_get_client(fs);
+  size_t name_len = strnlen((char *)name, FLA_NAME_SIZE_POOL);
+  if (FLA_ERR(name_len == FLA_NAME_SIZE_POOL,
+              "invalid, pool name exceeds max length or is not null-terminated"))
+    return 1;
 
   (*handle) = malloc(sizeof(struct fla_pool));
   if (FLA_ERR(!(*handle), "malloc()"))
@@ -468,12 +555,113 @@ fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, 
     goto exit;
   }
 
+  // write message to buffer
+  memcpy(client->send.data, name, name_len);
+  client->send.hdr->len = name_len;
+  client->send.hdr->cmd = FLA_MSG_CMD_POOL_OPEN;
+
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    goto exit;
+
+  // did operation succeed ?
+  err = *((int *)client->recv.data);
+  if (FLA_ERR(err, "pool_open()"))
+    goto exit;
+
+
   // copy response from buffer to allocated structure
-  **handle = *((struct fla_pool *) (client->recv.data + sizeof(int)));
+  memcpy(*handle, client->recv.data + sizeof(int), sizeof(struct fla_pool));
 
   return 0;
 
 exit:
+  if (err && *handle != NULL)
+  {
+    free(*handle);
+    *handle = NULL;
+  }
+  return err;
+}
+
+int
+fla_daemon_pool_open_rsp(struct fla_daemon *daemon, int client_fd,
+                         struct fla_msg const * const recv,
+                         struct fla_msg const * const send)
+{
+  int err;
+  char *name = recv->data;
+  // int name_len = recv->hdr->len; // API does not require this at the moment
+  struct fla_pool **handle = NULL;
+
+  err = daemon->base.fns.pool_open(&daemon->base, name, handle);
+  *((int *)send->data) = err;
+  send->hdr->len = sizeof(err);
+
+  if (FLA_ERR(err, "pool_open()"))
+  {
+    send->hdr->len = sizeof(int);
+  }
+  else
+  {
+    send->hdr->len = sizeof(int) + sizeof(struct fla_pool);
+    memcpy(send->data + sizeof(int), *handle, sizeof(struct fla_pool));
+  }
+
+  if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
+    goto exit;
+
+exit:
+  if (*handle != NULL) // TODO: change API to not allocate the handle
+    free(*handle);
+  return err;
+}
+
+void
+fla_daemon_pool_close_rq(struct flexalloc *fs, struct fla_pool *handle)
+{
+  // could do ref-counting on the daemon side if we sent a message back.
+  free(handle);
+}
+
+int
+fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, uint32_t obj_nlb,
+                          struct fla_pool **handle)
+{
+  int err;
+  struct fla_daemon_client *client = fla_get_client(fs);
+
+  (*handle) = malloc(sizeof(struct fla_pool));
+  if (FLA_ERR(!(*handle), "malloc()"))
+  {
+    err = -ENOMEM;
+    goto exit;
+  }
+
+  // write message to buffer
+  *((uint32_t *)client->send.data) = obj_nlb;
+  memcpy(client->send.data + sizeof(obj_nlb), name, name_len);
+  client->send.hdr->len = sizeof(uint32_t) + name_len;
+  client->send.hdr->cmd = FLA_MSG_CMD_POOL_CREATE;
+
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    goto exit;
+
+  // did operation succeed ?
+  err = *((int *)client->recv.data);
+  if (FLA_ERR(err, "pool_create()"))
+    goto exit;
+
+  // copy response from buffer to allocated structure
+  memcpy(*handle, client->recv.data + sizeof(int), sizeof(struct fla_pool));
+
+exit:
+  if (err && *handle != NULL)
+  {
+    free(*handle);
+    *handle = NULL;
+  }
   return err;
 }
 
@@ -505,42 +693,50 @@ fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
     goto exit;
 
 exit:
-  if (handle != NULL)
-    free(handle);
+  if (*handle != NULL) // TODO: change API to not allocate the handle
+    free(*handle);
   return err;
 }
 
 int
-fla_daemon_sync_rq(struct flexalloc *fs)
+fla_daemon_pool_destroy_rq(struct flexalloc *fs, struct fla_pool *handle)
 {
   int err;
-  struct fla_daemon_client *client = (struct fla_daemon_client *)fs;
+  struct fla_daemon_client *client = fla_get_client(fs);
+  memcpy(client->send.data, handle, sizeof(struct fla_pool));
+  client->send.hdr->len = sizeof(struct fla_pool);
+  client->send.hdr->cmd = FLA_MSG_CMD_POOL_DESTROY;
 
-  client->send.hdr->len = 0;
-
-  err = fla_sock_send_msg(client->sock_fd, &client->send);
+  err = fla_send_recv(client);
   if (FLA_ERR(err, "fla_sock_send_msg()"))
-    return err;
+    goto exit;
 
-  err = fla_sock_recv_msg(client->sock_fd, &client->send);
-  if (FLA_ERR(err, "fla_sock_recv_msg()"))
-    return err;
-
-  return 0;
+  // did operation succeed ?
+  err = *((int *)client->recv.data);
+exit:
+  return err;
 }
 
 int
-fla_daemon_sync_rsp(struct fla_daemon *daemon, int client_fd,
-                    struct fla_msg const * const recv,
-                    struct fla_msg const * const send)
+fla_daemon_pool_destroy_rsp(struct fla_daemon *daemon, int client_fd,
+                            struct fla_msg const * const recv,
+                            struct fla_msg const * const send)
 {
   int err;
-  err = daemon->base.fns.sync(&daemon->base);
-  *((int *)send->data) = err;
+  struct fla_pool *pool = (struct fla_pool*)recv->data;
 
+  if (FLA_ERR(recv->hdr->len != sizeof(struct fla_pool), "invalid message length"))
+  {
+    FLA_DBG_PRINTF("expected message to contain a 'struct fla_pool' (%zdB), but message length is %"PRIu32"B\n",
+                   sizeof(struct fla_pool), recv->hdr->len);
+    return 1;
+  }
+
+  err = daemon->base.fns.pool_destroy(&daemon->base, pool);
+  *((int *)send->data) = err;
   send->hdr->len = sizeof(int);
-  err = fla_sock_send_msg(client_fd, send);
-  if (FLA_ERR(err, "fla_sock_send_msg()"))
+
+  if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
     goto exit;
 
 exit:
@@ -548,38 +744,264 @@ exit:
 }
 
 int
-fla_daemon_close_rq(struct flexalloc *fs)
+fla_daemon_object_open_rq(struct flexalloc *fs, struct fla_pool *pool,
+                          struct fla_object *object)
 {
   int err;
-  struct fla_daemon_client *client = (struct fla_daemon_client *)fs;
-  struct fla_msg_header *send_hdr = FLA_MSG_HDR(client->send_buf);
+  struct fla_daemon_client *client = fla_get_client(fs);
 
-  if (client->sock_fd == 0)
-    return 0;
+  memcpy(client->send.data, pool, sizeof(struct fla_pool));
+  memcpy(client->send.data + sizeof(struct fla_pool), object, sizeof(struct fla_object));
+  client->send.hdr->len = sizeof(struct fla_pool) + sizeof(struct fla_object);
+  client->send.hdr->cmd = FLA_MSG_CMD_OBJECT_OPEN;
 
-  send_hdr->cmd = FLA_MSG_CMD_SYNC;
-  send_hdr->len = 0;
-  err = fla_sock_send_msg(client->sock_fd, &client->send);
-  if (FLA_ERR(err, "fla_sock_send_msg()"))
-    return err;
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    goto exit;
 
-  close(client->sock_fd);
-  client->sock_fd = 0;
-  return 0;
+  // did the operation succeed ?
+  err = *((int *)client->recv.data);
+  if (FLA_ERR(err, "object_open()"))
+    goto exit;
+
+exit:
+  return err;
 }
 
 int
-fla_daemon_close_rsp(struct fla_daemon *daemon, int client_fd,
-                     struct fla_msg const * const recv,
-                     struct fla_msg const * const send)
+fla_daemon_object_open_rsp(struct fla_daemon *daemon, int client_fd,
+                           struct fla_msg const * const recv,
+                           struct fla_msg const * const send)
 {
   int err;
-  err = daemon->base.fns.close(&daemon->base);
+  struct fla_pool *pool = (struct fla_pool*)recv->data;
+  struct fla_object *object = (struct fla_object *) (recv->data + sizeof(struct fla_pool));
+
+  err = daemon->base.fns.object_open(&daemon->base, pool, object);
+  if (FLA_ERR(err, "object_open()"))
+  {
+    FLA_DBG_PRINTF("failed to open object{slab_id: %"PRIu32", entry_ndx: %"PRIu32"}\n", object->slab_id,
+                   object->entry_ndx);
+  }
+
+  *((int *)send->data) = err;
+  send->hdr->len = sizeof(err);
+
+  if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_object_create_rq(struct flexalloc *fs, struct fla_pool *pool,
+                            struct fla_object *object)
+{
+  int err;
+  struct fla_daemon_client *client = fla_get_client(fs);
+
+  memcpy(client->send.data, pool, sizeof(struct fla_pool));
+  client->send.hdr->len = sizeof(struct fla_pool);
+  client->send.hdr->cmd = FLA_MSG_CMD_OBJECT_CREATE;
+
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    goto exit;
+
+  // did operation succeed ?
+  err = *((int *)client->recv.data);
+  if (FLA_ERR(err, "object_create()"))
+    goto exit;
+
+  memcpy(object, client->recv.data + sizeof(int), sizeof(struct fla_object));
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_object_create_rsp(struct fla_daemon *daemon, int client_fd,
+                             struct fla_msg const * const recv,
+                             struct fla_msg const * const send)
+{
+  int err;
+  struct fla_pool *pool = (struct fla_pool *)recv->data;
+  struct fla_object object;
+
+  err = daemon->base.fns.object_create(&daemon->base, pool, &object);
   *((int *)send->data) = err;
 
+  if (FLA_ERR(err, "object_create()"))
+  {
+    send->hdr->len = sizeof(int);
+  }
+  else
+  {
+    send->hdr->len = sizeof(int) + sizeof(struct fla_object);
+    memcpy(send->data + sizeof(int), &object, sizeof(struct fla_object));
+  }
+
+  if (FLA_ERR(err = fla_sock_send_msg(client_fd, send), "fla_sock_send_msg()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_object_destroy_rq(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *object)
+{
+  int err;
+  struct fla_daemon_client *client = fla_get_client(fs);
+
+  memcpy(client->send.data, pool, sizeof(struct fla_pool));
+  memcpy(client->send.data + sizeof(struct fla_pool), object, sizeof(struct fla_object));
+  client->send.hdr->len = sizeof(struct fla_pool) + sizeof(struct fla_object);
+  client->send.hdr->cmd = FLA_MSG_CMD_OBJECT_DESTROY;
+
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    goto exit;
+
+  // did the operation succeed ?
+  err = *((int *)client->recv.data);
+  if (FLA_ERR(err, "object_destroy()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
+
+int
+fla_daemon_object_destroy_rsp(struct fla_daemon *daemon, int client_fd,
+                              struct fla_msg const * const recv,
+                              struct fla_msg const * const send)
+{
+  int err;
+  struct fla_pool *pool = (struct fla_pool *)recv->data;
+  struct fla_object *object = (struct fla_object *)(recv->data + sizeof(struct fla_pool));
+
+  err = daemon->base.fns.object_destroy(&daemon->base, pool, object);
+  if (FLA_ERR(err, "object_destroy()"))
+  {} // nothing to do
+
+  *((int *)send->data) = err;
+  send->hdr->len = sizeof(err);
+
+  if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_pool_set_root_object_rq(struct flexalloc const * const fs,
+                                   struct fla_pool const * pool,
+                                   struct fla_object const * object,
+                                   fla_root_object_set_action action)
+{
+  int err;
+  struct fla_daemon_client *client = fla_get_client(fs);
+  char *data = client->send.data;
+
+  memcpy(data, pool, sizeof(struct fla_pool));
+  data += sizeof(struct fla_pool);
+  memcpy(data, object, sizeof(struct fla_object));
+  data += sizeof(struct fla_object);
+  memcpy(data, &action, sizeof(action));
+
+  client->send.hdr->len = sizeof(struct fla_pool) + sizeof(struct fla_object) + sizeof(action);
+  client->send.hdr->cmd = FLA_MSG_CMD_POOL_SET_ROOT_OBJECT;
+
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    goto exit;
+
+  // did operation succeed ?
+  err = *((int *)client->recv.data);
+  if (FLA_ERR(err, "pool_set_root_object()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_pool_set_root_object_rsp(struct fla_daemon *daemon, int client_fd,
+                                    struct fla_msg const * const recv,
+                                    struct fla_msg const * const send)
+{
+  int err;
+  char *recv_data = recv->data;
+
+  struct fla_pool *pool = (struct fla_pool*)recv_data;
+  recv_data += sizeof(struct fla_pool);
+  struct fla_object *object = (struct fla_object *)recv_data;
+  recv_data += sizeof(struct fla_object);
+  fla_root_object_set_action *action = (fla_root_object_set_action *)recv_data;
+
+  err = daemon->base.fns.pool_set_root_object(&daemon->base, pool, object, *action);
+  *((int *)send->data) = err;
   send->hdr->len = sizeof(int);
-  err = fla_sock_send_msg(client_fd, send);
-  if (FLA_ERR(err, "fla_sock_send_msg()"))
+
+  if (FLA_ERR(err = fla_sock_send_msg(client_fd, send), "fla_sock_send_msg()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_pool_get_root_object_rq(struct flexalloc const * const fs,
+                                   struct fla_pool const * pool,
+                                   struct fla_object *object)
+{
+  int err;
+  struct fla_daemon_client *client = fla_get_client(fs);
+
+  memcpy(client->send.data, pool, sizeof(struct fla_pool));
+  client->send.hdr->len = sizeof(struct fla_pool);
+  client->send.hdr->cmd = FLA_MSG_CMD_POOL_GET_ROOT_OBJECT;
+
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    goto exit;
+
+  // did operation succeed ?
+  err = *((int *)client->recv.data);
+  if (FLA_ERR(err, "pool_get_root_object()"))
+    goto exit;
+
+  memcpy(object, client->recv.data+sizeof(int), sizeof(struct fla_object));
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_pool_get_root_object_rsp(struct fla_daemon *daemon, int client_fd,
+                                    struct fla_msg const * const recv,
+                                    struct fla_msg const * const send)
+{
+  int err;
+  struct fla_pool *pool = (struct fla_pool *)recv->data;
+  struct fla_object object;
+
+  err = daemon->base.fns.pool_get_root_object(&daemon->base, pool, &object);
+  if (FLA_ERR(err, "pool_get_root_object()"))
+  {
+    send->hdr->len = sizeof(int);
+  }
+  else
+  {
+    send->hdr->len = sizeof(int) + sizeof(struct fla_object);
+    memcpy(send->data + sizeof(int), &object, sizeof(struct fla_object));
+  }
+
+  if (FLA_ERR(err = fla_sock_send_msg(client_fd, send), "fla_sock_send_msg()"))
     goto exit;
 
 exit:
@@ -590,15 +1012,15 @@ struct fla_fns client_fns =
 {
   .close = &fla_daemon_close_rq,
   .sync = &fla_daemon_sync_rq,
-  // .pool_open = &fla_base_pool_open,
-  // .pool_close = &fla_base_pool_close,
+  .pool_open = &fla_daemon_pool_open_rq,
+  .pool_close = &fla_daemon_pool_close_rq,
   .pool_create = &fla_daemon_pool_create_rq,
-  // .pool_destroy = &fla_base_pool_destroy,
-  // .object_open = &fla_base_object_open,
-  // .object_create = &fla_base_object_create,
-  // .object_destroy = &fla_base_object_destroy,
-  // .pool_set_root_object = &fla_base_pool_set_root_object,
-  // .pool_get_root_object = &fla_base_pool_get_root_object,
+  .pool_destroy = &fla_daemon_pool_destroy_rq,
+  .object_open = &fla_daemon_object_open_rq,
+  .object_create = &fla_daemon_object_create_rq,
+  .object_destroy = &fla_daemon_object_destroy_rq,
+  .pool_set_root_object = &fla_daemon_pool_set_root_object_rq,
+  .pool_get_root_object = &fla_daemon_pool_get_root_object_rq,
 };
 
 int
@@ -606,7 +1028,6 @@ fla_socket_open(const char *socket_path, struct fla_daemon_client *client)
 {
   int err;
   struct sockaddr_un server;
-  struct fla_sys_identity *identity = NULL;
 
   client->sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (FLA_ERR_ERRNO(err = client->sock_fd < 0, "socket()"))
@@ -625,14 +1046,12 @@ fla_socket_open(const char *socket_path, struct fla_daemon_client *client)
   client->recv.data = FLA_MSG_DATA(client->recv_buf);
 
   FLA_DBG_PRINT("connected to server!!\n");
-  if (FLA_ERR(fla_daemon_identify_rq(client, client->sock_fd, &identity),
-              "fla_daemon_identity_req()"))
+  if (FLA_ERR(fla_daemon_identify_rq(client, client->sock_fd, &client->server_version),
+              "fla_daemon_identify_rq()"))
     return 0;
 
-  FLA_DBG_PRINTF("identity{type: %"PRIu32", version: %"PRIu32"}\n", identity->type,
-                 identity->version);
-
-  client->server_version = *identity;
+  FLA_DBG_PRINTF("identity{type: %"PRIu32", version: %"PRIu32"}\n", client->server_version.type,
+                 client->server_version.version);
 
   client->base.fns = client_fns;
 
