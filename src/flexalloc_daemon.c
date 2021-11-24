@@ -24,17 +24,53 @@ sigint_handler(int _)
 }
 
 int
-msg_handler(struct fla_daemon *d, int client_fd, struct fla_msg const * const recv, struct fla_msg const * const send)
+msg_handler(struct fla_daemon *d, int client_fd, struct fla_msg const * const recv,
+            struct fla_msg const * const send)
 {
-  FLA_DBG_PRINTF("received msg hdr: {cmd: %"PRIu32", len: %"PRIu32"}\n", recv->hdr->cmd, recv->hdr->len);
+  FLA_DBG_PRINTF("received msg hdr: {cmd: %"PRIu32", len: %"PRIu32"}\n", recv->hdr->cmd,
+                 recv->hdr->len);
   switch (recv->hdr->cmd)
   {
-  case FLA_MSG_CMD_IDENTIFY:
-    if (FLA_ERR(fla_daemon_identify_rsp(d, client_fd, recv, send), "fla_daemon_identify_rsp()"))
+  case FLA_MSG_CMD_OBJECT_OPEN:
+    if (FLA_ERR(fla_daemon_object_open_rsp(d, client_fd, recv, send), "fla_daemon_object_open()"))
+      return -1;
+    break;
+  case FLA_MSG_CMD_OBJECT_CREATE:
+    if (FLA_ERR(fla_daemon_object_create_rsp(d, client_fd, recv, send), "fla_daemon_object_create()"))
+      return -1;
+    break;
+  case FLA_MSG_CMD_OBJECT_DESTROY:
+    if (FLA_ERR(fla_daemon_object_destroy_rsp(d, client_fd, recv, send), "fla_daemon_object_destroy()"))
+      return -1;
+    break;
+  case FLA_MSG_CMD_POOL_OPEN:
+    if (FLA_ERR(fla_daemon_pool_open_rsp(d, client_fd, recv, send), "fla_daemon_pool_open()"))
+      return -1;
+    break;
+  case FLA_MSG_CMD_POOL_CREATE:
+    if (FLA_ERR(fla_daemon_pool_create_rsp(d, client_fd, recv, send), "fla_daemon_pool_create()"))
+      return -1;
+    break;
+  case FLA_MSG_CMD_POOL_DESTROY:
+    if (FLA_ERR(fla_daemon_pool_destroy_rsp(d, client_fd, recv, send), "fla_daemon_pool_destroy()"))
       return -1;
     break;
   case FLA_MSG_CMD_SYNC:
     if (FLA_ERR(fla_daemon_sync_rsp(d, client_fd, recv, send), "fla_daemon_sync_rsp()"))
+      return -1;
+    break;
+  case FLA_MSG_CMD_POOL_GET_ROOT_OBJECT:
+    if (FLA_ERR(fla_daemon_pool_get_root_object_rsp(d, client_fd, recv, send),
+                "fla_daemon_pool_get_root_object()"))
+      return -1;
+    break;
+  case FLA_MSG_CMD_POOL_SET_ROOT_OBJECT:
+    if (FLA_ERR(fla_daemon_pool_set_root_object_rsp(d, client_fd, recv, send),
+                "fla_daemon_pool_set_root_object()"))
+      return -1;
+    break;
+  case FLA_MSG_CMD_IDENTIFY:
+    if (FLA_ERR(fla_daemon_identify_rsp(d, client_fd, recv, send), "fla_daemon_identify_rsp()"))
       return -1;
     break;
   default:
