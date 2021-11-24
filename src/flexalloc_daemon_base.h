@@ -201,16 +201,12 @@ fla_daemon_identify_rsp(struct fla_daemon *daemon, int client_fd,
                         struct fla_msg const * const send);
 
 int
-fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, uint32_t obj_nlb,
-                          struct fla_pool **handle);
+fla_daemon_close_rq(struct flexalloc *fs);
 
 int
-fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
-                           struct fla_msg const * const recv,
-                           struct fla_msg const * const send);
-
-int
-fla_socket_open(const char * socket_path, struct fla_daemon_client * client);
+fla_daemon_close_rsp(struct fla_daemon *daemon, int client_fd,
+                     struct fla_msg const * const recv,
+                     struct fla_msg const * const send);
 
 int
 fla_daemon_sync_rq(struct flexalloc *fs);
@@ -221,13 +217,85 @@ fla_daemon_sync_rsp(struct fla_daemon *daemon, int client_fd,
                     struct fla_msg const * const send);
 
 int
-fla_daemon_close_rq(struct flexalloc *fs);
+fla_daemon_pool_open_rq(struct flexalloc *fs, char const *name, struct fla_pool **handle);
 
 int
-fla_daemon_close_rsp(struct fla_daemon *daemon, int client_fd,
-                     struct fla_msg const * const recv,
-                     struct fla_msg const * const send);
+fla_daemon_pool_open_rsp(struct fla_daemon *daemon, int client_fd,
+                         struct fla_msg const * const recv,
+                         struct fla_msg const * const send);
 
+void
+fla_daemon_pool_close_rq(struct flexalloc *fs, struct fla_pool *handle);
+
+// no daemon_pool_rsp - no message is sent.
+
+int
+fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, uint32_t obj_nlb,
+                          struct fla_pool **handle);
+
+int
+fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
+                           struct fla_msg const * const recv,
+                           struct fla_msg const * const send);
+
+int
+fla_daemon_pool_destroy_rq(struct flexalloc *fs, struct fla_pool *handle);
+
+int
+fla_daemon_pool_destroy_rsp(struct fla_daemon *daemon, int client_fd,
+                            struct fla_msg const * const recv,
+                            struct fla_msg const * const send);
+
+int
+fla_daemon_object_open_rq(struct flexalloc *fs, struct fla_pool *pool,
+                          struct fla_object *object);
+
+int
+fla_daemon_object_open_rsp(struct fla_daemon *daemon, int client_fd,
+                           struct fla_msg const * const recv,
+                           struct fla_msg const * const send);
+
+int
+fla_daemon_object_create_rq(struct flexalloc *fs, struct fla_pool *pool,
+                            struct fla_object *object);
+
+int
+fla_daemon_object_create_rsp(struct fla_daemon *daemon, int client_fd,
+                             struct fla_msg const * const recv,
+                             struct fla_msg const * const send);
+
+int
+fla_daemon_object_destroy_rq(struct flexalloc *fs, struct fla_pool *pool,
+                             struct fla_object *object);
+
+int
+fla_daemon_object_destroy_rsp(struct fla_daemon *daemon, int client_fd,
+                              struct fla_msg const * const recv,
+                              struct fla_msg const * const send);
+
+int
+fla_daemon_pool_set_root_object_rq(struct flexalloc const * const fs,
+                                   struct fla_pool const * pool,
+                                   struct fla_object const * object,
+                                   fla_root_object_set_action action);
+
+int
+fla_daemon_pool_set_root_object_rsp(struct fla_daemon *daemon, int client_fd,
+                                    struct fla_msg const * const recv,
+                                    struct fla_msg const * const send);
+
+int
+fla_daemon_pool_get_root_object_rq(struct flexalloc const * const fs,
+                                   struct fla_pool const * pool,
+                                   struct fla_object *object);
+
+int
+fla_daemon_pool_get_root_object_rsp(struct fla_daemon *daemon, int client_fd,
+                                    struct fla_msg const * const recv,
+                                    struct fla_msg const * const send);
+
+int
+fla_socket_open(const char * socket_path, struct fla_daemon_client * client);
 
 #ifdef __cplusplus
 }
