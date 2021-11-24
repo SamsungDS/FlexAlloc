@@ -41,8 +41,12 @@ than XFS and and writes 6 times faster than XFS.  We execute 3 concurrent
 random write workloads of queue depth 1 with fio (10000 10Mib files, 10000
 100Mib files, 2000 1Gib files)
 
-* For information about the benchmark contact us:
+**More Information**
+* We usually hangout on discord [FlexAlloc Discord Channel](https://discord.gg/qx8yME4Dcd)
+* Feel free to drop us a mail:
    - j.granados@samsung.com
    - j.devantier@samsung.com
    - a.manzanares@samsung.com
+* Find our 2021 SDC presentation [FlexAlloc SDC presentation](https://www.youtube.com/watch?v=Hf23EQQv7g8)
+
 
