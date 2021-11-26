@@ -1195,7 +1195,7 @@ fla_acquire_slab(struct flexalloc *fs, const uint32_t obj_nlb,
   {
     // TODO : Define a proper error code for this.
     /* This error should not print anything as it is a valid state.  */
-    err = -1;
+    err = FLA_ERR_ALL_SLABS_USED;
     goto exit;
   }
 
