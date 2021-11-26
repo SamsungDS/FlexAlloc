@@ -167,9 +167,13 @@ fla_sock_send_msg(int sock_fd, struct fla_msg const * const msg)
 int
 fla_sock_recv_msg(int sock_fd, struct fla_msg const * const msg)
 {
+  int err = 0;
   unsigned int retries = 3;
   ssize_t n, nleft;
   char *data = msg->data;
+
+  // use as sanity-check value in case of disconnects
+  msg->hdr->cmd = FLA_MSG_CMD_NULL;
 
 retry_hdr:
   n = recv(sock_fd, (char *)msg->hdr, sizeof(struct fla_msg_header), MSG_PEEK | MSG_WAITALL);
@@ -178,7 +182,11 @@ retry_hdr:
     if (n > 0 || (n == -1 && errno == EINTR))
     {
       if (retries == 0)
-        return 1;
+      {
+        FLA_ERR_PRINT("recv() - retry limit exceeded, giving up!\n");
+        err = 1;
+        goto exit;
+      }
       retries--;
       goto retry_hdr;
     }
@@ -197,7 +205,8 @@ retry_hdr:
   {
     FLA_ERR_PRINTF("invalid msg from socket %d, hdr{cmd: %"PRIu32", len: %"PRIu32"}, max len is: %d\n",
                    sock_fd, msg->hdr->cmd, msg->hdr->len, FLA_MSG_DATA_MAX);
-    return 2; // TODO: document, this warrants dropping the client.
+    err = 2;
+    goto exit; // TODO: document, this warrants dropping the client
   }
 
   nleft = sizeof(struct fla_msg_header) + msg->hdr->len;
@@ -213,7 +222,8 @@ retry_data:
       }
 
       FLA_ERR_PRINTF("recv() - error receiving message payload (errno: %d)\n", errno);
-      return -errno;
+      err = -errno;
+      goto exit;
     }
     else
     {
@@ -221,7 +231,12 @@ retry_data:
       data += n;
     }
   }
-  return 0;
+
+  // return success unless CMD value is still NULL
+  err = msg->hdr->cmd = FLA_MSG_CMD_NULL;
+
+exit:
+  return err;
 }
 
 void

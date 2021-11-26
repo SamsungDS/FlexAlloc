@@ -35,6 +35,7 @@ struct fla_msg
   char *data;
 };
 
+#define FLA_MSG_CMD_NULL UINT32_MAX
 #define FLA_MSG_CMD_IDENTIFY 1
 #define FLA_MSG_CMD_SYNC 2
 
