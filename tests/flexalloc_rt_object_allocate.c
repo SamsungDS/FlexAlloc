@@ -2,9 +2,9 @@
 
 #include <stdint.h>
 #include "tests/flexalloc_tests_common.h"
-#include "src/flexalloc_util.h"
-#include "src/flexalloc_mm.h"
-#include "src/libflexalloc.h"
+#include "flexalloc_util.h"
+#include "flexalloc_mm.h"
+#include "libflexalloc.h"
 
 struct test_vals
 {

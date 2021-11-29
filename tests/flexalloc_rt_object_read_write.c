@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "src/libflexalloc.h"
-#include "src/flexalloc.h"
-#include "src/flexalloc_util.h"
+#include "libflexalloc.h"
+#include "flexalloc.h"
+#include "flexalloc_util.h"
 #include "tests/flexalloc_tests_common.h"
 
 struct test_vals

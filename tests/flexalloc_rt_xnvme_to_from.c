@@ -2,8 +2,8 @@
 #define FLA_TESTING
 #include <stdint.h>
 #include "flexalloc_tests_common.h"
-#include "src/flexalloc_util.h"
-#include "src/flexalloc_xnvme_env.h"
+#include "flexalloc_util.h"
+#include "flexalloc_xnvme_env.h"
 #include <unistd.h>
 #include <libxnvmec.h>
 

@@ -130,7 +130,7 @@ foreach suite : suites
       endforeach
     endif
     prog = executable(t_exec, [t_exec_files, t_sources],
-      dependencies: t_deps, link_args : t_link_args)
+      dependencies: t_deps, link_args : t_link_args, include_directories : 'src')
     c_test_progs += prog
 
     test_data = configuration_data()

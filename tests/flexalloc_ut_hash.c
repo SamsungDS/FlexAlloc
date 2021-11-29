@@ -2,8 +2,8 @@
 
 #include <stdio.h>
 #include <inttypes.h>
-#include "src/flexalloc_hash.h"
-#include "src/flexalloc_util.h"
+#include "flexalloc_hash.h"
+#include "flexalloc_util.h"
 #include "flexalloc_tests_common.h"
 
 #define HTBL_NEW_ERR "failed to initialize hash table"

@@ -1,8 +1,8 @@
 // Copyright (C) 2021 Jesper Devantier <j.devantier@samsung.com>
 
 #include <stdio.h>
-#include "src/flexalloc_bits.h"
-#include "src/flexalloc_util.h"
+#include "flexalloc_bits.h"
+#include "flexalloc_util.h"
 #include "flexalloc_tests_common.h"
 
 int

@@ -1,8 +1,8 @@
 // Copyright (C) 2021 Joel Granados <j.granados@samsung.com>
 #include "tests/flexalloc_tests_common.h"
-#include "src/flexalloc_util.h"
-#include "src/flexalloc_mm.h"
-#include "src/libflexalloc.h"
+#include "flexalloc_util.h"
+#include "flexalloc_mm.h"
+#include "libflexalloc.h"
 #include <stdint.h>
 
 struct test_vals

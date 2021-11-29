@@ -4,9 +4,9 @@
 
 #define _XOPEN_SOURCE 500
 #include "tests/flexalloc_tests_common.h"
-#include "src/flexalloc_xnvme_env.h"
-#include "src/flexalloc_util.h"
-#include "src/libflexalloc.h"
+#include "flexalloc_xnvme_env.h"
+#include "flexalloc_util.h"
+#include "libflexalloc.h"
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
