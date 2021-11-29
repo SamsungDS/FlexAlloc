@@ -7,11 +7,11 @@
 #include <stdint.h>
 #include <limits.h>
 #include <string.h>
-#include "src/flexalloc.h"
-#include "src/flexalloc_util.h"
-#include "src/flexalloc_hash.h"
+#include "flexalloc.h"
+#include "flexalloc_util.h"
+#include "flexalloc_hash.h"
 #include "flexalloc_freelist.h"
-#include "src/flexalloc_slabcache.h"
+#include "flexalloc_slabcache.h"
 #include "flexalloc_xnvme_env.h"
 #include "flexalloc_mm.h"
 #include "flexalloc_util.h"

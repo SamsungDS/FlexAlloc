@@ -6,8 +6,8 @@
 #define __FLEXALLOC_TESTS_COMMON_H
 
 #include <stdint.h>
-#include "src/flexalloc_xnvme_env.h"
-#include "src/flexalloc_mm.h"
+#include "flexalloc_xnvme_env.h"
+#include "flexalloc_mm.h"
 
 /**
  * Loopback elements

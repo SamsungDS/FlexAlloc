@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <string.h>
-#include "src/flexalloc_hash.h"
-#include "src/flexalloc_util.h"
+#include "flexalloc_hash.h"
+#include "flexalloc_util.h"
 
 char default_file[] = "wlist.txt";
 

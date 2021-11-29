@@ -2,9 +2,9 @@
 #include <inttypes.h>
 #include "flexalloc_freelist.h"
 #include "flexalloc_introspection.h"
-#include "src/flexalloc_hash.h"
-#include "src/flexalloc_mm.h"
-#include "src/flexalloc_util.h"
+#include "flexalloc_hash.h"
+#include "flexalloc_mm.h"
+#include "flexalloc_util.h"
 
 #define PTR_OFFSETOF(from, to) ((char*)to - (char*)from)
 

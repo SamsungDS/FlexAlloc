@@ -5,9 +5,9 @@
 #include <stdint.h>
 #include <errno.h>
 #include <string.h>
-#include "src/flexalloc_freelist.h"
-#include "src/flexalloc_bits.h"
-#include "src/flexalloc_util.h"
+#include "flexalloc_freelist.h"
+#include "flexalloc_bits.h"
+#include "flexalloc_util.h"
 #include "flexalloc_tests_common.h"
 
 #define FLIST_ENTRY(f, n) &(f)[1 + n]

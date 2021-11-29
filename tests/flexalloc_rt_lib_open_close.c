@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "src/libflexalloc.h"
-#include "src/flexalloc_mm.h"
-#include "src/flexalloc_util.h"
-#include "src/flexalloc_xnvme_env.h"
+#include "libflexalloc.h"
+#include "flexalloc_mm.h"
+#include "flexalloc_util.h"
+#include "flexalloc_xnvme_env.h"
 #include "tests/flexalloc_tests_common.h"
 
 int
