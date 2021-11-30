@@ -692,6 +692,7 @@ fla_close_noflush(struct flexalloc *fs)
   free(fs->super);
   if (fs->dev.md_dev)
     xnvme_dev_close(fs->dev.md_dev);
+  free(fs->dev.dev_uri);
   free(fs);
 }
 
@@ -1663,10 +1664,18 @@ fla_open_common(const char *dev_uri, struct flexalloc *fs)
 
   free(super);
 
+  fs->dev.dev_uri = strdup(dev_uri);
+  if (fs->dev.dev_uri == NULL)
+  {
+    err = -ENOMEM;
+    goto free_dev_uri;
+  }
   fs->state |= FLA_STATE_OPEN;
   fs->fns = base_fns;
   return 0;
 
+free_dev_uri:
+  free(fs->dev.dev_uri);
 free_md:
   fla_xne_free_buf(md_dev, fla_md_buf);
 free_super:
