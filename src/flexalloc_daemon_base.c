@@ -483,13 +483,12 @@ fla_daemon_close_rq(struct flexalloc *fs)
 {
   int err;
   struct fla_daemon_client *client = (struct fla_daemon_client *)fs;
-  struct fla_msg_header *send_hdr = FLA_MSG_HDR(client->send_buf);
 
   if (client->sock_fd == 0)
     return 0; /* ensure operation idempotency */
 
-  send_hdr->cmd = FLA_MSG_CMD_SYNC;
-  send_hdr->len = 0;
+  client->send.hdr->cmd = FLA_MSG_CMD_SYNC;
+  client->send.hdr->len = 0;
   err = fla_sock_send_msg(client->sock_fd, &client->send);
   if (FLA_ERR(err, "fla_sock_send_msg()"))
     return err;
