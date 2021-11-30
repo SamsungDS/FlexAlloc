@@ -27,6 +27,7 @@ TAILQ_HEAD(zs_thead, fla_zs_entry);
 struct fla_dev
 {
   struct xnvme_dev *dev;
+  char * dev_uri;
   struct xnvme_dev *md_dev;
   uint32_t lb_nbytes;
 };

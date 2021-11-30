@@ -498,6 +498,8 @@ fla_daemon_close_rq(struct flexalloc *fs)
 
   close(client->sock_fd);
   client->sock_fd = 0;
+  fla_xne_dev_close(fs->dev.dev);
+  free(fs->dev.dev_uri);
   return 0;
 }
 

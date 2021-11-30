@@ -140,4 +140,13 @@ fla_err_errno_fl(const int condition, const char * message, const char * f,
 size_t
 strnlen(char *s, size_t maxlen);
 
+/**
+ * Create a duplicate of the provided string.
+ *
+ * Returns a pointer to a new string which is a duplicate of the provided string.
+ * Memory is allocated by `malloc` and should be freed after use.
+ */
+char *
+strdup(char const *s);
+
 #endif /* __FLEXALLOC_UTIL_H */
