@@ -231,7 +231,7 @@ retry_data:
   }
 
   // return success unless CMD value is still NULL
-  err = msg->hdr->cmd = FLA_MSG_CMD_NULL;
+  err = msg->hdr->cmd == FLA_MSG_CMD_NULL;
 
 exit:
   return err;
