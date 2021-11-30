@@ -40,7 +40,7 @@ static inline int
 fla_err_fl(const int condition, const char * message, const char * f,
            const int l )
 {
-  if(condition && condition < 1001)
+  if(condition && condition < 2001)
   {
     FLA_ERR_PRINTF(" %s(%d) %s\n", f, l, message);
   }

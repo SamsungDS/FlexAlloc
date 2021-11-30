@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 #define FLA_ERR_ERROR 1001
-#define FLA_ERR_ALL_SLABS_USED 1002
+#define FLA_ERR_ALL_SLABS_USED 2001
 
 struct fla_pool;
 
