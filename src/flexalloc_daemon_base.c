@@ -14,6 +14,7 @@
 #include "src/flexalloc.h"
 #include "src/flexalloc_mm.h"
 #include "src/flexalloc_shared.h"
+#include "src/flexalloc_xnvme_env.h"
 #include <inttypes.h>
 
 #define BUF_SIZE 1024 * 10
@@ -476,6 +477,59 @@ fla_daemon_identify_rsp(struct fla_daemon *daemon, int client_fd,
     return err;
 
   return 0;
+}
+
+int
+fla_daemon_init_info_rq(struct fla_daemon_client *client, int sock_fd,
+                        char const ** dev_uri, struct fla_geo const **geo)
+{
+  int err;
+  char *read_ptr = client->recv.data;
+  memset(client->send.data, 0, FLA_MSG_DATA_MAX);
+  memset(client->recv.data, 0, FLA_MSG_DATA_MAX);
+
+  client->send.hdr->len = 0;
+  client->send.hdr->cmd = FLA_MSG_CMD_INIT_INFO;
+
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    return err;
+
+  (*geo) = (struct fla_geo *)read_ptr;
+  read_ptr += sizeof(struct fla_geo);
+
+  read_ptr += sizeof(size_t);
+  (*dev_uri) = read_ptr;
+
+  return 0;
+}
+
+int
+fla_daemon_init_info_rsp(struct fla_daemon *daemon, int client_fd,
+                         struct fla_msg const * const recv,
+                         struct fla_msg const * const send)
+{
+  // geo, dev_uri, md_uri
+  char *write_ptr = send->data;
+  size_t str_len;
+  int err = 0;
+
+  memset(send->data, 0, FLA_MSG_DATA_MAX);
+  memcpy(write_ptr, &daemon->base.geo, sizeof(struct fla_geo));
+  write_ptr += sizeof(struct fla_geo);
+
+  str_len = strlen(daemon->base.dev.dev_uri) + 1;
+  memcpy(write_ptr, &str_len, sizeof(size_t));
+  write_ptr += sizeof(size_t);
+  memcpy(write_ptr, daemon->base.dev.dev_uri, str_len);
+
+  send->hdr->len = sizeof(struct fla_geo) + sizeof(size_t) + str_len;
+
+  if (FLA_ERR(err = fla_sock_send_msg(client_fd, send), "fla_sock_send_msg()"))
+    goto exit;
+
+exit:
+  return err;
 }
 
 int
