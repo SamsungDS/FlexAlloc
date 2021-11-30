@@ -50,6 +50,8 @@ struct fla_msg
 #define FLA_MSG_CMD_OBJECT_CREATE 10
 #define FLA_MSG_CMD_OBJECT_DESTROY 11
 
+#define FLA_MSG_CMD_INIT_INFO 30
+
 struct fla_daemon;
 typedef int (*fla_daemon_msg_handler_t)(struct fla_daemon *daemon, int client_fd,
                                         struct fla_msg const * const recv, struct fla_msg const * const send);
@@ -200,6 +202,15 @@ int
 fla_daemon_identify_rsp(struct fla_daemon *daemon, int client_fd,
                         struct fla_msg const * const recv,
                         struct fla_msg const * const send);
+
+int
+fla_daemon_init_info_rq(struct fla_daemon_client *client, int sock_fd,
+                        char const ** dev_uri, struct fla_geo const **geo);
+
+int
+fla_daemon_init_info_rsp(struct fla_daemon *daemon, int client_fd,
+                         struct fla_msg const * const recv,
+                         struct fla_msg const * const send);
 
 int
 fla_daemon_close_rq(struct flexalloc *fs);
