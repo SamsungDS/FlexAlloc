@@ -1096,6 +1096,9 @@ fla_socket_open(const char *socket_path, struct fla_daemon_client *client)
 {
   int err;
   struct sockaddr_un server;
+  char const * dev_uri = NULL;
+  struct fla_geo const *geo = NULL;
+  struct xnvme_dev *dev = NULL;
 
   client->sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (FLA_ERR_ERRNO(err = client->sock_fd < 0, "socket()"))
@@ -1116,20 +1119,41 @@ fla_socket_open(const char *socket_path, struct fla_daemon_client *client)
   FLA_DBG_PRINT("connected to server!!\n");
   if (FLA_ERR(fla_daemon_identify_rq(client, client->sock_fd, &client->server_version),
               "fla_daemon_identify_rq()"))
-    return 0;
+    return 1;
 
   FLA_DBG_PRINTF("identity{type: %"PRIu32", version: %"PRIu32"}\n", client->server_version.type,
                  client->server_version.version);
 
+  err = fla_daemon_init_info_rq(client, client->sock_fd, &dev_uri, &geo);
+  if (FLA_ERR(err, "fla_daemon_init_rq()"))
+  {
+    return 1;
+  }
+  FLA_DBG_PRINTF("dev_uri: '%s'\n", dev_uri);
+
+
+  memset(&client->base, 0, sizeof(struct flexalloc));
+  err = fla_xne_dev_open(dev_uri, NULL, &dev);
+  if (FLA_ERR(err, "fla_xne_dev_open() - failed to open device"))
+  {
+    return 1;
+  }
+
+  client->base.dev.dev_uri = strdup(dev_uri);
+  if (!client->base.dev.dev_uri)
+  {
+    err = -ENOMEM;
+    goto close_dev;
+  }
+
+  client->base.dev.dev = dev;
+  memcpy(&client->base.geo, geo, sizeof(struct fla_geo));
   client->base.fns = client_fns;
 
-  // TODO: client must open device using dev_uri received from daemon
-  //   err = fla_xne_dev_open(dev_uri, NULL, &dev);
-  //   if (FLA_ERR(err, "fla_xne_dev_open()"))
-  //   {
-  //     err = FLA_ERR_ERROR;
-  //     return err;
-  //   }
+  return err;
+
+close_dev:
+  fla_xne_dev_close(dev);
 exit:
   return err;
 }
