@@ -147,8 +147,6 @@ fla_sock_send_msg(int sock_fd, struct fla_msg const * const msg)
   int err;
   size_t msg_size = sizeof(struct fla_msg_header) + msg->hdr->len;
   err = fla_sock_send_bytes(sock_fd, (char *)msg->hdr, msg_size);
-  FLA_DBG_PRINTF("fla_sock_send_msg {len: %"PRIu32" cmd: %"PRIu16", tag: %"PRIu16"}\n", msg->hdr->len,
-                 msg->hdr->cmd, msg->hdr->tag);
   if (err)
   {
     if (err < 0)
@@ -197,8 +195,6 @@ retry_hdr:
       return -errno;
     }
   }
-  FLA_DBG_PRINTF("fla_sock_recv_msg {len: %"PRIu32" cmd: %"PRIu16", tag: %"PRIu16"}\n", msg->hdr->len,
-                 msg->hdr->cmd, msg->hdr->tag);
 
   // ensure message data length is not exceeding protocol limits
   if (msg->hdr->len > FLA_MSG_DATA_MAX)
