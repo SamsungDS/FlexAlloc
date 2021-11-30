@@ -167,8 +167,8 @@ fla_sock_recv_msg(int sock_fd, struct fla_msg const * const msg)
 {
   int err = 0;
   unsigned int retries = 3;
-  ssize_t n, nleft;
-  char *data = msg->data;
+  ssize_t n, nleft = -1;
+  char *data;
 
   // use as sanity-check value in case of disconnects
   msg->hdr->cmd = FLA_MSG_CMD_NULL;
@@ -206,10 +206,12 @@ retry_hdr:
   }
 
   nleft = sizeof(struct fla_msg_header) + msg->hdr->len;
+  data = (char *)msg->hdr;
+
 retry_data:
   while (nleft > 0)
   {
-    if ((n = recv(sock_fd, (char *)msg->hdr, nleft, MSG_WAITALL)) <= 0)
+    if ((n = recv(sock_fd, data, nleft, MSG_WAITALL)) <= 0)
     {
       if (errno == EINTR && retries != 0)
       {
