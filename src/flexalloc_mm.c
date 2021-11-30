@@ -1722,6 +1722,7 @@ fla_open(const char *dev_uri, struct flexalloc **fs)
 {
   int err;
   err = fla_fs_alloc(fs);
+
   if (err)
     return err;
 
