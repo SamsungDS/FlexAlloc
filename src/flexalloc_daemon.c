@@ -110,7 +110,6 @@ main(int argc, char **argv)
   daemon.identity.type = FLA_SYS_FLEXALLOC_TYPE;
   daemon.identity.version = FLA_SYS_FLEXALLOC_V1;
 
-  // TODO open device, assign vtable
   err = fla_open_common(dev_uri, daemon.flexalloc);
   if (FLA_ERR(err, "fla_open_common()"))
     goto exit;
