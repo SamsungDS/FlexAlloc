@@ -31,7 +31,8 @@ flexalloc_common =  ['src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_has
   'src/flexalloc_freelist.c', 'src/flexalloc_ll.c', 'src/flexalloc_ll.h', 'src/flexalloc_slabcache.c',
   xnvme_env_files, flexalloc_util_files, flexalloc_znd_files]
 
-libflexalloc_headers = ['src/libflexalloc.h', 'src/flexalloc_shared.h']
+flexalloc_daemon_headers = ['src/flexalloc_daemon_base.h']
+libflexalloc_headers = ['src/libflexalloc.h', 'src/flexalloc_shared.h', flexalloc_daemon_headers]
 libflexalloc_files = ['src/libflexalloc.c', flexalloc_common]
 
 ### Executables ###
