@@ -22,6 +22,12 @@
 #define FLA_DAEMON_FD_FREE -1
 #define FLA_DAEMON_POLL_INF -1
 
+
+struct fla_daemon_client *fla_get_client(struct flexalloc const * const fs)
+{
+  return (struct fla_daemon_client *)fs->user_data;
+}
+
 int
 fla_max_open_files()
 {
@@ -49,6 +55,10 @@ fla_daemon_create(struct fla_daemon *d, char *socket_path, fla_daemon_msg_handle
     return -1;
 
   memset(d, 0, sizeof(struct fla_daemon));
+  d->flexalloc = fla_fs_alloc();
+  if (FLA_ERR(!d->flexalloc, "fla_fs_alloc()"))
+    return -ENOMEM;
+
   d->listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (FLA_ERR_ERRNO(err = d->listen_fd < 0, "socket()"))
     goto exit;
@@ -109,6 +119,12 @@ fla_daemon_destroy(struct fla_daemon *d)
     {
       d->server.sun_path[0] = '\0';
     }
+  }
+
+  if (d->flexalloc)
+  {
+    fla_fs_free(d->flexalloc);
+    d->flexalloc = NULL;
   }
 
 exit:
@@ -480,11 +496,12 @@ fla_daemon_identify_rsp(struct fla_daemon *daemon, int client_fd,
 }
 
 int
-fla_daemon_init_info_rq(struct fla_daemon_client *client, int sock_fd,
-                        char const ** dev_uri, struct fla_geo const **geo)
+fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
 {
   int err;
+  struct xnvme_dev *dev = NULL;
   char *read_ptr = client->recv.data;
+
   memset(client->send.data, 0, FLA_MSG_DATA_MAX);
   memset(client->recv.data, 0, FLA_MSG_DATA_MAX);
 
@@ -495,33 +512,47 @@ fla_daemon_init_info_rq(struct fla_daemon_client *client, int sock_fd,
   if (FLA_ERR(err, "fla_send_recv()"))
     return err;
 
-  (*geo) = (struct fla_geo *)read_ptr;
+  memcpy(&client->flexalloc->geo, read_ptr, sizeof(struct fla_geo));
   read_ptr += sizeof(struct fla_geo);
 
-  read_ptr += sizeof(size_t);
-  (*dev_uri) = read_ptr;
+  read_ptr += sizeof(size_t); // ignore string length field
+  client->flexalloc->dev.dev_uri = strdup(read_ptr);
+  if (!client->flexalloc->dev.dev_uri)
+  {
+    err = -ENOMEM;
+    return err;
+  }
+
+  err = fla_xne_dev_open(client->flexalloc->dev.dev_uri, NULL, &dev);
+  if (FLA_ERR(err, "fla_xne_dev_open() - failed to open device"))
+    goto exit;
 
   return 0;
+
+exit:
+  free(client->flexalloc->dev.dev_uri);
+  return err;
 }
 
 int
-fla_daemon_init_info_rsp(struct fla_daemon *daemon, int client_fd,
-                         struct fla_msg const * const recv,
-                         struct fla_msg const * const send)
+fla_daemon_fs_init_rsp(struct fla_daemon *daemon, int client_fd,
+                       struct fla_msg const * const recv,
+                       struct fla_msg const * const send)
 {
   // geo, dev_uri, md_uri
   char *write_ptr = send->data;
   size_t str_len;
   int err = 0;
+  struct flexalloc *fs = daemon->flexalloc;
 
   memset(send->data, 0, FLA_MSG_DATA_MAX);
-  memcpy(write_ptr, &daemon->base.geo, sizeof(struct fla_geo));
+  memcpy(write_ptr, &fs->geo, sizeof(struct fla_geo));
   write_ptr += sizeof(struct fla_geo);
 
-  str_len = strlen(daemon->base.dev.dev_uri) + 1;
+  str_len = strlen(fs->dev.dev_uri) + 1;
   memcpy(write_ptr, &str_len, sizeof(size_t));
   write_ptr += sizeof(size_t);
-  memcpy(write_ptr, daemon->base.dev.dev_uri, str_len);
+  memcpy(write_ptr, fs->dev.dev_uri, str_len);
 
   send->hdr->len = sizeof(struct fla_geo) + sizeof(size_t) + str_len;
 
@@ -536,7 +567,7 @@ int
 fla_daemon_close_rq(struct flexalloc *fs)
 {
   int err;
-  struct fla_daemon_client *client = (struct fla_daemon_client *)fs;
+  struct fla_daemon_client *client = fla_get_client(fs);
 
   if (client->sock_fd == 0)
     return 0; /* ensure operation idempotency */
@@ -560,7 +591,7 @@ fla_daemon_close_rsp(struct fla_daemon *daemon, int client_fd,
                      struct fla_msg const * const send)
 {
   int err;
-  err = daemon->base.fns.close(&daemon->base);
+  err = daemon->flexalloc->fns.close(daemon->flexalloc);
   *((int *)send->data) = err;
 
   send->hdr->len = sizeof(int);
@@ -594,7 +625,7 @@ fla_daemon_sync_rsp(struct fla_daemon *daemon, int client_fd,
                     struct fla_msg const * const send)
 {
   int err;
-  err = daemon->base.fns.sync(&daemon->base);
+  err = daemon->flexalloc->fns.sync(daemon->flexalloc);
   *((int *)send->data) = err;
 
   send->hdr->len = sizeof(int);
@@ -662,7 +693,7 @@ fla_daemon_pool_open_rsp(struct fla_daemon *daemon, int client_fd,
   // int name_len = recv->hdr->len; // API does not require this at the moment
   struct fla_pool **handle = NULL;
 
-  err = daemon->base.fns.pool_open(&daemon->base, name, handle);
+  err = daemon->flexalloc->fns.pool_open(daemon->flexalloc, name, handle);
   *((int *)send->data) = err;
   send->hdr->len = sizeof(err);
 
@@ -744,7 +775,7 @@ fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
   int name_len = recv->hdr->len - sizeof(uint32_t);
   struct fla_pool **handle = NULL;
 
-  err = daemon->base.fns.pool_create(&daemon->base, name, name_len, obj_nlb, handle);
+  err = daemon->flexalloc->fns.pool_create(daemon->flexalloc, name, name_len, obj_nlb, handle);
   *((int *)send->data) = err;
 
   if (FLA_ERR(err, "pool_create()"))
@@ -800,7 +831,7 @@ fla_daemon_pool_destroy_rsp(struct fla_daemon *daemon, int client_fd,
     return 1;
   }
 
-  err = daemon->base.fns.pool_destroy(&daemon->base, pool);
+  err = daemon->flexalloc->fns.pool_destroy(daemon->flexalloc, pool);
   *((int *)send->data) = err;
   send->hdr->len = sizeof(int);
 
@@ -845,7 +876,7 @@ fla_daemon_object_open_rsp(struct fla_daemon *daemon, int client_fd,
   struct fla_pool *pool = (struct fla_pool*)recv->data;
   struct fla_object *object = (struct fla_object *) (recv->data + sizeof(struct fla_pool));
 
-  err = daemon->base.fns.object_open(&daemon->base, pool, object);
+  err = daemon->flexalloc->fns.object_open(daemon->flexalloc, pool, object);
   if (FLA_ERR(err, "object_open()"))
   {
     FLA_DBG_PRINTF("failed to open object{slab_id: %"PRIu32", entry_ndx: %"PRIu32"}\n", object->slab_id,
@@ -897,7 +928,7 @@ fla_daemon_object_create_rsp(struct fla_daemon *daemon, int client_fd,
   struct fla_pool *pool = (struct fla_pool *)recv->data;
   struct fla_object object;
 
-  err = daemon->base.fns.object_create(&daemon->base, pool, &object);
+  err = daemon->flexalloc->fns.object_create(daemon->flexalloc, pool, &object);
   *((int *)send->data) = err;
 
   if (FLA_ERR(err, "object_create()"))
@@ -951,7 +982,7 @@ fla_daemon_object_destroy_rsp(struct fla_daemon *daemon, int client_fd,
   struct fla_pool *pool = (struct fla_pool *)recv->data;
   struct fla_object *object = (struct fla_object *)(recv->data + sizeof(struct fla_pool));
 
-  err = daemon->base.fns.object_destroy(&daemon->base, pool, object);
+  err = daemon->flexalloc->fns.object_destroy(daemon->flexalloc, pool, object);
   if (FLA_ERR(err, "object_destroy()"))
   {} // nothing to do
 
@@ -1011,7 +1042,7 @@ fla_daemon_pool_set_root_object_rsp(struct fla_daemon *daemon, int client_fd,
   recv_data += sizeof(struct fla_object);
   fla_root_object_set_action *action = (fla_root_object_set_action *)recv_data;
 
-  err = daemon->base.fns.pool_set_root_object(&daemon->base, pool, object, *action);
+  err = daemon->flexalloc->fns.pool_set_root_object(daemon->flexalloc, pool, object, *action);
   *((int *)send->data) = err;
   send->hdr->len = sizeof(int);
 
@@ -1058,7 +1089,7 @@ fla_daemon_pool_get_root_object_rsp(struct fla_daemon *daemon, int client_fd,
   struct fla_pool *pool = (struct fla_pool *)recv->data;
   struct fla_object object;
 
-  err = daemon->base.fns.pool_get_root_object(&daemon->base, pool, &object);
+  err = daemon->flexalloc->fns.pool_get_root_object(daemon->flexalloc, pool, &object);
   if (FLA_ERR(err, "pool_get_root_object()"))
   {
     send->hdr->len = sizeof(int);
@@ -1096,64 +1127,53 @@ fla_socket_open(const char *socket_path, struct fla_daemon_client *client)
 {
   int err;
   struct sockaddr_un server;
-  char const * dev_uri = NULL;
-  struct fla_geo const *geo = NULL;
-  struct xnvme_dev *dev = NULL;
 
   client->sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
   if (FLA_ERR_ERRNO(err = client->sock_fd < 0, "socket()"))
     goto exit;
 
   if (FLA_ERR(err = fla_sock_sockaddr_init(&server, socket_path), "fla_sock_sockaddr_init()"))
-    goto exit;
+    goto socket_close;
 
   if (FLA_ERR(err = connect(client->sock_fd, (struct sockaddr *)&server, sizeof(server)),
               "connect()"))
-    goto exit;
+    goto socket_close;
 
   client->send.hdr = FLA_MSG_HDR(client->send_buf);
   client->send.data = FLA_MSG_DATA(client->send_buf);
   client->recv.hdr = FLA_MSG_HDR(client->recv_buf);
   client->recv.data = FLA_MSG_DATA(client->recv_buf);
 
+  client->flexalloc = fla_fs_alloc();
+  if (FLA_ERR(!client->flexalloc, "fla_fs_alloc()"))
+    goto socket_close;
+
+  // install back-pointer -- used by rq functions to get the client instance.
+  client->flexalloc->user_data = client;
+
   FLA_DBG_PRINT("connected to server!!\n");
   if (FLA_ERR(fla_daemon_identify_rq(client, client->sock_fd, &client->server_version),
               "fla_daemon_identify_rq()"))
-    return 1;
+    goto free_flexalloc;
 
   FLA_DBG_PRINTF("identity{type: %"PRIu32", version: %"PRIu32"}\n", client->server_version.type,
                  client->server_version.version);
 
-  err = fla_daemon_init_info_rq(client, client->sock_fd, &dev_uri, &geo);
-  if (FLA_ERR(err, "fla_daemon_init_rq()"))
-  {
-    return 1;
-  }
-  FLA_DBG_PRINTF("dev_uri: '%s'\n", dev_uri);
+  // should be last step - if successful, device should be closed with fla_close
+  err = fla_daemon_fs_init_rq(client, client->sock_fd);
+  if (FLA_ERR(err, "fla_daemon_fs_init_rq()"))
+    goto free_flexalloc;
 
-
-  memset(&client->base, 0, sizeof(struct flexalloc));
-  err = fla_xne_dev_open(dev_uri, NULL, &dev);
-  if (FLA_ERR(err, "fla_xne_dev_open() - failed to open device"))
-  {
-    return 1;
-  }
-
-  client->base.dev.dev_uri = strdup(dev_uri);
-  if (!client->base.dev.dev_uri)
-  {
-    err = -ENOMEM;
-    goto close_dev;
-  }
-
-  client->base.dev.dev = dev;
-  memcpy(&client->base.geo, geo, sizeof(struct fla_geo));
-  client->base.fns = client_fns;
+  client->flexalloc->fns = client_fns;
 
   return err;
 
-close_dev:
-  fla_xne_dev_close(dev);
+free_flexalloc:
+  fla_fs_free(client->flexalloc);
+  client->flexalloc = NULL;
+socket_close:
+  close(client->sock_fd);
+  client->sock_fd = 0;
 exit:
   return err;
 }

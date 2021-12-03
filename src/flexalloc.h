@@ -128,6 +128,9 @@ struct flexalloc
   uint32_t zs_size;
 
   struct fla_fns fns;
+
+  /// pointer for the application to associate additional data
+  void *user_data;
 };
 
 struct fla_pool
