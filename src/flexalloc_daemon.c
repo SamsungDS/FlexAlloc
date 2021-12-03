@@ -124,8 +124,8 @@ main(int argc, char **argv)
   if (FLA_ERR(err, "failure during cleanup"))
     goto close_dev;
 
+  return 0;
 close_dev:
-  fprintf(stderr, "TODO: will get free(): invalid size -- close tries to free flexalloc struct\n");
   fla_close(daemon.flexalloc);
 exit:
   return err;

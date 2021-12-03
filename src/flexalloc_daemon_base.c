@@ -121,12 +121,6 @@ fla_daemon_destroy(struct fla_daemon *d)
     }
   }
 
-  if (d->flexalloc)
-  {
-    fla_fs_free(d->flexalloc);
-    d->flexalloc = NULL;
-  }
-
 exit:
   return err;
 }
