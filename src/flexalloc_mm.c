@@ -634,16 +634,16 @@ exit:
   return err;
 }
 
-int
-fla_fs_alloc(struct flexalloc **fs)
+struct flexalloc *
+fla_fs_alloc()
 {
-  (*fs) = malloc(sizeof(struct flexalloc));
-  if (FLA_ERR(!(*fs), "fla_fs_alloc malloc()"))
-    return -ENOMEM;
+  struct flexalloc *fs = malloc(sizeof(struct flexalloc));
+  if (FLA_ERR(!fs, "fla_fs_alloc malloc()"))
+    return NULL;
 
-  memset(*fs, 0, sizeof(struct flexalloc));
+  memset(fs, 0, sizeof(struct flexalloc));
 
-  return 0;
+  return fs;
 }
 
 void
@@ -1699,9 +1699,12 @@ fla_md_open(const char *dev_uri, const char *md_dev_uri, struct flexalloc **fs)
     return err;
   }
 
-  err = fla_fs_alloc(fs);
-  if (err)
+  (*fs) = fla_fs_alloc();
+  if (!(*fs))
+  {
+    err = -ENOMEM;
     goto exit;
+  }
 
   (*fs)->dev.md_dev = md_dev;
   err = fla_open_common(dev_uri, *fs);
@@ -1721,10 +1724,10 @@ int
 fla_open(const char *dev_uri, struct flexalloc **fs)
 {
   int err;
-  err = fla_fs_alloc(fs);
+  (*fs) = fla_fs_alloc();
 
-  if (err)
-    return err;
+  if (!(*fs))
+    return -ENOMEM;
 
   err = fla_open_common(dev_uri, *fs);
   if (FLA_ERR(err, "fla_open_common()"))

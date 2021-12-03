@@ -11,7 +11,7 @@
 #include <sys/un.h>
 #include <sys/types.h>
 #include <signal.h>
-#include "flexalloc.h"
+#include "flexalloc_shared.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,7 +67,7 @@ struct fla_sys_identity
 
 struct fla_daemon
 {
-  struct flexalloc base;
+  struct flexalloc *flexalloc;
   struct fla_sys_identity identity;
   int listen_fd;
   struct sockaddr_un server;
@@ -87,7 +87,7 @@ struct fla_daemon
 
 struct fla_daemon_client
 {
-  struct flexalloc base;
+  struct flexalloc *flexalloc;
   struct fla_sys_identity server_version;
   int sock_fd;
   /// view into send buffer
@@ -100,12 +100,8 @@ struct fla_daemon_client
   char recv_buf[FLA_MSG_BUFSIZ];
 };
 
-/// get fla_daemon_client reference from flexalloc struct
-static inline struct fla_daemon_client *fla_get_client(struct flexalloc const * const fs)
-{
-  return (struct fla_daemon_client *)fs;
-}
-
+struct fla_daemon_client *
+fla_get_client(struct flexalloc const * const fs);
 
 int
 fla_max_open_files();
@@ -204,13 +200,12 @@ fla_daemon_identify_rsp(struct fla_daemon *daemon, int client_fd,
                         struct fla_msg const * const send);
 
 int
-fla_daemon_init_info_rq(struct fla_daemon_client *client, int sock_fd,
-                        char const ** dev_uri, struct fla_geo const **geo);
+fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd);
 
 int
-fla_daemon_init_info_rsp(struct fla_daemon *daemon, int client_fd,
-                         struct fla_msg const * const recv,
-                         struct fla_msg const * const send);
+fla_daemon_fs_init_rsp(struct fla_daemon *daemon, int client_fd,
+                       struct fla_msg const * const recv,
+                       struct fla_msg const * const send);
 
 int
 fla_daemon_close_rq(struct flexalloc *fs);

@@ -3,6 +3,7 @@
 #include "src/flexalloc_util.h"
 #include "libflexalloc.h"
 #include <stdlib.h>
+#include <inttypes.h>
 
 #define SOCKET_PATH "/tmp/flexalloc.socket"
 #define MAX_CLIENTS 110
@@ -75,7 +76,7 @@ msg_handler(struct fla_daemon *d, int client_fd, struct fla_msg const * const re
     break;
   case FLA_MSG_CMD_INIT_INFO:
     FLA_DBG_PRINT("FLA_MSG_CMD_INIT_INFO\n");
-    if (FLA_ERR(fla_daemon_init_info_rsp(d, client_fd, recv, send), "fla_daemon_init_info()"))
+    if (FLA_ERR(fla_daemon_fs_init_rsp(d, client_fd, recv, send), "fla_daemon_init_info()"))
       return -1;
     break;
   default:
@@ -110,7 +111,7 @@ main(int argc, char **argv)
   daemon.identity.version = FLA_SYS_FLEXALLOC_V1;
 
   // TODO open device, assign vtable
-  err = fla_open_common(dev_uri, &daemon.base);
+  err = fla_open_common(dev_uri, daemon.flexalloc);
   if (FLA_ERR(err, "fla_open_common()"))
     goto exit;
 
@@ -125,7 +126,7 @@ main(int argc, char **argv)
 
 close_dev:
   fprintf(stderr, "TODO: will get free(): invalid size -- close tries to free flexalloc struct\n");
-  fla_close(&daemon.base);
+  fla_close(daemon.flexalloc);
 exit:
   return err;
 }

@@ -60,6 +60,19 @@ struct fla_fns
                               struct fla_object *object);
 };
 
+struct flexalloc *
+fla_fs_alloc();
+
+void
+fla_fs_free(struct flexalloc *fs);
+
+int
+fla_fs_set_user(void *user_data);
+
+void *
+fla_fs_get_user();
+
+
 #ifdef __cplusplus
 }
 #endif
