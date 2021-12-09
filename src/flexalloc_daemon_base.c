@@ -767,9 +767,9 @@ fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
   uint32_t obj_nlb = *((uint32_t *)recv->data);
   char *name = (recv->data + sizeof(uint32_t));
   int name_len = recv->hdr->len - sizeof(uint32_t);
-  struct fla_pool **handle = NULL;
+  struct fla_pool *handle = NULL;
 
-  err = daemon->flexalloc->fns.pool_create(daemon->flexalloc, name, name_len, obj_nlb, handle);
+  err = daemon->flexalloc->fns.pool_create(daemon->flexalloc, name, name_len, obj_nlb, &handle);
   *((int *)send->data) = err;
 
   if (FLA_ERR(err, "pool_create()"))
@@ -779,15 +779,15 @@ fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
   else
   {
     send->hdr->len = sizeof(int) + sizeof(struct fla_pool);
-    memcpy(send->data + sizeof(int), *handle, sizeof(struct fla_pool));
+    memcpy(send->data + sizeof(int), handle, sizeof(struct fla_pool));
   }
 
   if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
     goto exit;
 
 exit:
-  if (*handle != NULL) // TODO: change API to not allocate the handle
-    free(*handle);
+  if (handle != NULL) // TODO: change API to not allocate the handle
+    free(handle);
   return err;
 }
 
