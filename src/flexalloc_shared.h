@@ -26,6 +26,18 @@ struct fla_object
   uint32_t entry_ndx;
 };
 
+
+struct fla_pool
+{
+  /// h2 hash of entry.
+  /// Can be used to check that acquired pool entry's name matches the name of
+  /// the pool when the handle was made. This may prevent following stale
+  /// handles to repurposed pool entries.
+  uint64_t h2;
+  /// offset of entry in the pool entries table
+  uint32_t ndx;
+};
+
 typedef enum
 {
   ROOT_OBJ_SET_DEF = 0,
