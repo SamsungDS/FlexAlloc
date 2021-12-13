@@ -32,6 +32,7 @@ flexalloc_common =  ['src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_has
   xnvme_env_files, flexalloc_util_files, flexalloc_znd_files]
 
 flexalloc_daemon_headers = ['src/flexalloc_daemon_base.h']
+flexalloc_daemon_files = ['src/flexalloc_daemon_base.c']
 libflexalloc_headers = ['src/libflexalloc.h', 'src/flexalloc_shared.h', flexalloc_daemon_headers]
 libflexalloc_files = ['src/libflexalloc.c', flexalloc_common]
 
@@ -44,7 +45,7 @@ executable('flexalloc_daemon', ['src/flexalloc_daemon.c', flexalloc_common, 'src
 executable('flexalloc_client', ['src/flexalloc_test_client.c', flexalloc_common, 'src/flexalloc_daemon_base.c', libflexalloc_files], dependencies: [xnvme_deps])
 
 ### Libraries ###
-library = both_libraries('flexalloc', [libflexalloc_files],
+library = both_libraries('flexalloc', [libflexalloc_files, flexalloc_daemon_files],
                          dependencies: xnvme_deps, install : true)
 install_headers(libflexalloc_headers)
 
