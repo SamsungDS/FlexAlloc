@@ -816,7 +816,7 @@ fla_daemon_pool_destroy_rsp(struct fla_daemon *daemon, int client_fd,
                             struct fla_msg const * const send)
 {
   int err;
-  struct fla_pool *pool = (struct fla_pool*)recv->data;
+  struct fla_pool *pool = NULL;
 
   if (FLA_ERR(recv->hdr->len != sizeof(struct fla_pool), "invalid message length"))
   {
@@ -824,6 +824,20 @@ fla_daemon_pool_destroy_rsp(struct fla_daemon *daemon, int client_fd,
                    sizeof(struct fla_pool), recv->hdr->len);
     return 1;
   }
+
+  // TODO: fla_base_pool_destroy also frees the handle - until changed, we have to allocate
+  //       memory to subsequently free.
+  // pool = (struct fla_pool*)recv->data;
+
+  pool = malloc(sizeof(struct fla_pool));
+  if (!pool)
+  {
+    err = -ENOMEM;
+    goto exit;
+  }
+
+  memcpy(pool, recv->data, sizeof(struct fla_pool));
+
 
   err = daemon->flexalloc->fns.pool_destroy(daemon->flexalloc, pool);
   *((int *)send->data) = err;
