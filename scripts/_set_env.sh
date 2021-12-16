@@ -34,7 +34,7 @@ create_env() {
 # Create virtual environment if:
 # * does not exist
 # * requirements.txt or requirements.dev.txt have changed since venv was created.
-if [[ ! -d "${VIRTUAL_ENV}" ]]; then
+if [ ! -d "${VIRTUAL_ENV}" ]; then
     create_env
 elif ! diff "${PY_SOURCE_ROOT}/requirements.txt" "${VIRTUAL_ENV}/requirements.txt" 2>&1 >/dev/null; then
     rm -rf "${VIRTUAL_ENV}"
