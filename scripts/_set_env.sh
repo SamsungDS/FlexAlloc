@@ -3,6 +3,14 @@ if [ -z "${MESON_SOURCE_ROOT}" ] || [ -z "${MESON_BUILD_ROOT}" ]; then
     exit 1
 fi
 
+# resolv MESON_{SOURCE,BUILD}_ROOT to absolute paths
+# this in turn renders all paths derived from these* absolute.
+# This, in turn, avoids errors where we change the CWD and execute a command, only to have it
+# fail because the (relative) paths to the various commands are then invalid.
+# (derived path vars: PY_{SOURCE,BUILD}_ROOT, VIRTUAL_ENV, VENV_{BIN,PY,PIP})
+export MESON_SOURCE_ROOT="`readlink -e $MESON_SOURCE_ROOT`"
+export MESON_BUILD_ROOT="`readlink -e $MESON_BUILD_ROOT`"
+
 export PY_SOURCE_ROOT="${MESON_SOURCE_ROOT}/pyflexalloc"
 export PY_BUILD_ROOT="${MESON_BUILD_ROOT}/pyflexalloc"
 export VIRTUAL_ENV="${PY_SOURCE_ROOT}/.venv"
