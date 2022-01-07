@@ -252,5 +252,9 @@ fla_slab_id(const struct fla_slab_header * slab, const struct flexalloc * fs,
 int
 fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t obj_nlb);
 
+uint64_t
+fla_object_slba(struct flexalloc const * fs, struct fla_object const * obj,
+                const struct fla_pool * pool_handle);
+
 #endif // __FLEXALLOC_MM_H_
 

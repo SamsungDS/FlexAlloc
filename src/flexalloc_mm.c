@@ -18,6 +18,13 @@
 #include "flexalloc_ll.h"
 #include "flexalloc_slabcache.h"
 #include "flexalloc_shared.h"
+#include "flexalloc_znd.h"
+
+static inline bool
+fla_geo_zoned(const struct fla_geo *geo)
+{
+  return geo->type == XNVME_GEO_ZONED;
+}
 
 void
 print_slab_sgmt(const struct flexalloc * fs)
@@ -189,84 +196,6 @@ fla_geo_nbytes(struct fla_geo *geo)
   return ((uint64_t)fla_geo_nblocks(geo)) * geo->lb_nbytes;
 }
 
-// Full zones are implicitly placed into the closed state so no need to manage anymore
-void
-fla_zone_full(struct flexalloc *fs, uint32_t zone)
-{
-  struct fla_zs_entry *z_entry;
-
-  TAILQ_FOREACH(z_entry, &fs->zs_thead, entries)
-  {
-    if (z_entry->zone_number == zone)
-      break;
-  }
-
-  // We should probably warn here
-  if (!z_entry)
-    return;
-
-  TAILQ_REMOVE(&fs->zs_thead, z_entry, entries);
-  fs->zs_size--;
-}
-
-void
-fla_manage_zones_cleanup(struct flexalloc *fs)
-{
-  struct fla_zs_entry *z_entry;
-
-  while ((z_entry = TAILQ_FIRST(&fs->zs_thead)))
-  {
-    TAILQ_REMOVE(&fs->zs_thead, z_entry, entries);
-    free(z_entry);
-  }
-}
-
-void
-fla_manage_zones(struct flexalloc *fs, uint32_t zone)
-{
-
-  struct fla_zs_entry *z_entry;
-  uint64_t zlba;
-  int ret;
-
-  TAILQ_FOREACH(z_entry, &fs->zs_thead, entries)
-  {
-    if (z_entry->zone_number == zone)
-      break;
-  }
-
-  if (z_entry)
-  {
-    // We found the entry so remove and reinsert at head
-    TAILQ_REMOVE(&fs->zs_thead, z_entry, entries);
-    TAILQ_INSERT_HEAD(&fs->zs_thead, z_entry, entries);
-    return;
-  }
-
-  // We are under the number of zones limit
-  if (fs->zs_size < fla_xne_dev_get_znd_mor(fs->dev.dev))
-  {
-    z_entry = malloc(sizeof(struct fla_zs_entry));
-    z_entry->zone_number = zone;
-    TAILQ_INSERT_HEAD(&fs->zs_thead, z_entry, entries);
-    fs->zs_size++;
-  }
-  else // We have to close a zone
-  {
-    z_entry = TAILQ_LAST(&fs->zs_thead, zs_thead);
-    if (!z_entry)
-      printf("fla_manage_zones: We should not end up here\n");
-
-    zlba = z_entry->zone_number * fs->geo.nzsect;
-    ret = fla_xne_dev_znd_send_mgmt(fs->dev.dev, zlba, XNVME_SPEC_ZND_CMD_MGMT_SEND_CLOSE, false);
-    if (ret)
-      printf("Error trying to close zone at:%lu\n", zlba);
-
-    z_entry->zone_number = zone;
-    TAILQ_REMOVE(&fs->zs_thead, z_entry, entries);
-    TAILQ_INSERT_HEAD(&fs->zs_thead, z_entry, entries);
-  }
-}
 
 void
 fla_geo_init(const struct xnvme_dev *dev, uint32_t npools, uint32_t slab_nlb,
@@ -309,7 +238,7 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
   fla_geo_init(dev, npools, slab_nlb, lb_nbytes, geo);
   fla_geo_init(dev, npools, slab_nlb, lb_nbytes, &md_geo);
 
-  if (geo->type == XNVME_GEO_ZONED && geo->slab_nlb % geo->nzsect)
+  if (fla_geo_zoned(geo) && geo->slab_nlb % geo->nzsect)
   {
     FLA_ERR_PRINTF("Znd dev slb sz:%u not multiple of zone sz:%lu\n", slab_nlb, geo->nzsect);
     return -1;
@@ -436,7 +365,7 @@ fla_geo_slab_lb_off(struct flexalloc const *fs, uint32_t slab_id)
     slabs_base = 0;
 
   slab_base = slabs_base + (slab_id * fs->geo.slab_nlb);
-  if (fs->geo.type == XNVME_GEO_ZONED && slab_base % fs->geo.nzsect)
+  if (fla_geo_zoned(&fs->geo) && slab_base % fs->geo.nzsect)
   {
     slab_base += fs->geo.nzsect - slabs_base;
   }
@@ -774,8 +703,8 @@ fla_close(struct flexalloc *fs)
   if (!fs)
     return 0;
 
-  if (fs->geo.type == XNVME_GEO_ZONED)
-    fla_manage_zones_cleanup(fs);
+  if (fla_geo_zoned(&fs->geo))
+    fla_znd_manage_zones_cleanup(fs);
 
   err = fla_flush(fs);
   if(FLA_ERR(err, "fla_flush()"))
@@ -899,7 +828,7 @@ fla_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t o
   if ((err = FLA_ERR(name_len >= FLA_NAME_SIZE_POOL, "pool name too long")))
     goto exit;
 
-  if (fs->geo.type == XNVME_GEO_ZONED)
+  if (fla_geo_zoned(&fs->geo))
   {
     if ((err = FLA_ERR(obj_nlb > fs->super->slab_nlb, "object sz > fomatted slab size")))
       goto exit;
@@ -1220,7 +1149,7 @@ fla_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
   uint32_t obj_zn = obj_slba / (fs->geo.nzsect);
   struct fla_zs_entry *z_entry;
 
-  if (fs->geo.type == XNVME_GEO_ZONED)
+  if (fla_geo_zoned(&fs->geo))
   {
     TAILQ_FOREACH(z_entry, &fs->zs_thead, entries)
     {
@@ -1379,7 +1308,7 @@ fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t ob
   size_t unused_nlb, free_list_nlb;
   uint32_t obj_num, slab_id;
 
-  if (fs->geo.type != XNVME_GEO_ZONED)
+  if (!fla_geo_zoned(&fs->geo))
   {
     for(obj_num = fs->geo.slab_nlb / obj_nlb ; obj_num > 0; --obj_num)
     {
@@ -1494,8 +1423,8 @@ fla_object_write(struct flexalloc * fs,
   sp.strp_sz = pool_entry->strp_sz;
   sp.obj_len = obj_len;
 
-  if (fs->geo.type == XNVME_GEO_ZONED)
-    fla_manage_zones(fs, obj_zn);
+  if (fla_geo_zoned(&fs->geo))
+    fla_znd_manage_zones(fs, obj_zn);
 
   if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
     goto exit;
@@ -1508,33 +1437,11 @@ fla_object_write(struct flexalloc * fs,
   if(FLA_ERR(err, "fla_xne_sync_seq_w_nbytes()"))
     goto exit;
 
-  if (fs->geo.type == XNVME_GEO_ZONED && w_eoffset == obj_eoffset)
-    fla_zone_full(fs, obj_zn);
+  if (fla_geo_zoned(&fs->geo) && w_eoffset == obj_eoffset)
+    fla_znd_zone_full(fs, obj_zn);
 
 exit:
   return err;
-}
-
-bool
-fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct fla_object *obj)
-{
-
-  uint64_t obj_slba = fla_object_slba(fs, obj, pool_handle);
-  uint32_t obj_zn = obj_slba / fs->geo.nzsect;
-  struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
-  uint32_t strps = pool_entry->strp_num;
-
-  for (uint32_t strp = 0; strp < strps; strp++)
-  {
-    int err = fla_xne_dev_znd_send_mgmt(fs->dev.dev, obj_slba + (fs->geo.nzsect * strp),
-                                        XNVME_SPEC_ZND_CMD_MGMT_SEND_FINISH, false);
-    if (FLA_ERR(err, "fla_xne_dev_znd_send_mgmt_finish()"))
-      return false;
-  }
-
-  // Update me for striping
-  fla_zone_full(fs, obj_zn);
-  return true;
 }
 
 int
@@ -1555,8 +1462,8 @@ fla_object_unaligned_write(struct flexalloc * fs,
   aligned_eb = FLA_CEIL_DIV(orig_eb, fs->dev.lb_nbytes) * fs->dev.lb_nbytes;
   bounce_buf_size = aligned_eb - aligned_sb;
 
-  if (fs->geo.type == XNVME_GEO_ZONED)
-    fla_manage_zones(fs, obj_zn);
+  if (fla_geo_zoned(&fs->geo))
+    fla_znd_manage_zones(fs, obj_zn);
 
   bounce_buf = fla_xne_alloc_buf(fs->dev.dev, bounce_buf_size);
   if(FLA_ERR(!bounce_buf, "fla_buf_alloc()"))
@@ -1681,7 +1588,7 @@ fla_fs_nzsect(struct flexalloc const *fs)
 bool
 fla_fs_zns(struct flexalloc const *fs)
 {
-  return fs->geo.type == XNVME_GEO_ZONED;
+  return fla_geo_zoned(&fs->geo);
 }
 
 int
