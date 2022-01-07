@@ -26,9 +26,10 @@ xnvme_deps = [thread_dep, uuid_dep, numa_dep, aio_dep, rt_dep, xnvme_dep]
 flexalloc_util_files = ['src/flexalloc_util.c']
 flexalloc_introspect = ['src/flexalloc_introspection.c']
 xnvme_env_files = ['src/flexalloc_xnvme_env.c', 'src/flexalloc_xnvme_env.h']
+flexalloc_znd_files = ['src/flexalloc_znd.c', 'src/flexalloc_znd.h']
 flexalloc_common =  ['src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_hash.c', 'src/flexalloc_bits.c',
   'src/flexalloc_freelist.c', 'src/flexalloc_ll.c', 'src/flexalloc_ll.h', 'src/flexalloc_slabcache.c',
-  xnvme_env_files, flexalloc_util_files]
+  xnvme_env_files, flexalloc_util_files, flexalloc_znd_files]
 
 libflexalloc_headers = ['src/libflexalloc.h', 'src/flexalloc_shared.h']
 libflexalloc_files = ['src/libflexalloc.c', flexalloc_common]
