@@ -11,7 +11,6 @@
 #define __FLEXALLOC_H_
 #include <stdint.h>
 #include <libxnvme.h>
-#include <sys/queue.h>
 #include "flexalloc_shared.h"
 #include "flexalloc_freelist.h"
 #include "flexalloc_hash.h"
