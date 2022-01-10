@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 set -x
 set -e
-source "${MESON_SOURCE_ROOT}/scripts/_set_env.sh"
+source "${SCRIPT_DIR}/_set_env.sh"
 
 cd "${PY_SOURCE_ROOT}"
 
