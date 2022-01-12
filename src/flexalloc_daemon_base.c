@@ -1131,7 +1131,7 @@ struct fla_fns client_fns =
 };
 
 int
-fla_socket_open(const char *socket_path, struct fla_daemon_client *client)
+fla_daemon_open(const char *socket_path, struct fla_daemon_client *client)
 {
   int err;
   struct sockaddr_un server;
@@ -1184,4 +1184,19 @@ socket_close:
   client->sock_fd = 0;
 exit:
   return err;
+}
+
+void
+fla_daemon_close(struct fla_daemon_client *client)
+{
+  if (client->flexalloc)
+  {
+    fla_fs_free(client->flexalloc);
+    client->flexalloc = NULL;
+  }
+  if (client->sock_fd != 0)
+  {
+    close(client->sock_fd);
+    client->sock_fd = 0;
+  }
 }
