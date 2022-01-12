@@ -44,4 +44,5 @@ print_options(struct cli_option *options)
     fmt_arg(buf, ARG_BUFLEN, o);
     fprintf(stdout, " -%c, %-*s\t%s\n", o->base.val, longest_arg, buf, o->description);
   }
+  fprintf(stdout, "\n\n");
 }
