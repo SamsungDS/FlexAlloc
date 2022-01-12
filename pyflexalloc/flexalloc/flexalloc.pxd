@@ -88,7 +88,6 @@ cdef extern from "flexalloc.h" nogil:
 cdef class FlexAlloc:
     cdef flexalloc *data
     cdef bint owner
-    cdef object _dev_uri_py_str
 
     @staticmethod
     cdef public FlexAlloc from_ptr(flexalloc *ptr)
