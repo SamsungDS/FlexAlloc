@@ -2,46 +2,36 @@ from libc.stdlib cimport malloc, free
 
 
 cdef extern from "libflexalloc.h" nogil:
-    int fla_open(char * dev_uri, flexalloc ** fs)
-    int fla_close(flexalloc * fs)
-    int fla_sync(flexalloc *fs)
+    # have to handle calling `fla_close` here to break an otherwise circular
+    # reference between libflexalloc.pyx and this file
+    int fla_close(flexalloc *fs)
 
 
 cdef class FlexAlloc:
-    def __init__(self, dev_uri: str):
-        self._dev_uri_py_str = dev_uri.encode("ascii")
-        cdef char *c_str = self._dev_uri_py_str
-        self.data = NULL
-        if fla_open(c_str, &self.data):
-            raise MemoryError("failed to open FlexAlloc system")
-        self.owner = True
+    def __init__(self):
+        raise RuntimeError("do not instantiate directly, use `from_ptr` method")
 
     @staticmethod
     cdef public FlexAlloc from_ptr(flexalloc *fs):
+        """initialize wrapper type by providing underlying pointer."""
         cdef FlexAlloc inst = FlexAlloc.__new__(FlexAlloc)
         inst.data = fs
-        inst.owner = False
+        inst.owner = True
         return inst
 
     def close(self):
         if self.data == NULL:
             return  # already closed
-        print("FlexAlloc.close()")
+
         if fla_close(self.data):
-            raise RuntimeError("failed to close {}".format(self._dev_uri_py_str))
+            raise RuntimeError("failed to close system")
         else:
             self.data = NULL
 
-    def sync(self):
-      if self.data == NULL:
-        return # can't sync a closed FS
-      print("FlexAlloc.sync()")
-      if fla_sync(self.data):
-        raise RuntimeError("failed to sync {}".format(self.dev_uri.py_str))
-
     def __dealloc__(self):
-        if self.owner and self.data != NULL:
+        if self.data == NULL and self.owner:
             self.close()
+
 
 cdef class ObjectHandle:
     def __init__(self):

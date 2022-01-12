@@ -13,7 +13,7 @@ def test_pool_root(dev):
     with dev() as tdev:
         mm.mkfs(tdev.dev_uri, 10, 1000, True)
         print("Getting device")
-        fs = FlexAlloc(tdev.dev_uri)
+        fs = libflexalloc.open(tdev.dev_uri)
         print("creating pool")
         p1 = libflexalloc.pool_create(fs, "lol", 10)
         print("object_alloc")
@@ -35,5 +35,5 @@ def test_pool_root(dev):
             print ("Root obj sid:", ro.slab_id, " entry_ndx:", ro.entry_ndx)
             print ("Pool obj sid:", p1o1.slab_id, " entry_ndx:", p1o1.entry_ndx)
             raise RuntimeError("Root object != Pool obj, bailing!")
-        fs.close()
+        libflexalloc.close(fs)
         print(tdev)

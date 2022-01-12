@@ -12,9 +12,11 @@ cdef extern from "libflexalloc.h" nogil:
       ROOT_OBJ_SET_FORCE = 1 << 0,
       ROOT_OBJ_SET_CLEAR = 1 << 1,
 
-    # The 'FlexAlloc' type in flexalloc.pyx manages calls to the open/close functions
-    # int fla_open(char *dev_uri, flexalloc **fs)
+    int fla_open(char *dev_uri, flexalloc ** fs)
+    int fla_md_open(char *dev_uri, char *md_dev_uri, flexalloc ** fs)
+    # wrapper for this call is implemented directly on the FlexAlloc type
     # int fla_close(flexalloc *fs)
+    int fla_sync(flexalloc *fs)
 
     int fla_pool_create(flexalloc *fs, const char *name, int name_len,
                           uint32_t obj_nlb, fla_pool **handle)

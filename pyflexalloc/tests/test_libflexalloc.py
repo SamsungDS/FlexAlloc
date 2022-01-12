@@ -11,8 +11,8 @@ from functools import partial
 def test_open_close(mkdev):
     with mkdev() as tdev:
         mm.mkfs(tdev.dev_uri, 10, 10)
-        fs = FlexAlloc(tdev.dev_uri)
-        fs.close()
+        fs = libflexalloc.open(tdev.dev_uri)
+        libflexalloc.close(fs)
 
 
 @pytest.mark.parametrize("dev", [partial(loop_device, 100, 512)])
@@ -21,7 +21,7 @@ def test_loop_write_read(dev, num):
     with dev() as tdev:
         mm.mkfs(tdev.dev_uri, 10, 1000, True)
         print("Getting device")
-        fs = FlexAlloc(tdev.dev_uri)
+        fs = libflexalloc.open(tdev.dev_uri)
         print("creating pool")
         p1 = libflexalloc.pool_create(fs, "lol", 10)
         print("object_alloc")
@@ -43,5 +43,5 @@ def test_loop_write_read(dev, num):
             print("free buf2")
 
         print("close fs")
-        fs.close()
+        libflexalloc.close(fs)
         print(tdev)

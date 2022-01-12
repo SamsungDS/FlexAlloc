@@ -3,6 +3,44 @@ Copyright (C) 2021 Jesper Devantier <j.devantier@samsung.com>
 """
 
 
+def open(dev_uri: str) -> FlexAlloc:
+    py_str = dev_uri.encode("ascii")
+    cdef char *c_str = py_str
+    cdef flexalloc *data
+    if fla_open(c_str, &data):
+        raise MemoryError("failed to open FlexAlloc system")
+
+    cdef FlexAlloc fs = FlexAlloc.from_ptr(data)
+    return fs
+
+
+def md_open(dev_uri: str, md_dev_uri: str) -> FlexAlloc:
+    dev_pystr = dev_uri.encode("ascii")
+    cdef char *dev_cstr = dev_pystr
+    md_dev_pystr = md_dev_uri.encode("ascii")
+    cdef char *md_dev_cstr = md_dev_pystr
+
+    cdef flexalloc *data
+    if fla_md_open(dev_cstr, md_dev_cstr, &data):
+        raise MemoryError("failed to open FlexAlloc system")
+
+    cdef FlexAlloc fs = FlexAlloc.from_ptr(data)
+    return fs
+
+
+def close(fs: FlexAlloc) -> None:
+    # delegate to actual implementation on type itself
+    fs.close()
+
+
+def sync(fs: FlexAlloc) -> int:
+    if fs.data == NULL:
+        return 1  # cannot sync already closed FS
+    if fla_sync(fs.data):
+        raise RuntimeError("failed to sync system")
+    return 0
+
+
 def pool_create(fs: FlexAlloc, name: str, obj_nlb: int) -> PoolHandle:
     py_str = name.encode("ascii")
     cdef char *c_str = py_str
