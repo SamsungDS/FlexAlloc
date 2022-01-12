@@ -1,11 +1,11 @@
 // Copyright (C) 2021 Jesper Devantier <j.devantier@samsung.com>
 #include "flexalloc_daemon_base.h"
+#include "src/flexalloc_cli_common.h"
 #include "src/flexalloc_util.h"
 #include "libflexalloc.h"
 #include <stdlib.h>
 #include <inttypes.h>
 
-#define SOCKET_PATH "/tmp/flexalloc.socket"
 #define MAX_CLIENTS 110
 #define MAX_CONN_QUEUE 100
 
@@ -86,34 +86,97 @@ msg_handler(struct fla_daemon *d, int client_fd, struct fla_msg const * const re
   return 0;
 }
 
+static struct cli_option options[] =
+{
+  {
+    .base = {"socket", required_argument, NULL, 's'},
+    .description = "path of where to create the UNIX socket",
+    .arg_ex = "PATH"
+  },
+  {
+    .base = {"device", required_argument, NULL, 'd'},
+    .description = "path of device containing the FlexAlloc system",
+    .arg_ex = "DEVICE"
+  },
+  {
+    . base = {"verbose", no_argument, NULL, 'v'},
+    .description = "display additional information",
+    .arg_ex = NULL
+  },
+  {
+    .base = {NULL, 0, NULL, 0}
+  }
+};
+
+void
+fla_daemon_usage()
+{
+  fprintf(stdout, "Usage: flexalloc_daemon [options]\n\n");
+  fprintf(stdout, "Provide mediated access to a FlexAlloc system via a daemon\n\n");
+  print_options(options);
+}
+
 int
 main(int argc, char **argv)
 {
-  struct fla_daemon daemon;
   int err = 0;
-  char *dev_uri;
+  int c;
+  int opt_idx = 0;
+  int verbose = 0;
+  char *socket_path = NULL;
+  char *device = NULL;
+  struct fla_daemon daemon;
+  int const n_opts = sizeof(options)/sizeof(struct cli_option);
+  struct option long_options[n_opts];
 
-  if (argc != 2)
+  for (int i=0; i<n_opts; i++)
   {
-    fprintf(stderr, "USAGE: flexalloc_daemon <disk>\n");
-    err = -1;
+    memcpy(long_options+i, &options[i].base, sizeof(struct option));
+  }
+
+  while ((c = getopt_long(argc, argv, "vs:d:", long_options, &opt_idx)) != -1)
+  {
+    switch (c)
+    {
+    case 'v':
+      verbose = 1;
+      break;
+    case 's':
+      socket_path = optarg;
+      break;
+    case 'd':
+      device = optarg;
+      break;
+    default:
+      break;
+    }
+  }
+
+  if (!socket_path || !device)
+  {
+    fla_daemon_usage();
+    err = 2;
+    if (!socket_path)
+      fprintf(stderr, "missing socket argument - must specify where to create the UNIX socket mediating access to FlexAlloc system\n");
+    if (!device)
+      fprintf(stderr, "missing device argument - must specify which device holds the FlexAlloc system\n");
     goto exit;
   }
-  dev_uri = argv[1];
 
   signal(SIGINT, sigint_handler);
 
-  err = fla_daemon_create(&daemon, SOCKET_PATH, msg_handler, MAX_CLIENTS, MAX_CONN_QUEUE);
+  err = fla_daemon_create(&daemon, socket_path, msg_handler, MAX_CLIENTS, MAX_CONN_QUEUE);
   if (FLA_ERR(err, "failed to initialize"))
     return EXIT_FAILURE;
 
   daemon.identity.type = FLA_SYS_FLEXALLOC_TYPE;
   daemon.identity.version = FLA_SYS_FLEXALLOC_V1;
 
-  err = fla_open_common(dev_uri, daemon.flexalloc);
+  err = fla_open_common(device, daemon.flexalloc);
   if (FLA_ERR(err, "fla_open_common()"))
     goto exit;
 
+  fprintf(stderr, "daemon ready for connections...\n");
   err = fla_daemon_loop(&daemon, &keep_running);
   if (FLA_ERR(err, "failure operate"))
     goto close_dev;
