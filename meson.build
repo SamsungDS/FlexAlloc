@@ -87,6 +87,9 @@ core_tests = {
   'rt_object_read_write'
   : {'sources': 'tests/flexalloc_rt_object_read_write.c',
     'suite' : 'core'},
+  'rt_strp_object_read_write'
+  : {'sources': 'tests/flexalloc_rt_strp_object_read_write.c',
+    'suite' : 'core'},
   'rt_object_unaligned_write'
   : {'sources': 'tests/flexalloc_rt_object_unaligned_write.c',
     'suite' : 'core'},
