@@ -205,6 +205,7 @@ main(int argc, char **argv)
   struct flexalloc *fs;
   char *dev_uri = NULL;
   int err = 0;
+  struct fla_open_opts open_opts = {0};
 
   for (int i = 0; i < num_opts; i++)
   {
@@ -231,10 +232,10 @@ main(int argc, char **argv)
     goto exit;
   }
 
-  dev_uri = argv[optind++];
+  open_opts.dev_uri = argv[optind++];
 
   fprintf(stdout, "opening flexalloc system on %s...\n", dev_uri);
-  err = fla_open(dev_uri, &fs);
+  err = fla_open(&open_opts, &fs);
   if (err)
   {
     fprintf(stderr, "failed to open device '%s'\n", dev_uri);

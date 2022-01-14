@@ -126,6 +126,7 @@ main(int argc, char **argv)
   struct fla_daemon daemon;
   int const n_opts = sizeof(options)/sizeof(struct cli_option);
   struct option long_options[n_opts];
+  struct fla_open_opts fla_oopts = {0};
 
   for (int i=0; i<n_opts; i++)
   {
@@ -152,7 +153,8 @@ main(int argc, char **argv)
     fla_daemon_usage();
     err = 2;
     if (!socket_path)
-      fprintf(stderr, "missing socket argument - must specify where to create the UNIX socket mediating access to FlexAlloc system\n");
+      fprintf(stderr,
+              "missing socket argument - must specify where to create the UNIX socket mediating access to FlexAlloc system\n");
     if (!device)
       fprintf(stderr, "missing device argument - must specify which device holds the FlexAlloc system\n");
     goto exit;
@@ -167,8 +169,9 @@ main(int argc, char **argv)
   daemon.identity.type = FLA_SYS_FLEXALLOC_TYPE;
   daemon.identity.version = FLA_SYS_FLEXALLOC_V1;
 
-  err = fla_open_common(device, daemon.flexalloc);
-  if (FLA_ERR(err, "fla_open_common()"))
+  fla_oopts.dev_uri = device;
+  err = fla_open(&fla_oopts, &daemon.flexalloc);
+  if (FLA_ERR(err, "fla_open()"))
     goto exit;
 
   fprintf(stderr, "daemon ready for connections...\n");

@@ -24,6 +24,7 @@ main(int argc, char **argv)
   struct flexalloc *fs = NULL;
   struct fla_pool *pool_handle;
   struct fla_object obj;
+  struct fla_open_opts open_opts = {0};
   struct test_vals test_vals
       = {.blk_num = 40000, .slab_nlb = 4000, .npools = 1, .obj_nlb = 2};
 
@@ -73,11 +74,9 @@ main(int argc, char **argv)
   if(FLA_ERR(err, "fla_close()"))
     goto free_write_buffer;
 
-  if (!dev._md_dev_uri)
-    err = fla_open(dev._dev_uri, &fs);
-  else
-    err = fla_md_open(dev._dev_uri, dev._md_dev_uri, &fs);
-
+  open_opts.dev_uri = dev._dev_uri;
+  open_opts.md_dev_uri = dev._md_dev_uri;
+  err = fla_open(&open_opts, &fs);
   if(FLA_ERR(err, "fla_open()"))
     goto free_write_buffer;
 
