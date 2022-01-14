@@ -83,6 +83,7 @@ main(int argc, char **argv)
   struct fla_ut_dev dev;
   struct flexalloc *fs = NULL;
   struct fla_pool * handle;
+  struct fla_open_opts open_opts = {0};
   int err = 0, ret;
 
   err = fla_ut_dev_init(40000, &dev);
@@ -136,15 +137,9 @@ main(int argc, char **argv)
   if (FLA_ERR(err, "fla_close()"))
     goto teardown_ut_fs;
 
-  if (dev._md_dev_uri)
-  {
-    err = fla_md_open(dev._dev_uri, dev._md_dev_uri, &fs);
-  }
-  else
-  {
-    err = fla_open(dev._dev_uri, &fs);
-  }
-
+  open_opts.dev_uri = dev._dev_uri;
+  open_opts.md_dev_uri = dev._md_dev_uri;
+  err = fla_open(&open_opts, &fs);
   if (FLA_ERR(err, "fla_open() - failed to re-open device"))
     goto teardown_ut_fs;
 
@@ -179,17 +174,10 @@ main(int argc, char **argv)
     goto teardown_ut_fs;
 
   // We need to reopen the device to verify pools have been destroyed
-  if (dev._is_zns)
-  {
-    err = fla_md_open(dev._dev_uri, dev._md_dev_uri, &fs);
-  }
-  else
-  {
-    err = fla_open(dev._dev_uri, &fs);
-  }
-
+  err = fla_open(&open_opts, &fs);
   if (FLA_ERR(err, "fla_open() - failed to re-open device"))
     goto teardown_ut_fs;
+
   for (unsigned int i = 0; i < pools_len; i++)
   {
     err = fla_pool_open(fs, pools[i].name, &handle) == 0;

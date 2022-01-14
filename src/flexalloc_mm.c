@@ -453,7 +453,7 @@ fla_mkfs_super_init(struct flexalloc *fs, struct fla_geo *geo)
 }
 
 int
-fla_init(struct fla_geo *geo, struct xnvme_dev *dev, void *fla_md_buf,
+fla_init(struct fla_geo *geo, struct xnvme_dev *dev, struct xnvme_dev *md_dev, void *fla_md_buf,
          struct flexalloc *fs)
 {
   /*
@@ -468,6 +468,7 @@ fla_init(struct fla_geo *geo, struct xnvme_dev *dev, void *fla_md_buf,
   uint8_t *pool_sgmt_base;
 
   fs->dev.dev = dev;
+  fs->dev.md_dev = md_dev;
   fs->dev.lb_nbytes = fla_xne_dev_lba_nbytes(dev);
 
   fs->fs_buffer = fla_md_buf;
@@ -568,7 +569,7 @@ fla_mkfs(struct fla_mkfs_p *p)
   }
 
   memset(fla_md_buf, 0, fla_md_buf_len);
-  err = fla_init(&geo, dev, fla_md_buf, fs);
+  err = fla_init(&geo, dev, NULL, fla_md_buf, fs);
   if (FLA_ERR(err, "fla_init()"))
     goto free_md;
 
@@ -1592,34 +1593,39 @@ fla_fs_zns(struct flexalloc const *fs)
 }
 
 int
-fla_open_common(const char *dev_uri, struct flexalloc *fs)
+fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
 {
   struct xnvme_dev *dev = NULL, *md_dev = NULL;
   void *fla_md_buf;
   size_t fla_md_buf_len;
   struct fla_geo geo;
   struct fla_super *super;
-  int err = 0;
+  int err = 0;;
 
-  err = fla_xne_dev_open(dev_uri, NULL, &dev);
+  err = fla_fs_alloc(fs);
+  if (err)
+    goto exit;
+
+  err = fla_xne_dev_open(opts->dev_uri, &opts->opts, &dev);
   if (FLA_ERR(err, "fla_xne_dev_open()"))
-  {
-    err = FLA_ERR_ERROR;
-    return err;
-  }
+    goto free_fs;
 
-  if (fs->dev.md_dev)
-    md_dev = fs->dev.md_dev;
+  if (opts->md_dev_uri)
+  {
+    err = fla_xne_dev_open(opts->md_dev_uri, NULL, &md_dev);
+    if (FLA_ERR(err, "fla_xne_dev_open()"))
+      goto xnvme_dev_close;
+  }
   else
     md_dev = dev;
 
   err = fla_xne_dev_sanity_check(dev, md_dev);
   if(FLA_ERR(err, "fla_xne_dev_sanity_check()"))
-    goto xnvme_close;
+    goto xnvme_dev_close;
 
   err = fla_super_read(md_dev, fla_xne_dev_lba_nbytes(dev), &super);
   if (FLA_ERR(err, "fla_super_read"))
-    goto xnvme_close;
+    goto xnvme_dev_close;
 
   // read disk geometry
   fla_geo_from_super(dev, super, &geo);
@@ -1638,71 +1644,30 @@ fla_open_common(const char *dev_uri, struct flexalloc *fs)
   if (FLA_ERR(err, "fla_xne_sync_seq_r_nbyte_nbytess()"))
     goto free_md;
 
-  err = fla_init(&geo, dev, fla_md_buf, fs);
+  err = fla_init(&geo, dev, md_dev, fla_md_buf, (*fs));
   if (FLA_ERR(err, "fla_init()"))
     goto free_md;
 
-  err = fla_slab_cache_init(fs, &fs->slab_cache);
+  err = fla_slab_cache_init((*fs), &((*fs)->slab_cache));
   if (FLA_ERR(err, "fla_slab_cache_init()"))
     goto free_md;
 
   free(super);
 
-  fs->state |= FLA_STATE_OPEN;
+  (*fs)->state |= FLA_STATE_OPEN;
   return 0;
 
 free_md:
   fla_xne_free_buf(md_dev, fla_md_buf);
 free_super:
   fla_xne_free_buf(md_dev, super);
-xnvme_close:
-  xnvme_dev_close(dev);
+xnvme_dev_close:
+  if (dev != md_dev)
+    xnvme_dev_close(dev);
 
-  return err;
-}
-
-int
-fla_md_open(const char *dev_uri, const char *md_dev_uri, struct flexalloc **fs)
-{
-  struct xnvme_dev *md_dev;
-  int err;
-
-  err = fla_xne_dev_open(md_dev_uri, NULL, &md_dev);
-  if (FLA_ERR(err, "fla_xne_dev_open()"))
-  {
-    err = FLA_ERR_ERROR;
-    return err;
-  }
-
-  err = fla_fs_alloc(fs);
-  if (err)
-    goto exit;
-
-  (*fs)->dev.md_dev = md_dev;
-  err = fla_open_common(dev_uri, *fs);
-  if (FLA_ERR(err, "fla_open_common()"))
-    fla_fs_free(*fs);
-
-  return err;
-
+  xnvme_dev_close(md_dev);
+free_fs:
+  free(*fs);
 exit:
-  if (err)
-    xnvme_dev_close((*fs)->dev.md_dev);
-
-  return err;
-}
-
-int
-fla_open(const char *dev_uri, struct flexalloc **fs)
-{
-  int err;
-  err = fla_fs_alloc(fs);
-  if (err)
-    return err;
-
-  err = fla_open_common(dev_uri, *fs);
-  if (FLA_ERR(err, "fla_open_common()"))
-    fla_fs_free(*fs);
-
   return err;
 }

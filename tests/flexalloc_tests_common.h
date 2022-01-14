@@ -129,10 +129,6 @@ int
 fla_ut_fs_teardown(struct flexalloc *fs);
 
 int
-fla_ut_dev_fs_create(char *uri, char *md_uri, uint32_t slab_nlb, uint32_t npools,
-                     struct flexalloc **fs);
-
-int
 fla_ut_temp_file_create(const int size, char * created_name);
 
 int
