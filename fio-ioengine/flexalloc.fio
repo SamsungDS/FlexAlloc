@@ -1,0 +1,12 @@
+# this assumes that a flexalloc file system
+# has been created on /dev/ram0
+[test]
+ioengine=external:./flexalloc.o
+rw=randwrite
+verify=crc32c
+direct=1				# required for buffer alignment
+thread=1				# required for sharing FS handles
+dev_uri=/dev/ram0			# device where FS resides
+filesize=2M				# size of each object
+nrfiles=100				# number of objects
+poolname=testpool
