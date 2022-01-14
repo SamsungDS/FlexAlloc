@@ -468,33 +468,12 @@ fla_expr_assert(char *expr_s, int expr_result, char *err_msg, const char *func,
 }
 
 int
-fla_ut_dev_fs_create(char *uri, char *md_uri, uint32_t slab_nlb, uint32_t npools,
-                     struct flexalloc **fs)
-{
-  int err;
-  struct fla_mkfs_p mkfs_params = {0};
-
-  mkfs_params.dev_uri = uri;
-  mkfs_params.slab_nlb = slab_nlb;
-  mkfs_params.npools = npools;
-
-  err = fla_mkfs(&mkfs_params);
-  if(FLA_ERR(err, "fla_mkfs()"))
-    goto exit;
-
-  err = fla_md_open(uri, md_uri, fs);
-  FLA_ERR(err, "fla_open()");
-
-exit:
-  return err;
-}
-
-int
 fla_ut_lpbk_fs_create(uint64_t lb_nbytes, uint64_t nblocks, uint32_t slab_nlb,
                       uint32_t npools,
                       struct fla_ut_lpbk **lpbk, struct flexalloc **fs)
 {
   struct fla_mkfs_p mkfs_params = {0};
+  struct fla_open_opts open_opts = {0};
   int err, ret;
 
   err = fla_ut_lpbk_dev_alloc(lb_nbytes, nblocks, lpbk);
@@ -506,14 +485,14 @@ fla_ut_lpbk_fs_create(uint64_t lb_nbytes, uint64_t nblocks, uint32_t slab_nlb,
   mkfs_params.dev_uri = (*lpbk)->dev_name;
   mkfs_params.slab_nlb = slab_nlb;
   mkfs_params.npools = npools;
-
   err = fla_mkfs(&mkfs_params);
   if(FLA_ERR(err, "fla_mkfs()"))
   {
     goto teardown_lpbk;
   }
 
-  err = fla_open((*lpbk)->dev_name, fs);
+  open_opts.dev_uri = (*lpbk)->dev_name;
+  err = fla_open(&open_opts, fs);
   if(FLA_ERR(err, "fla_open()"))
   {
     goto teardown_lpbk;
@@ -625,6 +604,7 @@ fla_ut_fs_create(uint32_t slab_min_blocks, uint32_t npools,
                  struct fla_ut_dev *dev, struct flexalloc **fs)
 {
   struct fla_mkfs_p mkfs_params = {0};
+  struct fla_open_opts open_opts = {0};
   int err = 0, ret;
 
   if (dev->_is_loop)
@@ -644,18 +624,15 @@ fla_ut_fs_create(uint32_t slab_min_blocks, uint32_t npools,
   mkfs_params.md_dev_uri = (char *)dev->_md_dev_uri;
   mkfs_params.slab_nlb = slab_min_blocks;
   mkfs_params.npools = npools;
-
   err = fla_mkfs(&mkfs_params);
   if(FLA_ERR(err, "fla_mkfs()"))
   {
     goto teardown;
   }
 
-  if (dev->_md_dev_uri)
-    err = fla_md_open(dev->_dev_uri, dev->_md_dev_uri, fs);
-  else
-    err = fla_open(dev->_dev_uri, fs);
-
+  open_opts.dev_uri = (char *)dev->_dev_uri;
+  open_opts.md_dev_uri = (char *)dev->_md_dev_uri;
+  err = fla_open(&open_opts, fs);
   if(FLA_ERR(err, "fla_open()"))
   {
     goto teardown;

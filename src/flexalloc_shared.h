@@ -1,6 +1,7 @@
 #ifndef FLEXALLOC_SHARED_H_
 #define FLEXALLOC_SHARED_H_
 #include <stdint.h>
+#include <libxnvme.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -13,6 +14,18 @@ struct flexalloc;
 
 struct fla_pool;
 struct flexalloc;
+
+/// flexalloc open options
+///
+/// Minimally the dev_uri needs to be set
+/// If the md_dev is set than flexalloc md will be stored on this device
+/// The xnvme open options are optionally set at open time as well
+struct fla_open_opts
+{
+  const char *dev_uri;
+  const char *md_dev_uri;
+  struct xnvme_opts opts;
+};
 
 /// flexalloc object handle
 ///

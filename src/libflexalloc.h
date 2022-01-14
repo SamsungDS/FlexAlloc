@@ -22,26 +22,14 @@ struct flexalloc;
 
 /**
  * Open flexalloc system
- * @param dev_uri path to device node, e.g. "/dev/nvme0"
+ * @param opts pointer to initialized fla open opts struct
  * @param flexalloc pointer to flexalloc system handle, if successful, otherwise uninitialized.
  *
  * @return On success 0 and *fs pointing to a flexalloc system handle. On error, non-zero
  * and *fs being uninitialized.
  */
 int
-fla_open(const char *dev_uri, struct flexalloc **fs);
-
-/**
- * Open flexalloc with MD on a separate device
- * @param dev_uri path to device node that does not have MD, e.g. "/dev/nvme0n1"
- * @parm md_dev_uri path to device node where MD will be stored, e.g "/dev/nvme0n2"
- * @param flexalloc pointer to flexalloc system handle, if successful, otherwise uninitialized.
- *
- * @return On success 0 and *fs pointing to a flexalloc system handle. On error, non-zero
- * and *fs being uninitialized.
- */
-int
-fla_md_open(const char *dev_uri, const char *md_dev_uri, struct flexalloc **fs);
+fla_open(struct fla_open_opts *opts, struct flexalloc **fs);
 
 /**
  * Close flexalloc system.

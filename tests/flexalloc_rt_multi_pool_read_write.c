@@ -31,6 +31,7 @@ main(int argc, char **argv)
   struct fla_object obj[NUM_POOLS] = {0};
   struct test_vals t_val = {0};
   struct fla_ut_dev tdev = {0};
+  struct fla_open_opts open_opts = {0};
 
   err = fla_ut_dev_init(t_val.blk_num, &tdev);
   if (FLA_ERR(err, "fla_ut_dev_init()"))
@@ -82,8 +83,9 @@ main(int argc, char **argv)
   if(FLA_ERR(err, "fla_close()"))
     goto free_write_buffer;
 
-  err = fla_md_open(tdev._dev_uri, tdev._md_dev_uri, &fs);
-
+  open_opts.dev_uri = tdev._dev_uri;
+  open_opts.md_dev_uri = tdev._md_dev_uri;
+  err = fla_open(&open_opts, &fs);
   if(FLA_ERR(err, "fla_open()"))
     goto free_write_buffer;
 
