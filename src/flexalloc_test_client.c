@@ -48,5 +48,5 @@ main(int argc, char **argv)
   if (FLA_ERR(err, "fla_close()"))
     err = 1;
 
-  fla_daemon_close(&client);
+  return err;
 }
