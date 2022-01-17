@@ -601,7 +601,7 @@ int
 fla_daemon_sync_rq(struct flexalloc *fs)
 {
   int err;
-  struct fla_daemon_client *client = (struct fla_daemon_client *)fs;
+  struct fla_daemon_client *client = fla_get_client(fs);
 
   client->send.hdr->len = 0;
   client->send.hdr->cmd = FLA_MSG_CMD_SYNC;
