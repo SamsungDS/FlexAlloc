@@ -1186,17 +1186,3 @@ exit:
   return err;
 }
 
-void
-fla_daemon_close(struct fla_daemon_client *client)
-{
-  if (client->flexalloc)
-  {
-    fla_fs_free(client->flexalloc);
-    client->flexalloc = NULL;
-  }
-  if (client->sock_fd != 0)
-  {
-    close(client->sock_fd);
-    client->sock_fd = 0;
-  }
-}

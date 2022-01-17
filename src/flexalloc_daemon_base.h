@@ -304,9 +304,6 @@ fla_daemon_pool_get_root_object_rsp(struct fla_daemon *daemon, int client_fd,
 int
 fla_daemon_open(const char * socket_path, struct fla_daemon_client * client);
 
-void
-fla_daemon_close(struct fla_daemon_client * client);
-
 #ifdef __cplusplus
 }
 #endif
