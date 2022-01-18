@@ -19,7 +19,7 @@ cdef class FlexAlloc:
         inst.owner = True
         return inst
 
-    def close(self):
+    cpdef public void close(self):
         if self.data == NULL:
             return  # already closed
 

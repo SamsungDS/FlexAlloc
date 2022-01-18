@@ -91,6 +91,7 @@ cdef class FlexAlloc:
 
     @staticmethod
     cdef public FlexAlloc from_ptr(flexalloc *ptr)
+    cpdef public void close(self)
 
 
 cdef class ObjectHandle:
