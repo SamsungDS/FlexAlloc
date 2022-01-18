@@ -191,6 +191,22 @@ fla_close_noflush(struct flexalloc *fs);
 
 
 /**
+ * @brief set initial pool_entry values for new/reset entry.
+ *
+ * Initializes the pool_entry as when newly acquired by a freshly created pool.
+ * Chiefly, the name and obj_nlb entries are set while other accounting structures
+ * are initialized to their default starting values.
+ *
+ * @param pool_entry the pool entry itself, should point to an entry in fs->pools.entries
+ * @param name name given to the pool
+ * @param name_len length of the pool name (should match strlen(name))
+ * @param obj_nlb describes object size in the form of number of logical blocks
+ */
+void
+fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int name_len,
+                     uint32_t obj_nlb);
+
+/**
  * @brief Acquire the next free slab
  *
  * The next free slab gets assigned to slab_header and it is removed from the

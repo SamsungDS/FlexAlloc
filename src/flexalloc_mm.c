@@ -790,6 +790,19 @@ fla_base_pool_open(struct flexalloc *fs, const char *name, struct fla_pool **han
   return 0;
 }
 
+void
+fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int name_len,
+                     uint32_t obj_nlb)
+{
+  memcpy(pool_entry->name, name, name_len);
+  pool_entry->obj_nlb = obj_nlb;
+  pool_entry->empty_slabs = FLA_LINKED_LIST_NULL;
+  pool_entry->full_slabs = FLA_LINKED_LIST_NULL;
+  pool_entry->partial_slabs = FLA_LINKED_LIST_NULL;
+  pool_entry->root_obj_hndl = FLA_ROOT_OBJ_NONE;
+  pool_entry->strp_num = 1; // By default we don't stripe across objects
+}
+
 int
 fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_num, uint32_t strp_sz)
 {
@@ -860,13 +873,7 @@ fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint3
     goto free_freelist_entry;
 
   pool_entry = &fs->pools.entries[entry_ndx];
-  memcpy(pool_entry->name, name, name_len);
-  pool_entry->obj_nlb = obj_nlb;
-  pool_entry->empty_slabs = FLA_LINKED_LIST_NULL;
-  pool_entry->full_slabs = FLA_LINKED_LIST_NULL;
-  pool_entry->partial_slabs = FLA_LINKED_LIST_NULL;
-  pool_entry->root_obj_hndl = FLA_ROOT_OBJ_NONE;
-  pool_entry->strp_num = 1; // By default we don't stripe across objects
+  fla_pool_entry_reset(pool_entry, name, name_len, obj_nlb);
 
   (*handle)->ndx = entry_ndx;
   (*handle)->h2 = FLA_HTBL_H2(name);
