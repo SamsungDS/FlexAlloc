@@ -19,10 +19,10 @@ def test_sync(fs):
     with fs() as fs:
         p1 = libflexalloc.pool_create(fs, "lol", 10)
         print("object_alloc #1")
-        p1o1 = libflexalloc.object_alloc(fs, p1)
+        p1o1 = libflexalloc.object_create(fs, p1)
         print(p1o1)
         print("sync fs")
         libflexalloc.sync(fs)
         print("object_alloc #2")
-        p1o2 = libflexalloc.object_alloc(fs, p1)
+        p1o2 = libflexalloc.object_create(fs, p1)
         print(p1o2)
