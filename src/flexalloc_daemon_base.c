@@ -664,6 +664,8 @@ fla_daemon_pool_open_rq(struct flexalloc *fs, char const *name, struct fla_pool 
 {
   int err;
   struct fla_daemon_client *client = fla_get_client(fs);
+  struct fla_pool_entry *pool_entry = NULL;
+  uint32_t obj_nlb;
   size_t name_len = strnlen((char *)name, FLA_NAME_SIZE_POOL);
   if (FLA_ERR(name_len == FLA_NAME_SIZE_POOL,
               "invalid, pool name exceeds max length or is not null-terminated"))
@@ -693,6 +695,12 @@ fla_daemon_pool_open_rq(struct flexalloc *fs, char const *name, struct fla_pool 
 
   // copy response from buffer to allocated structure
   memcpy(*handle, client->recv.data + sizeof(int), sizeof(struct fla_pool));
+  pool_entry = &client->flexalloc->pools.entries[(*handle)->ndx];
+  obj_nlb = *(client->recv.data + sizeof(int) + sizeof(struct fla_pool));
+  fla_pool_entry_reset(
+    pool_entry,
+    name, name_len,
+    obj_nlb);
 
   return 0;
 
@@ -711,9 +719,11 @@ fla_daemon_pool_open_rsp(struct fla_daemon *daemon, int client_fd,
                          struct fla_msg const * const send)
 {
   int err;
-  char *name = recv->data;
-  // int name_len = recv->hdr->len; // API does not require this at the moment
   struct fla_pool **handle = NULL;
+  struct fla_pool_entry *pool_entry = NULL;
+  char *name = recv->data;
+  size_t name_len = recv->hdr->len;
+  name[name_len] = '\0'; // ensure string is null-terminated
 
   err = daemon->flexalloc->fns.pool_open(daemon->flexalloc, name, handle);
   *((int *)send->data) = err;
@@ -725,8 +735,12 @@ fla_daemon_pool_open_rsp(struct fla_daemon *daemon, int client_fd,
   }
   else
   {
-    send->hdr->len = sizeof(int) + sizeof(struct fla_pool);
+    // SUCCESS RSP: [<err code: 0>, <struct fla_pool>, obj_nlb]
+    pool_entry = &daemon->flexalloc->pools.entries[(*handle)->ndx];
+    send->hdr->len = sizeof(int) + sizeof(struct fla_pool) + sizeof(pool_entry->obj_nlb);
     memcpy(send->data + sizeof(int), *handle, sizeof(struct fla_pool));
+    memcpy(send->data + sizeof(int) + sizeof(struct fla_pool), &pool_entry->obj_nlb,
+           sizeof(pool_entry->obj_nlb));
   }
 
   if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
