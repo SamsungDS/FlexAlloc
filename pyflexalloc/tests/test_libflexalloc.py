@@ -29,7 +29,7 @@ def test_loop_write_read(fs):
         print("creating pool")
         p1 = libflexalloc.pool_create(fs, "lol", 10)
         print("object_alloc")
-        p1o1 = libflexalloc.object_alloc(fs, p1)
+        p1o1 = libflexalloc.object_create(fs, p1)
         print(p1o1)
         print("IOBuffer (#1)")
 
