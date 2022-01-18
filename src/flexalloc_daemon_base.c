@@ -507,6 +507,7 @@ fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
     return err;
 
   memcpy(&client->flexalloc->geo, read_ptr, sizeof(struct fla_geo));
+  client->flexalloc->dev.lb_nbytes = client->flexalloc->geo.lb_nbytes;
   read_ptr += sizeof(struct fla_geo);
 
   read_ptr += sizeof(size_t); // ignore string length field
