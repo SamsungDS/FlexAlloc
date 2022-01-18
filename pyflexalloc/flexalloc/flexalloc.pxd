@@ -98,6 +98,7 @@ cdef class ObjectHandle:
     cdef fla_object *data
     cdef bint owner
 
+
 cdef class PoolHandle:
     cdef fla_pool *data
     cdef bint owner

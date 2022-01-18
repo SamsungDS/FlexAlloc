@@ -72,22 +72,27 @@ def pool_open(fs: FlexAlloc, name: str) -> PoolHandle:
         raise RuntimeError("failed to open pool")
     return PoolHandle.from_ptr(hptr)
 
+
 def pool_close(fs: FlexAlloc, handle: PoolHandle) -> None:
     pool_close(fs, handle)
+
 
 def pool_set_root(fs: FlexAlloc, pool: PoolHandle, obj: ObjectHandle, fla_root_object_set_action act) -> None:
     if fla_pool_set_root_object(fs.data, pool.data, obj.data, act):
         raise RuntimeError("Failed to set root object for pool")
 
+
 def pool_get_root(fs: FlexAlloc, pool: PoolHandle, obj: ObjectHandle) -> None:
     if fla_pool_get_root_object(fs.data, pool.data, obj.data):
         raise RuntimeError("Failed to get root object for pool")
+
 
 def object_create(fs: FlexAlloc, pool: PoolHandle) -> ObjectHandle:
   oh = ObjectHandle()
   if fla_object_create(fs.data, pool.data, oh.data):
     raise RuntimeError("failed to allocate object")
   return oh
+
 
 def object_open(fs: FlexAlloc, pool: PoolHandle, obj: ObjectHandle) -> None:
     if fla_object_open(fs.data, pool.data, obj.data):
