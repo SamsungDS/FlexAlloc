@@ -4,6 +4,7 @@ Copyright (C) 2021 Jesper Devantier <j.devantier@samsung.com>
 from libc.stdint cimport uint64_t, uint32_t
 from libc.stdlib cimport malloc, free
 
+
 cdef extern from "flexalloc_hash.h" nogil:
     uint64_t fla_hash_djb2(char *key)
     uint64_t fla_hash_sdbm(char *key)

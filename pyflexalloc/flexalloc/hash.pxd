@@ -1,5 +1,6 @@
 from libc.stdint cimport uint64_t, uint16_t
 
+
 cdef extern from "flexalloc_hash.h" nogil:
     cdef struct fla_htbl_entry:
         uint64_t h2
