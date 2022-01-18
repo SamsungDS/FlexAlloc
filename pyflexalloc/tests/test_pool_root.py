@@ -1,19 +1,21 @@
 from flexalloc import libflexalloc
-from flexalloc import mm
-from flexalloc.flexalloc import FlexAlloc
 from flexalloc.flexalloc import ObjectHandle
-import flexalloc
-from tests_common import loop_device
+from tests_common import dev_loop, fla_open_direct, fla_open_daemon, format_fla_mkfs
 import pytest
-from functools import partial
 
 
-@pytest.mark.parametrize("dev", [partial(loop_device, 100, 512)])
-def test_pool_root(dev):
-    with dev() as tdev:
-        mm.mkfs(tdev.dev_uri, 10, 1000, True)
-        print("Getting device")
-        fs = libflexalloc.open(tdev.dev_uri)
+@pytest.mark.parametrize("fs", [
+    fla_open_direct(
+        device=dev_loop(size_mb=100, block_size_bytes=512),
+        formatter=format_fla_mkfs(npools=10, slab_nlb=1000)
+    ),
+    fla_open_daemon(
+        device=dev_loop(size_mb=100, block_size_bytes=512),
+        formatter=format_fla_mkfs(npools=10, slab_nlb=1000)
+    )
+])
+def test_pool_root(fs):
+    with fs() as fs:
         print("creating pool")
         p1 = libflexalloc.pool_create(fs, "lol", 10)
         print("object_alloc")
@@ -32,8 +34,6 @@ def test_pool_root(dev):
         if p1o1.slab_id == ro.slab_id and p1o1.entry_ndx == ro.entry_ndx:
             print("Root object set and get successful")
         else:
-            print ("Root obj sid:", ro.slab_id, " entry_ndx:", ro.entry_ndx)
-            print ("Pool obj sid:", p1o1.slab_id, " entry_ndx:", p1o1.entry_ndx)
+            print("Root obj sid:", ro.slab_id, " entry_ndx:", ro.entry_ndx)
+            print("Pool obj sid:", p1o1.slab_id, " entry_ndx:", p1o1.entry_ndx)
             raise RuntimeError("Root object != Pool obj, bailing!")
-        libflexalloc.close(fs)
-        print(tdev)
