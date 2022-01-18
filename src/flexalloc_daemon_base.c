@@ -518,16 +518,30 @@ fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
     return err;
   }
 
+  client->flexalloc->pools.entries = calloc(
+    sizeof(struct fla_pool_entry),
+    client->flexalloc->geo.npools);
+  if (!client->flexalloc->pools.entries)
+  {
+    err = -ENOMEM;
+    goto free_dev_uri;
+  }
+
   err = fla_xne_dev_open(client->flexalloc->dev.dev_uri, NULL, &dev);
   if (FLA_ERR(err, "fla_xne_dev_open() - failed to open device"))
-    goto exit;
+    goto free_pool_entry_array;
 
   client->flexalloc->dev.dev = dev;
 
   return 0;
 
-exit:
+free_pool_entry_array:
+  free(client->flexalloc->pools.entries);
+  client->flexalloc->pools.entries = NULL;
+free_dev_uri:
   free(client->flexalloc->dev.dev_uri);
+  client->flexalloc->dev.dev_uri = NULL;
+
   return err;
 }
 
@@ -575,10 +589,22 @@ fla_daemon_close_rq(struct flexalloc *fs)
   if (FLA_ERR(err, "fla_sock_send_msg()"))
     return err;
 
+  // while this should've been the LAST thing to do when reversing
+  // the initialization order, we shut down the socket first to avoid
+  // further requests or responses triggering processing.
   close(client->sock_fd);
   client->sock_fd = 0;
+
   fla_xne_dev_close(fs->dev.dev);
+  fs->dev.dev = NULL;
+
+  free(fs->pools.entries);
+  fs->pools.entries = 0;
+
   free(fs->dev.dev_uri);
+  fs->dev.dev_uri = NULL;
+
+  fla_fs_free(client->flexalloc);
   return 0;
 }
 
