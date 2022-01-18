@@ -13,7 +13,6 @@ def test_open_close(loop_dev):
         libflexalloc.close(fs)
 
 
-@pytest.mark.xyz
 @pytest.mark.parametrize("fs", [
     fla_open_direct(
         device=dev_loop(size_mb=100, block_size_bytes=512),
