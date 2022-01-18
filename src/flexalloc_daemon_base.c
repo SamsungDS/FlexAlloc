@@ -521,6 +521,8 @@ fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
   if (FLA_ERR(err, "fla_xne_dev_open() - failed to open device"))
     goto exit;
 
+  client->flexalloc->dev.dev = dev;
+
   return 0;
 
 exit:
