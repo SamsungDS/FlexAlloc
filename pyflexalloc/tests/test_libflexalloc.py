@@ -1,27 +1,31 @@
 from flexalloc import libflexalloc
 from flexalloc import mm
-from flexalloc.flexalloc import FlexAlloc
 import flexalloc
-from tests_common import loop_device
+from tests_common import dev_loop, fla_open_direct, fla_open_daemon, format_fla_mkfs
 import pytest
-from functools import partial
 
 
-@pytest.mark.parametrize("mkdev", [partial(loop_device, 10, 512)])
-def test_open_close(mkdev):
-    with mkdev() as tdev:
-        mm.mkfs(tdev.dev_uri, 10, 10)
-        fs = libflexalloc.open(tdev.dev_uri)
+@pytest.mark.parametrize("loop_dev", [dev_loop(size_mb=10, block_size_bytes=512)])
+def test_open_close(loop_dev):
+    with loop_dev() as tdev:
+        mm.mkfs(tdev.uri, 10, 10)
+        fs = libflexalloc.open(tdev.uri)
         libflexalloc.close(fs)
 
 
-@pytest.mark.parametrize("dev", [partial(loop_device, 100, 512)])
-@pytest.mark.parametrize("num", [1])
-def test_loop_write_read(dev, num):
-    with dev() as tdev:
-        mm.mkfs(tdev.dev_uri, 10, 1000, True)
-        print("Getting device")
-        fs = libflexalloc.open(tdev.dev_uri)
+@pytest.mark.xyz
+@pytest.mark.parametrize("fs", [
+    fla_open_direct(
+        device=dev_loop(size_mb=100, block_size_bytes=512),
+        formatter=format_fla_mkfs(npools=10, slab_nlb=1000)
+    ),
+    fla_open_daemon(
+        device=dev_loop(size_mb=100, block_size_bytes=512),
+        formatter=format_fla_mkfs(npools=10, slab_nlb=1000)
+    )
+])
+def test_loop_write_read(fs):
+    with fs() as fs:
         print("creating pool")
         p1 = libflexalloc.pool_create(fs, "lol", 10)
         print("object_alloc")
@@ -29,9 +33,11 @@ def test_loop_write_read(dev, num):
         print(p1o1)
         print("IOBuffer (#1)")
 
+        msg = "hello"
+
         with flexalloc.io_buffer(fs, 512 * 8) as buf:
             print("write to memoryview")
-            buf.view[0:5] = "hello".encode("ascii")
+            buf.view[0:5] = msg.encode("ascii")
             print("object_write")
             libflexalloc.object_write(fs, p1, p1o1, buf, 0, 512 * 8)
 
@@ -39,9 +45,9 @@ def test_loop_write_read(dev, num):
             print("object_read")
             libflexalloc.object_read(fs, p1, p1o1, buf2, 0, 512 * 8)
             print("try to decode buffer contents")
-            print(bytes(buf2.view[0:5]).decode("ascii"))
+            buf2_contents = bytes(buf2.view[0:5]).decode("ascii")
+            print(buf2_contents)
+            assert buf2_contents == msg
             print("free buf2")
 
         print("close fs")
-        libflexalloc.close(fs)
-        print(tdev)
