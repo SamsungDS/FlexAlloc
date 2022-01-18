@@ -21,6 +21,7 @@ from typing import Optional, Union, Callable
 from flexalloc import xnvme_env, FlexAlloc, mm, libflexalloc
 from flexalloc.pyutils import loop
 from typing import Generator
+import threading
 
 
 def subprocess_tail_lines(p: Popen) -> Generator[str, None, None]:
@@ -313,28 +314,48 @@ def _fla_daemon(device: DeviceContextThunk,
         if not daemon_program_path.exists():
             raise RuntimeError(f"could not find daemon program in '{daemon_program_path}'")
 
+        socket_path: Path = temp_file_path()
         try:
-            socket_path: Path = temp_file_path()
-            daemon = new_process([
+            cmd = [
                 str(daemon_program_path),
                 "-d", device.uri,
                 "-s", str(socket_path)
-            ])
+            ]
+            print(f"""Daemon start command: {" ".join(cmd)}""")
+            daemon = new_process(cmd)
 
-            daemon_ready = False
-            for line in subprocess_tail_lines(daemon):
-                # TODO: can get stuck here indefinitely - should have a timeout check
-                if line.startswith("daemon ready for connections"):
-                    daemon_ready = True
-                    break
-            if not daemon_ready:
-                raise RuntimeError("failed to start daemon")
+            proc_tail_lines = subprocess_tail_lines(daemon)
+
+            def wait_for_daemon_ready_fn():
+                for line in proc_tail_lines:
+                    print(f"server> {line}")
+                    if line.startswith("daemon ready for connections"):
+                        return True
+
+            def tail_daemon_output():
+                for line in proc_tail_lines:
+                    print(f"server> {line}")
+
+            th = threading.Thread(target=wait_for_daemon_ready_fn)
+            th.start()
+            th.join(timeout=10)
+            if th.is_alive():
+                raise RuntimeError("timeout waiting for daemon to start")
+
+            # print server output in the background.
+            # it will not be fully caught up in case of sudden segfaults, but it
+            # remains useful.
+            th = threading.Thread(target=tail_daemon_output)
+            th.start()
+
             yield socket_path
         finally:
             if not daemon:
+                socket_path.unlink(missing_ok=True)
                 return
             daemon.send_signal(signal.SIGINT)
             daemon.wait(timeout=10)
+            socket_path.unlink(missing_ok=True)
 
 
 def fla_daemon(device: DeviceContextThunk,
