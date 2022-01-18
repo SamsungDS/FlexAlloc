@@ -1,8 +1,33 @@
 """
 Copyright (C) 2021 Jesper Devantier <j.devantier@samsung.com>
 """
-from libc.stdint cimport int32_t, uint8_t
+from libc.stdint cimport int32_t, uint8_t, uint16_t
 from flexalloc.flexalloc cimport *
+
+
+cdef extern from "flexalloc_daemon_base.h" nogil:
+
+    cdef struct fla_msg_header:
+        uint32_t len
+        uint16_t cmd
+        uint16_t tag
+
+
+    cdef struct fla_msg:
+        fla_msg_header *hdr
+        char *data
+
+
+    cdef struct fla_sys_identity:
+        uint32_t type
+        uint32_t version
+
+
+    cdef struct fla_daemon_client:
+        flexalloc *flexalloc
+        pass
+
+    int fla_daemon_open(char *socket_path, fla_daemon_client *client)
 
 
 cdef extern from "libflexalloc.h" nogil:
@@ -58,3 +83,11 @@ cdef class IOBuffer:
     cdef uint8_t[:] _view
     cdef bint owner
     cdef int nbytes
+
+
+cdef class FlexAllocDaemonClient:
+    cdef fla_daemon_client client
+    # (Python) property `fs` provides access but prevents re-assignment
+    cdef FlexAlloc _fs
+
+    # open() method not typed as static cpdef methods are not supported.

@@ -1,6 +1,8 @@
 """
 Copyright (C) 2021 Jesper Devantier <j.devantier@samsung.com>
 """
+from pathlib import Path
+from typing import Union
 
 
 def open(dev_uri: str) -> FlexAlloc:
@@ -26,6 +28,10 @@ def md_open(dev_uri: str, md_dev_uri: str) -> FlexAlloc:
 
     cdef FlexAlloc fs = FlexAlloc.from_ptr(data)
     return fs
+
+
+def daemon_open(socket: Union[str, Path]) -> FlexAllocDaemonClient:
+    return FlexAllocDaemonClient.open(socket)
 
 
 def close(fs: FlexAlloc) -> None:
@@ -164,3 +170,30 @@ def object_unaligned_write(fs: FlexAlloc, pool: PoolHandle, obj: ObjectHandle,
 
 def fs_lb_nbytes(fs: FlexAlloc) -> int:
     return fla_fs_lb_nbytes(fs.data)
+
+
+cdef class FlexAllocDaemonClient:
+    def __init__(self):
+        raise RuntimeError("do not instantiate directly, use `daemon_open` method")
+
+    @staticmethod
+    def open(socket: Union[str, Path]) -> FlexAllocDaemonClient:
+        if not isinstance(socket, Path):
+            socket = Path(socket)
+
+        if not Path(socket).exists():
+            raise RuntimeError(f"specified socket '{socket}' does not exist!")
+
+        py_str = str(socket).encode("ascii")
+        cdef char *c_str = py_str
+
+        cdef FlexAllocDaemonClient inst = FlexAllocDaemonClient.__new__(FlexAllocDaemonClient)
+        if fla_daemon_open(c_str, &inst.client):
+            raise RuntimeError("failed to connect to daemon")
+
+        inst._fs = FlexAlloc.from_ptr(inst.client.flexalloc)
+        return inst
+
+    @property
+    def fs(self) -> FlexAlloc:
+        return self._fs
