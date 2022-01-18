@@ -752,6 +752,7 @@ fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, 
 {
   int err;
   struct fla_daemon_client *client = fla_get_client(fs);
+  struct fla_pool_entry *pool_entry = NULL;
 
   (*handle) = malloc(sizeof(struct fla_pool));
   if (FLA_ERR(!(*handle), "malloc()"))
@@ -777,6 +778,11 @@ fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, 
 
   // copy response from buffer to allocated structure
   memcpy(*handle, client->recv.data + sizeof(int), sizeof(struct fla_pool));
+
+  // to write to objects in the pool, the pool entry needs to record the `obj_nlb`
+  // value at minimum.
+  pool_entry = &fs->pools.entries[(*handle)->ndx];
+  fla_pool_entry_reset(pool_entry, name, name_len, obj_nlb);
 
 exit:
   if (err && *handle != NULL)
