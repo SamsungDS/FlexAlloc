@@ -518,9 +518,8 @@ fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
     return err;
   }
 
-  client->flexalloc->pools.entries = calloc(
-    sizeof(struct fla_pool_entry),
-    client->flexalloc->geo.npools);
+  client->flexalloc->pools.entries = calloc(sizeof(struct fla_pool_entry),
+                                     client->flexalloc->geo.npools);
   if (!client->flexalloc->pools.entries)
   {
     err = -ENOMEM;
