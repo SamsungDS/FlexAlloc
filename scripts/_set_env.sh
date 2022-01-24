@@ -3,6 +3,21 @@ if [ -z "${MESON_SOURCE_ROOT}" ] || [ -z "${MESON_BUILD_ROOT}" ]; then
     exit 1
 fi
 
+PKG_CONFIG_BIN="${PKG_CONFIG_BIN:-pkg-config}"
+if [ -z "${PKG_CONFIG_BIN}" ] ; then
+    echo "Must have pkg-config installed"
+    exit 1
+fi
+
+XNVME_LIBDIR=$(${PKG_CONFIG_BIN} --variable=libdir xnvme)
+if [ $? -ne 0 ] ; then
+    echo "You must install xnvme with pkg-config support"
+    exit 1
+fi
+if [ -n ${XNVME_LIBDIR} ] ; then
+    XNVME_LIBDIR="${XNVME_LIBDIR}:"
+fi
+
 # resolv MESON_{SOURCE,BUILD}_ROOT to absolute paths
 # this in turn renders all paths derived from these* absolute.
 # This, in turn, avoids errors where we change the CWD and execute a command, only to have it
@@ -44,7 +59,7 @@ elif ! diff "${PY_SOURCE_ROOT}/requirements.dev.txt" "${VIRTUAL_ENV}/requirement
     create_env
 fi
 
-export LD_LIBRARY_PATH="${MESON_BUILD_ROOT}:$LD_LIBRARY_PATH"
+export LD_LIBRARY_PATH="${XNVME_LIBDIR}${MESON_BUILD_ROOT}:$LD_LIBRARY_PATH"
 export LIBRARY_PATH="${MESON_BUILD_ROOT}:$LIBRARY_PATH"
 export PY_BUILD_DIR="${PY_BUILD_ROOT}/build"
 export PY_DIST_DIR="${PY_BUILD_ROOT}/dist"

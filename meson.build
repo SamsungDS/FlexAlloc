@@ -13,13 +13,7 @@ if get_option('FLEXALLOC_XNVME_IGNORE_MDTS')
 endif
 
 ### Dependencies ###
-thread_dep = dependency('threads')
-uuid_dep = dependency('uuid')
-numa_dep = cc.find_library('libnuma', dirs:['/usr/lib/x86_64-linux-gnu'], required : true)
-aio_dep = cc.find_library('libaio', dirs:['/usr/lib/x86_64-linux-gnu'], required : true)
-rt_dep = cc.find_library('rt', required: true)
-xnvme_dep = cc.find_library('libxnvme', dirs:['/usr/lib/', '/usr/local/lib'], required : true)
-xnvme_deps = [thread_dep, uuid_dep, numa_dep, aio_dep, rt_dep, xnvme_dep]
+xnvme_deps = dependency('xnvme', version : '>=0.0.28' )
 
 
 ### Files ###
@@ -135,7 +129,7 @@ foreach suite : suites
     assert('sources' in opts, 'error in "' + t_name
       + '" test entry must set key \'sources\' to a string or array of strings to C source files')
 
-    t_deps = xnvme_deps + opts.get('dependencies', [])
+    t_deps = xnvme_deps
     t_sources = opts.get('sources', [])
     t_opts = {'timeout': 60, 'is_parallel': false} + opts.get('test_opts', {})
     t_suite = opts.get('suite', 'Default')
