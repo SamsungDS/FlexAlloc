@@ -1384,7 +1384,7 @@ fla_object_read(const struct flexalloc * fs,
   r_eoffset = r_soffset + len;
   sp.strp_num = pool_entry->strp_num;
   sp.strp_sz = pool_entry->strp_sz;
-  sp.obj_len = obj_len;
+  sp.obj_len = obj_len / fs->dev.lb_nbytes;
 
   if((err = FLA_ERR(obj_eoffset < r_eoffset, "Read outside of an object")))
     goto exit;
@@ -1421,7 +1421,7 @@ fla_object_write(struct flexalloc * fs,
   obj_zn = w_soffset / (fs->geo.nzsect * fla_fs_lb_nbytes(fs));
   sp.strp_num = pool_entry->strp_num;
   sp.strp_sz = pool_entry->strp_sz;
-  sp.obj_len = obj_len;
+  sp.obj_len = obj_len / fs->dev.lb_nbytes;
 
   if (fla_geo_zoned(&fs->geo))
     fla_znd_manage_zones(fs, obj_zn);
