@@ -310,8 +310,9 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
 }
 
 void
-fla_geo_print(struct fla_geo *geo)
+fla_geo_print(struct flexalloc *fs)
 {
+  struct fla_geo * geo = &(fs->geo);
   fprintf(stdout, "LBAs: %"PRIu64"\n", geo->nlb);
   fprintf(stdout, "LBA width: %"PRIu32"B\n", geo->lb_nbytes);
 
@@ -726,12 +727,14 @@ fla_base_sync(struct flexalloc *fs)
 }
 
 void
-fla_print_pool_entry(struct flexalloc *fs, struct fla_pool_entry * pool_entry)
+fla_print_pool_entry(struct flexalloc *fs, struct fla_pool *pool)
 {
   int err = 0;
   struct fla_slab_header * curr_slab;
+  struct fla_pool_entry * pool_entry = &fs->pools.entries[pool->ndx];
   uint32_t * heads[3] = {&pool_entry->empty_slabs, &pool_entry->full_slabs, &pool_entry->partial_slabs};
   uint32_t tmp;
+
   fprintf(stderr, "===============\n");
   fprintf(stderr, "Pool Entry %p\n", pool_entry);
   fprintf(stderr, "obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
