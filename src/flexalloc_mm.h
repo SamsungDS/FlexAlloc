@@ -65,9 +65,6 @@ struct fla_slab_header
 
   /// number of objects allocated from slab
   uint32_t refcount; // TODO: should have a var in cache structure describing n_entries/slab
-
-  /// maximum possible number of objects. It is not necessarity slab_size/object_size
-  uint32_t maxcount; // TODO: This is probably best placed in pool?
 };
 
 struct fla_pool_htbl_header
@@ -90,6 +87,9 @@ struct fla_pool_entry
   /// Note that all objects in a cache have the same size.
   /// Also note that this is rounded up to fit alignment requirements.
   uint32_t obj_nlb;
+
+  /// Number of Objects that fit in each slab
+  uint32_t slab_nobj;
 
   /// Root object that is optionally set
   ///
@@ -205,10 +205,11 @@ fla_close_noflush(struct flexalloc *fs);
  * @param name name given to the pool
  * @param name_len length of the pool name (should match strlen(name))
  * @param obj_nlb describes object size in the form of number of logical blocks
+ * @param slab_nobj describes the number of objects of this pool that fit in a slab
  */
 void
 fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int name_len,
-                     uint32_t obj_nlb);
+                     uint32_t const obj_nlb, uint32_t const slab_nobj);
 
 /**
  * @brief Acquire the next free slab
