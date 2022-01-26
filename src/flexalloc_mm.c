@@ -820,6 +820,9 @@ fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_num, 
   if (FLA_ERR(strp_sz > geo->mdts_nbytes, "Strp sz > mdts for device"))
     return -1;
 
+  if (FLA_ERR(strp_num > pool_entry->slab_nobj, "Strp sz > max obj in slab"))
+    return -1;
+
   pool_entry->strp_num = strp_num;
   pool_entry->strp_sz = strp_sz;
 
