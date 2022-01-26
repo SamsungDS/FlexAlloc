@@ -737,11 +737,12 @@ fla_print_pool_entry(struct flexalloc *fs, struct fla_pool *pool)
 
   fprintf(stderr, "===============\n");
   fprintf(stderr, "Pool Entry %p\n", pool_entry);
-  fprintf(stderr, "obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
-  fprintf(stderr, "root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
-  fprintf(stderr, "strp_num : %"PRIu32"\n", pool_entry->strp_num);
-  fprintf(stderr, "strp_sz : %"PRIu32"\n", pool_entry->strp_sz);
-  fprintf(stderr, "PoolName : %s\n", pool_entry->name);
+  fprintf(stderr, "--> obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
+  fprintf(stderr, "--> root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
+  fprintf(stderr, "--> strp_num : %"PRIu32"\n", pool_entry->strp_num);
+  fprintf(stderr, "--> strp_sz : %"PRIu32"\n", pool_entry->strp_sz);
+  fprintf(stderr, "--> PoolName : %s\n", pool_entry->name);
+  fprintf(stderr, "--> Max Number of Objects In Slab %"PRIu32"\n", pool_entry->slab_nobj);
   for(size_t i = 0 ; i < 3 ; ++i)
   {
     fprintf(stderr, "* Head : %d, offset %ld\n", *heads[i], i);
@@ -752,9 +753,8 @@ fla_print_pool_entry(struct flexalloc *fs, struct fla_pool *pool)
       if((err = FLA_ERR(!curr_slab, "fla_slab_header_ptr()")))
         return;
 
-      fprintf(stderr, "`-->next : %d, prev : %d, maxcount : %d, refcount : %d, ptr %p\n",
-              curr_slab->next, curr_slab->prev, curr_slab->maxcount, curr_slab->refcount, curr_slab);
-
+      fprintf(stderr, "`-->next : %"PRIu32", prev : %"PRIu32", refcount : %"PRIu32", ptr %p\n",
+              curr_slab->next, curr_slab->prev, curr_slab->refcount, curr_slab);
       tmp = curr_slab->next;
     }
   }
@@ -799,10 +799,11 @@ fla_base_pool_open(struct flexalloc *fs, const char *name, struct fla_pool **han
 
 void
 fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int name_len,
-                     uint32_t obj_nlb)
+                     uint32_t const obj_nlb, uint32_t const slab_nobj)
 {
   memcpy(pool_entry->name, name, name_len);
   pool_entry->obj_nlb = obj_nlb;
+  pool_entry->slab_nobj = slab_nobj;
   pool_entry->empty_slabs = FLA_LINKED_LIST_NULL;
   pool_entry->full_slabs = FLA_LINKED_LIST_NULL;
   pool_entry->partial_slabs = FLA_LINKED_LIST_NULL;
@@ -825,6 +826,28 @@ fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_num, 
   return 0;
 }
 
+uint32_t
+fla_calc_objs_in_slab(struct flexalloc const * fs, uint32_t const obj_nlb)
+{
+  uint32_t obj_num;
+  size_t unused_nlb, free_list_nlb;
+
+  if (!fla_geo_zoned(&fs->geo))
+  {
+    for(obj_num = fs->geo.slab_nlb / obj_nlb ; obj_num > 0; --obj_num)
+    {
+      unused_nlb = (fs->geo.slab_nlb - (obj_num * obj_nlb));
+      free_list_nlb = fla_slab_cache_flist_nlb(fs, obj_num);
+      if(unused_nlb >= free_list_nlb)
+        break;
+    }
+  }
+  else   // For a zoned device we place free list nlb in the MD dev
+    obj_num = fs->geo.slab_nlb / obj_nlb;
+
+  return obj_num;
+}
+
 int
 fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
                      struct fla_pool **handle)
@@ -832,6 +855,7 @@ fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint3
   int err;
   struct fla_pool_entry *pool_entry;
   int entry_ndx = 0;
+  uint32_t slab_nobj;
 
   // Return pool if it exists
   err = fla_base_pool_open(fs, name, handle);
@@ -849,18 +873,14 @@ fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint3
   if ((err = FLA_ERR(name_len >= FLA_NAME_SIZE_POOL, "pool name too long")))
     goto exit;
 
+  slab_nobj = fla_calc_objs_in_slab(fs, obj_nlb);
+  if((err = FLA_ERR(slab_nobj < 1, "Object size is incompatible with slab size.")))
+    goto exit;
+
+
   if (fla_geo_zoned(&fs->geo))
   {
-    if ((err = FLA_ERR(obj_nlb > fs->super->slab_nlb, "object sz > fomatted slab size")))
-      goto exit;
-
     if ((err = FLA_ERR(obj_nlb != fs->geo.nzsect, "object sz != fomatted zone size")))
-      goto exit;
-  }
-  else
-  {
-    if ((err = FLA_ERR(obj_nlb >= fs->super->slab_nlb,
-                       "object size is too large for the chosen slab sizes")))
       goto exit;
   }
 
@@ -880,7 +900,7 @@ fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint3
     goto free_freelist_entry;
 
   pool_entry = &fs->pools.entries[entry_ndx];
-  fla_pool_entry_reset(pool_entry, name, name_len, obj_nlb);
+  fla_pool_entry_reset(pool_entry, name, name_len, obj_nlb, slab_nobj);
 
   (*handle)->ndx = entry_ndx;
   (*handle)->h2 = FLA_HTBL_H2(name);
@@ -1043,10 +1063,9 @@ fla_pool_best_slab_list(const struct fla_slab_header* slab,
                         struct fla_pool_entry * pool_entry)
 {
   return slab->refcount == 0 ? &pool_entry->empty_slabs
-         : slab->refcount == slab->maxcount ? &pool_entry->full_slabs
+         : slab->refcount == pool_entry->slab_nobj ? &pool_entry->full_slabs
          : &pool_entry->partial_slabs;
 }
-
 
 int
 fla_base_object_open(struct flexalloc * fs, struct fla_pool * pool_handle,
@@ -1054,20 +1073,18 @@ fla_base_object_open(struct flexalloc * fs, struct fla_pool * pool_handle,
 {
   int err;
   struct fla_slab_header * slab;
+  struct fla_pool_entry const * pool_entry;
 
   slab = fla_slab_header_ptr(obj->slab_id, fs);
   if((err = FLA_ERR(!slab, "fla_slab_header_ptr()")))
-  {
     goto exit;
-  }
 
-  err = fla_slab_cache_elem_load(&fs->slab_cache, obj->slab_id, slab->maxcount);
+  pool_entry = &fs->pools.entries[pool_handle->ndx];
+  err = fla_slab_cache_elem_load(&fs->slab_cache, obj->slab_id, pool_entry->slab_nobj);
   if(err == FLA_SLAB_CACHE_INVALID_STATE)
     err = 0; //Ignore as it was already loaded.
   else if(FLA_ERR(err, "fla_slab_cache_elem_load()"))
-  {
     goto exit;
-  }
 
   //FIXME : make sure that the object is taken in the free list.
 
@@ -1085,7 +1102,6 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
   uint32_t * from_head, * to_head, slab_id;
 
   pool_entry = &fs->pools.entries[pool_handle->ndx];
-
   err = fla_pool_next_available_slab(fs, pool_entry, &slab);
   if(FLA_ERR(err, "fla_pool_next_available_slab()"))
   {
@@ -1098,7 +1114,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
     goto exit;
   }
 
-  err = fla_slab_cache_elem_load(&fs->slab_cache, slab_id, slab->maxcount);
+  err = fla_slab_cache_elem_load(&fs->slab_cache, slab_id, pool_entry->slab_nobj);
   if(err == FLA_SLAB_CACHE_INVALID_STATE)
     err = 0; //Ignore as it was already loaded.
   else if(FLA_ERR(err, "fla_slab_cache_elem_load()"))
@@ -1316,31 +1332,6 @@ exit:
   return err;
 }
 
-
-uint32_t
-fla_calc_objs_in_slab(struct flexalloc const * fs, uint32_t const obj_nlb)
-{
-  uint32_t obj_num;
-  size_t unused_nlb, free_list_nlb;
-
-  if (!fla_geo_zoned(&fs->geo))
-  {
-    for(obj_num = fs->geo.slab_nlb / obj_nlb ; obj_num > 0; --obj_num)
-    {
-      unused_nlb = (fs->geo.slab_nlb - (obj_num * obj_nlb));
-      free_list_nlb = fla_slab_cache_flist_nlb(fs, obj_num);
-      if(unused_nlb >= free_list_nlb)
-        break;
-    }
-    if(obj_num < 1)
-      return obj_num;
-  }
-  else   // For a zoned device we place free list nlb in the MD dev
-    obj_num = fs->geo.slab_nlb / obj_nlb;
-
-  return obj_num;
-}
-
 int
 fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t obj_nlb)
 {
@@ -1354,7 +1345,6 @@ fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t ob
   slab->next = FLA_LINKED_LIST_NULL;
   slab->prev = FLA_LINKED_LIST_NULL;
   slab->refcount = 0;
-  slab->maxcount = obj_num;
 
   // FIXME: Do we need the pool ID here?
   slab->pool = 0;

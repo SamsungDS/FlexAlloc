@@ -25,7 +25,6 @@ cdef extern from "flexalloc_mm.h" nogil:
         uint32_t prev
         uint32_t next
         uint32_t refcount
-        uint32_t maxcount
 
 
     cdef struct fla_pool_htbl_header:
