@@ -11,7 +11,7 @@
 #include <string.h>
 
 size_t
-fla_slab_cache_flist_nlb(struct flexalloc *fs, uint32_t flist_len)
+fla_slab_cache_flist_nlb(struct flexalloc const * fs, uint32_t flist_len)
 {
   return FLA_CEIL_DIV(fla_flist_size(flist_len), fs->geo.lb_nbytes);
 }

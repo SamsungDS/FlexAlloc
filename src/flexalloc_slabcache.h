@@ -61,7 +61,7 @@ struct fla_slab_flist_cache_elem
  * @return number of logical blocks required to contain the freelist
  */
 size_t
-fla_slab_cache_flist_nlb(struct flexalloc *fs, uint32_t flist_len);
+fla_slab_cache_flist_nlb(struct flexalloc const * fs, uint32_t flist_len);
 
 /**
  * Initialize new slab freelist cache instance.

@@ -1316,12 +1316,12 @@ exit:
   return err;
 }
 
-int
-fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t obj_nlb)
+
+uint32_t
+fla_calc_objs_in_slab(struct flexalloc const * fs, uint32_t const obj_nlb)
 {
-  int err = 0;
+  uint32_t obj_num;
   size_t unused_nlb, free_list_nlb;
-  uint32_t obj_num, slab_id;
 
   if (!fla_geo_zoned(&fs->geo))
   {
@@ -1330,17 +1330,26 @@ fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t ob
       unused_nlb = (fs->geo.slab_nlb - (obj_num * obj_nlb));
       free_list_nlb = fla_slab_cache_flist_nlb(fs, obj_num);
       if(unused_nlb >= free_list_nlb)
-      {
         break;
-      }
     }
-    if((err = FLA_ERR(obj_num < 1, "fla_format_slab()")))
-    {
-      goto exit;
-    }
+    if(obj_num < 1)
+      return obj_num;
   }
   else   // For a zoned device we place free list nlb in the MD dev
     obj_num = fs->geo.slab_nlb / obj_nlb;
+
+  return obj_num;
+}
+
+int
+fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t obj_nlb)
+{
+  int err = 0;
+  uint32_t obj_num, slab_id;
+
+  obj_num = fla_calc_objs_in_slab(fs, obj_nlb);
+  if((err = FLA_ERR(obj_num < 1, "No objects can fit in the slab")))
+    goto exit;
 
   slab->next = FLA_LINKED_LIST_NULL;
   slab->prev = FLA_LINKED_LIST_NULL;
@@ -1352,15 +1361,11 @@ fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t ob
 
   err = fla_slab_id(slab, fs, &slab_id);
   if(FLA_ERR(err, "fla_slab_id()"))
-  {
     goto exit;
-  }
 
   err = fla_slab_cache_elem_init(&fs->slab_cache, slab_id, obj_num);
   if(FLA_ERR(err, "fla_slab_cache_elem_init()"))
-  {
     goto exit;
-  }
 
 exit:
   return err;
