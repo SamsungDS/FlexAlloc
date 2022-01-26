@@ -1387,7 +1387,7 @@ fla_object_read(const struct flexalloc * fs,
                 struct fla_object const * obj, void * buf, size_t offset, size_t len)
 {
   int err;
-  uint64_t obj_eoffset, r_soffset, r_eoffset, obj_len;
+  uint64_t obj_eoffset, r_soffset, r_eoffset, obj_len, slab_eoffset;
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
   struct fla_sync_strp_params sp;
 
@@ -1398,6 +1398,10 @@ fla_object_read(const struct flexalloc * fs,
   sp.strp_num = pool_entry->strp_num;
   sp.strp_sz = pool_entry->strp_sz;
   sp.obj_len = obj_len / fs->dev.lb_nbytes;
+
+  slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
+  if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Read outside a slab")))
+    goto exit;
 
   if((err = FLA_ERR(obj_eoffset < r_eoffset, "Read outside of an object")))
     goto exit;
@@ -1417,12 +1421,11 @@ exit:
 
 
 int
-fla_object_write(struct flexalloc * fs,
-                 struct fla_pool const * pool_handle,
+fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
                  struct fla_object const * obj, void const * buf, size_t offset, size_t len)
 {
   int err = 0;
-  uint64_t obj_eoffset, w_soffset, w_eoffset, obj_len;
+  uint64_t obj_eoffset, w_soffset, w_eoffset, obj_len, slab_eoffset;
   uint32_t obj_zn;
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
   struct fla_sync_strp_params sp;
@@ -1438,6 +1441,10 @@ fla_object_write(struct flexalloc * fs,
 
   if (fla_geo_zoned(&fs->geo))
     fla_znd_manage_zones(fs, obj_zn);
+
+  slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
+  if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Write outside a slab")))
+    goto exit;
 
   if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
     goto exit;
