@@ -117,19 +117,18 @@ int
 fla_flist_entries_alloc(freelist_t flist, unsigned int num)
 {
   uint32_t elems = FLA_FREELIST_U32_ELEMS(*flist);
-  uint32_t alloc_count = 0;
+  uint32_t alloc_count;
   int alloc_ret;
 
-  if (num == 1)
-    return fla_flist_entry_alloc(flist, elems);
+  alloc_ret = fla_flist_entry_alloc(flist, elems);
 
-  while (alloc_count != num)
+  if (num == 1)
+    return alloc_ret;
+
+  for(alloc_count = 1; alloc_count != num; ++alloc_count)
   {
-    alloc_ret = fla_flist_entry_alloc(flist, elems);
-    if (alloc_ret != -1)
-      alloc_count++;
-    else
-      return alloc_ret;
+    if(fla_flist_entry_alloc(flist, elems) == -1)
+      return -1;
   }
 
   return alloc_ret;
