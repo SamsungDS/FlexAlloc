@@ -1364,8 +1364,6 @@ exit:
   return err;
 }
 
-
-
 uint64_t
 fla_object_elba(struct flexalloc const * fs, struct fla_object const * obj,
                 const struct fla_pool * pool_handle)
@@ -1395,9 +1393,6 @@ fla_object_read(const struct flexalloc * fs,
   obj_eoffset = fla_object_eoffset(fs, obj, pool_handle) + (obj_len * (pool_entry->strp_num -1 ));
   r_soffset = fla_object_soffset(fs, obj, pool_handle) + offset / pool_entry->strp_num;
   r_eoffset = r_soffset + len;
-  sp.strp_num = pool_entry->strp_num;
-  sp.strp_sz = pool_entry->strp_sz;
-  sp.obj_len = obj_len / fs->dev.lb_nbytes;
 
   slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
   if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Read outside a slab")))
@@ -1409,7 +1404,12 @@ fla_object_read(const struct flexalloc * fs,
   if (pool_entry->strp_num == 1)
     err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, r_soffset, len, buf);
   else
+  {
+    sp.strp_num = pool_entry->strp_num;
+    sp.strp_sz = pool_entry->strp_sz;
+    sp.obj_len = obj_len / fs->dev.lb_nbytes;
     err = fla_xne_sync_strp_seq_x(fs->dev.dev, r_soffset, len, buf, &sp, false);
+  }
 
   if(FLA_ERR(err, "fla_xne_sync_seq_r_nbytes()"))
     goto exit;
@@ -1417,8 +1417,6 @@ fla_object_read(const struct flexalloc * fs,
 exit:
   return err;
 }
-
-
 
 int
 fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
@@ -1435,9 +1433,6 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   w_soffset = fla_object_soffset(fs, obj, pool_handle) + offset / pool_entry->strp_num;
   w_eoffset = w_soffset + len;
   obj_zn = w_soffset / (fs->geo.nzsect * fla_fs_lb_nbytes(fs));
-  sp.strp_num = pool_entry->strp_num;
-  sp.strp_sz = pool_entry->strp_sz;
-  sp.obj_len = obj_len / fs->dev.lb_nbytes;
 
   if (fla_geo_zoned(&fs->geo))
     fla_znd_manage_zones(fs, obj_zn);
@@ -1452,7 +1447,12 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   if (pool_entry->strp_num == 1)
     err = fla_xne_sync_seq_w_nbytes(fs->dev.dev, w_soffset, len, buf);
   else
+  {
+    sp.strp_num = pool_entry->strp_num;
+    sp.strp_sz = pool_entry->strp_sz;
+    sp.obj_len = obj_len / fs->dev.lb_nbytes;
     err = fla_xne_sync_strp_seq_x(fs->dev.dev, w_soffset, len, buf, &sp, true);
+  }
 
   if(FLA_ERR(err, "fla_xne_sync_seq_w_nbytes()"))
     goto exit;
