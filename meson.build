@@ -2,6 +2,7 @@ project('flexalloc', 'c', default_options : ['c_std=c11'])
 cc = meson.get_compiler('c')
 pymod = import('python')
 py = pymod.find_installation('python3', modules: ['pip', 'venv'], required: true)
+pconf = import('pkgconfig')
 
 
 add_project_arguments('-DFLEXALLOC_VERBOSITY=' + get_option('FLEXALLOC_VERBOSITY').to_string(), language : 'c')
@@ -21,8 +22,17 @@ rt_dep = cc.find_library('rt', required: true)
 xnvme_dep = cc.find_library('libxnvme', dirs:['/usr/lib/', '/usr/local/lib'], required : true)
 xnvme_deps = [thread_dep, uuid_dep, numa_dep, aio_dep, rt_dep, xnvme_dep]
 
+# compiling a fio plugin requires a fio installation (which we'll install) with
+# development files for us to compile the engine plugin against.
+fio_cfg_h = 'subprojects'/'fio'/'config-host.h'
+fio_dep = dependency(
+  'fio',
+  required: get_option('with-fio')
+)
+
 
 ### Files ###
+libflexalloc_header_dirs = include_directories('./src')
 flexalloc_util_files = ['src/flexalloc_util.c']
 flexalloc_introspect = ['src/flexalloc_introspection.c']
 xnvme_env_files = ['src/flexalloc_xnvme_env.c', 'src/flexalloc_xnvme_env.h']
@@ -31,7 +41,6 @@ flexalloc_common =  ['src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_has
   'src/flexalloc_freelist.c', 'src/flexalloc_ll.c', 'src/flexalloc_ll.h', 'src/flexalloc_slabcache.c',
   xnvme_env_files, flexalloc_util_files, flexalloc_znd_files]
 
-libflexalloc_headers = ['src/libflexalloc.h', 'src/flexalloc_shared.h']
 libflexalloc_files = ['src/libflexalloc.c', flexalloc_common]
 
 ### Executables ###
@@ -43,7 +52,14 @@ executable('flexalloc_inspect', ['src/flexalloc_inspect.c', 'src/flexalloc_cli_c
 ### Libraries ###
 library = both_libraries('flexalloc', [libflexalloc_files],
                          dependencies: xnvme_deps, install : true)
-install_headers(libflexalloc_headers)
+
+foreach header_file: ['libflexalloc.h', 'flexalloc_shared.h']
+  install_headers('src' / header_file)
+endforeach
+
+if get_option('with-fio')
+  subdir('fio-ioengine')
+endif
 
 ### Tests ###
 flexalloc_testing = ['tests/flexalloc_tests_common.c', 'tests/flexalloc_tests_common.h']
