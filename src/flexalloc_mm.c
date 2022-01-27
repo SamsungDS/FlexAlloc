@@ -1044,20 +1044,19 @@ fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab
 {
   int err = 0;
   uint32_t slab_id;
+  struct fla_pool_entry const * pool_entry;
 
   err = fla_slab_id(slab, fs, &slab_id);
   if(FLA_ERR(err, "fla_slab_id()"))
-  {
     return err;
-  }
 
   err = fla_slab_cache_obj_alloc(&fs->slab_cache, slab_id, obj, num_objs);
   if(FLA_ERR(err, "fla_slab_cache_obj_alloc()"))
-  {
     return err;
-  }
 
-  slab->refcount++;
+  pool_entry = &fs->pools.entries[slab->pool];
+  slab->refcount += pool_entry->strp_num;
+
   return err;
 }
 
@@ -1192,11 +1191,8 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
         break;
     }
 
-    if (z_entry)
-    {
-      // We found the entry so remove
+    if (z_entry) // We found the entry so remove
       TAILQ_REMOVE(&fs->zs_thead, z_entry, entries);
-    }
 
     err = fla_xne_dev_znd_send_mgmt(fs->dev.dev, obj_slba, XNVME_SPEC_ZND_CMD_MGMT_SEND_RESET,
                                     false);
@@ -1206,33 +1202,25 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
 
   slab = fla_slab_header_ptr(obj->slab_id, fs);
   if((err = FLA_ERR(!slab, "fla_slab_header_ptr()")))
-  {
     goto exit;
-  }
 
   pool_entry = &fs->pools.entries[pool_handle->ndx];
   from_head = fla_pool_best_slab_list(slab, pool_entry);
 
   err = fla_slab_cache_obj_free(&fs->slab_cache, obj);
   if(FLA_ERR(err, "fla_slab_cache_obj_free()"))
-  {
     goto exit;
-  }
 
-  slab->refcount--;
+  slab->refcount -= pool_entry->strp_num;
   to_head = fla_pool_best_slab_list(slab, pool_entry);
 
   err = fla_hdll_remove(fs, slab, from_head);
   if(FLA_ERR(err, "fla_hdll_remove()"))
-  {
     goto exit;
-  }
 
   err = fla_hdll_prepend(fs, slab, to_head);
   if(FLA_ERR(err, "fla_hdll_prepend()"))
-  {
     goto exit;
-  }
 
 exit:
   return err;
