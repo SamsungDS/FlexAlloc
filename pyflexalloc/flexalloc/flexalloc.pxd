@@ -3,6 +3,7 @@ Copyright (C) 2021 Jesper Devantier <j.devantier@samsung.com>
 """
 from libc.stdint cimport uint64_t, uint32_t
 from flexalloc.xnvme_env cimport xnvme_dev
+from flexalloc.xnvme_env cimport xnvme_opts
 from flexalloc.hash cimport fla_htbl
 from flexalloc.freelist cimport freelist_t
 from flexalloc.slabcache cimport fla_slab_flist_cache_elem
@@ -83,6 +84,11 @@ cdef extern from "flexalloc.h" nogil:
     cdef struct fla_pool:
         uint64_t h2
         uint32_t ndx
+
+    cdef struct fla_open_opts:
+      char *dev_uri
+      char *md_dev_uri
+      xnvme_opts opts
 
 
 cdef class FlexAlloc:

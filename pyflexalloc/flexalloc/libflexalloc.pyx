@@ -5,30 +5,25 @@ from pathlib import Path
 from typing import Union
 
 
-def open(dev_uri: str) -> FlexAlloc:
-    py_str = dev_uri.encode("ascii")
-    cdef char *c_str = py_str
+def open(dev_uri: str, md_dev_uri: str = None) -> FlexAlloc:
+    py_dev_str = dev_uri.encode("ascii")
+    cdef char *c_dev_str = py_dev_str
     cdef flexalloc *data
-    if fla_open(c_str, &data):
+    cdef fla_open_opts oopts
+    cdef char *c_mdev_str
+    if (md_dev_uri is not None):
+        py_dev_mstr = md_dev_uri.encode("ascii")
+    else:
+        py_dev_mstr = "".encode("ascii")
+
+    c_mdev_str = py_dev_mstr
+    oopts.dev_uri = c_dev_str
+    oopts.md_dev_uri = c_mdev_str
+    if fla_open(&oopts, &data):
         raise MemoryError("failed to open FlexAlloc system")
 
     cdef FlexAlloc fs = FlexAlloc.from_ptr(data)
     return fs
-
-
-def md_open(dev_uri: str, md_dev_uri: str) -> FlexAlloc:
-    dev_pystr = dev_uri.encode("ascii")
-    cdef char *dev_cstr = dev_pystr
-    md_dev_pystr = md_dev_uri.encode("ascii")
-    cdef char *md_dev_cstr = md_dev_pystr
-
-    cdef flexalloc *data
-    if fla_md_open(dev_cstr, md_dev_cstr, &data):
-        raise MemoryError("failed to open FlexAlloc system")
-
-    cdef FlexAlloc fs = FlexAlloc.from_ptr(data)
-    return fs
-
 
 def daemon_open(socket: Union[str, Path]) -> FlexAllocDaemonClient:
     return FlexAllocDaemonClient.open(socket)
