@@ -37,8 +37,7 @@ cdef extern from "libflexalloc.h" nogil:
       ROOT_OBJ_SET_FORCE = 1 << 0,
       ROOT_OBJ_SET_CLEAR = 1 << 1,
 
-    int fla_open(char *dev_uri, flexalloc ** fs)
-    int fla_md_open(char *dev_uri, char *md_dev_uri, flexalloc ** fs)
+    int fla_open(fla_open_opts *opts, flexalloc **fs)
     # wrapper for this call is implemented directly on the FlexAlloc type
     # int fla_close(flexalloc *fs)
     int fla_sync(flexalloc *fs)
