@@ -11,7 +11,7 @@ if not fs.exists('config-host.h')
 endif
 if not fs.exists('fio')
   cpu_count = run_command([
-    import('python').find_installation('python3'),
+    find_program('python3'),
     '-c',
     'from multiprocessing import cpu_count; print(cpu_count())'
     ],
