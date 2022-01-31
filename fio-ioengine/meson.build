@@ -1,11 +1,12 @@
+cc = meson.get_compiler('c')
+rt_dep = cc.find_library('rt', required: true)
 
 flexallocfioe = shared_module(
   meson.project_name() + '-fio-engine',
   ['flexalloc.c'],
   include_directories: [libflexalloc_header_dirs],
-  dependencies: [fio_dep],
+  dependencies: [rt_dep, fio_dep],
   link_with: library.get_static_lib(),
-  link_args: ['-lrt'],
   install: true,
   c_args: [
     '-std=gnu11',
