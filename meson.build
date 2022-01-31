@@ -2,7 +2,6 @@ project('flexalloc', 'c', default_options : ['c_std=c11'])
 cc = meson.get_compiler('c')
 pymod = import('python')
 py = pymod.find_installation('python3', modules: ['pip', 'venv'], required: true)
-pconf = import('pkgconfig')
 
 
 add_project_arguments('-DFLEXALLOC_VERBOSITY=' + get_option('FLEXALLOC_VERBOSITY').to_string(), language : 'c')
