@@ -41,7 +41,7 @@ executable('mkfs.flexalloc', ['src/flexalloc_mkfs.c', 'src/flexalloc_cli_common.
   dependencies: xnvme_deps, install : true)
 executable('flexalloc_inspect', ['src/flexalloc_inspect.c', 'src/flexalloc_cli_common.c',
   flexalloc_introspect, flexalloc_common], dependencies: xnvme_deps)
-executable('flexalloc_daemon', ['src/flexalloc_daemon.c', flexalloc_common, 'src/flexalloc_cli_common.c', 'src/flexalloc_daemon_base.c', libflexalloc_files], dependencies: xnvme_deps)
+daemon_exe = executable('flexalloc_daemon', ['src/flexalloc_daemon.c', flexalloc_common, 'src/flexalloc_cli_common.c', 'src/flexalloc_daemon_base.c', libflexalloc_files], dependencies: xnvme_deps)
 executable('flexalloc_client', ['src/flexalloc_test_client.c', flexalloc_common, 'src/flexalloc_daemon_base.c', libflexalloc_files], dependencies: [xnvme_deps])
 
 ### Libraries ###
@@ -170,7 +170,7 @@ run_target(
   command: [
     meson.current_source_dir() + '/scripts/run_tests.sh',
   ],
-  depends: [tgt_build_py_bindings, c_test_progs],
+  depends: [tgt_build_py_bindings, c_test_progs, daemon_exe],
   env: {
     'MESON_SOURCE_ROOT': meson.current_source_dir(),
     'MESON_BUILD_ROOT': meson.current_build_dir(),
