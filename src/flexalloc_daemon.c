@@ -99,11 +99,6 @@ static struct cli_option options[] =
     .arg_ex = "DEVICE"
   },
   {
-    . base = {"verbose", no_argument, NULL, 'v'},
-    .description = "display additional information",
-    .arg_ex = NULL
-  },
-  {
     .base = {NULL, 0, NULL, 0}
   }
 };
@@ -122,7 +117,6 @@ main(int argc, char **argv)
   int err = 0;
   int c;
   int opt_idx = 0;
-  int verbose = 0;
   char *socket_path = NULL;
   char *device = NULL;
   struct fla_daemon daemon;
@@ -138,9 +132,6 @@ main(int argc, char **argv)
   {
     switch (c)
     {
-    case 'v':
-      verbose = 1;
-      break;
     case 's':
       socket_path = optarg;
       break;
