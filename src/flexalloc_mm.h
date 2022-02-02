@@ -109,6 +109,10 @@ struct fla_pool_entry
   /// and when creating the read-only file system view.
   // TODO get rid of 512B block assumption
   char name[FLA_NAME_SIZE_POOL]; // maximize use of 512B block while having entries aligned by 8B
+
+  //TODO : add a struct nested inside fla_pool_entry which holds just the metadata
+  //       (everything but the name and name length). This will allow us to ignore the
+  //       name when we need to.
 };
 
 /// flexalloc super block structure
