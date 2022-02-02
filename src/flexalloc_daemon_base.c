@@ -665,7 +665,6 @@ fla_daemon_pool_open_rq(struct flexalloc *fs, char const *name, struct fla_pool 
   int err;
   struct fla_daemon_client *client = fla_get_client(fs);
   struct fla_pool_entry *pool_entry = NULL;
-  uint32_t obj_nlb;
   size_t name_len = strnlen((char *)name, FLA_NAME_SIZE_POOL);
   if (FLA_ERR(name_len == FLA_NAME_SIZE_POOL,
               "invalid, pool name exceeds max length or is not null-terminated"))
@@ -696,11 +695,8 @@ fla_daemon_pool_open_rq(struct flexalloc *fs, char const *name, struct fla_pool 
   // copy response from buffer to allocated structure
   memcpy(*handle, client->recv.data + sizeof(int), sizeof(struct fla_pool));
   pool_entry = &client->flexalloc->pools.entries[(*handle)->ndx];
-  obj_nlb = *(client->recv.data + sizeof(int) + sizeof(struct fla_pool));
-  fla_pool_entry_reset(
-    pool_entry,
-    name, name_len,
-    obj_nlb);
+  memcpy(pool_entry, client->recv.data + sizeof(int) + sizeof(struct fla_pool),
+         sizeof(struct fla_pool_entry));
 
   return 0;
 
@@ -735,12 +731,12 @@ fla_daemon_pool_open_rsp(struct fla_daemon *daemon, int client_fd,
   }
   else
   {
-    // SUCCESS RSP: [<err code: 0>, <struct fla_pool>, obj_nlb]
+    // SUCCESS RSP: [<err code: 0>, <struct fla_pool>, <struct fla_pool_entry>]
     pool_entry = &daemon->flexalloc->pools.entries[(*handle)->ndx];
-    send->hdr->len = sizeof(int) + sizeof(struct fla_pool) + sizeof(pool_entry->obj_nlb);
+    send->hdr->len = sizeof(int) + sizeof(struct fla_pool) + sizeof(struct fla_pool_entry);
     memcpy(send->data + sizeof(int), *handle, sizeof(struct fla_pool));
-    memcpy(send->data + sizeof(int) + sizeof(struct fla_pool), &pool_entry->obj_nlb,
-           sizeof(pool_entry->obj_nlb));
+    memcpy(send->data + sizeof(int) + sizeof(struct fla_pool), pool_entry,
+           sizeof(struct fla_pool_entry));
   }
 
   if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
@@ -765,7 +761,7 @@ fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, 
 {
   int err;
   struct fla_daemon_client *client = fla_get_client(fs);
-  struct fla_pool_entry *pool_entry = NULL;
+  struct fla_pool_entry * pool_entry;
 
   (*handle) = malloc(sizeof(struct fla_pool));
   if (FLA_ERR(!(*handle), "malloc()"))
@@ -791,11 +787,9 @@ fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, 
 
   // copy response from buffer to allocated structure
   memcpy(*handle, client->recv.data + sizeof(int), sizeof(struct fla_pool));
-
-  // to write to objects in the pool, the pool entry needs to record the `obj_nlb`
-  // value at minimum.
   pool_entry = &fs->pools.entries[(*handle)->ndx];
-  fla_pool_entry_reset(pool_entry, name, name_len, obj_nlb);
+  memcpy(pool_entry, client->recv.data + sizeof(int) + sizeof(struct fla_pool),
+         sizeof(struct fla_pool_entry));
 
 exit:
   if (err && *handle != NULL)
@@ -816,18 +810,20 @@ fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
   char *name = (recv->data + sizeof(uint32_t));
   int name_len = recv->hdr->len - sizeof(uint32_t);
   struct fla_pool *handle = NULL;
+  struct fla_pool_entry *pool_entry = NULL;
 
   err = daemon->flexalloc->fns.pool_create(daemon->flexalloc, name, name_len, obj_nlb, &handle);
   *((int *)send->data) = err;
 
   if (FLA_ERR(err, "pool_create()"))
-  {
     send->hdr->len = sizeof(int);
-  }
   else
   {
-    send->hdr->len = sizeof(int) + sizeof(struct fla_pool);
+    send->hdr->len = sizeof(int) + sizeof(struct fla_pool) + sizeof(struct fla_pool_entry);
     memcpy(send->data + sizeof(int), handle, sizeof(struct fla_pool));
+    pool_entry = &daemon->flexalloc->pools.entries[handle->ndx];
+    memcpy(send->data + sizeof(int) + sizeof(struct fla_pool), pool_entry,
+           sizeof(struct fla_pool_entry));
   }
 
   if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
