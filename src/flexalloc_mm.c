@@ -734,6 +734,11 @@ fla_print_pool_entry(struct flexalloc *fs, struct fla_pool_entry * pool_entry)
   uint32_t tmp;
   fprintf(stderr, "===============\n");
   fprintf(stderr, "Pool Entry %p\n", pool_entry);
+  fprintf(stderr, "obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
+  fprintf(stderr, "root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
+  fprintf(stderr, "strp_num : %"PRIu32"\n", pool_entry->strp_num);
+  fprintf(stderr, "strp_sz : %"PRIu32"\n", pool_entry->strp_sz);
+  fprintf(stderr, "PoolName : %s\n", pool_entry->name);
   for(size_t i = 0 ; i < 3 ; ++i)
   {
     fprintf(stderr, "* Head : %d, offset %ld\n", *heads[i], i);
@@ -742,9 +747,8 @@ fla_print_pool_entry(struct flexalloc *fs, struct fla_pool_entry * pool_entry)
     {
       curr_slab = fla_slab_header_ptr(tmp, fs);
       if((err = FLA_ERR(!curr_slab, "fla_slab_header_ptr()")))
-      {
         return;
-      }
+
       fprintf(stderr, "`-->next : %d, prev : %d, maxcount : %d, refcount : %d, ptr %p\n",
               curr_slab->next, curr_slab->prev, curr_slab->maxcount, curr_slab->refcount, curr_slab);
 
