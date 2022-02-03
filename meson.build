@@ -23,6 +23,7 @@ xnvme_deps = [thread_dep, uuid_dep, numa_dep, aio_dep, rt_dep, xnvme_dep]
 
 
 ### Files ###
+libflexalloc_header_dirs = include_directories('./src')
 flexalloc_util_files = ['src/flexalloc_util.c']
 flexalloc_introspect = ['src/flexalloc_introspection.c']
 xnvme_env_files = ['src/flexalloc_xnvme_env.c', 'src/flexalloc_xnvme_env.h']
@@ -31,9 +32,7 @@ flexalloc_common =  ['src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_has
   'src/flexalloc_freelist.c', 'src/flexalloc_ll.c', 'src/flexalloc_ll.h', 'src/flexalloc_slabcache.c',
   xnvme_env_files, flexalloc_util_files, flexalloc_znd_files]
 
-flexalloc_daemon_headers = ['src/flexalloc_daemon_base.h']
 flexalloc_daemon_files = ['src/flexalloc_daemon_base.c']
-libflexalloc_headers = ['src/libflexalloc.h', 'src/flexalloc_shared.h', flexalloc_daemon_headers]
 libflexalloc_files = ['src/libflexalloc.c', flexalloc_common]
 
 ### Executables ###
@@ -47,7 +46,20 @@ executable('flexalloc_client', ['src/flexalloc_test_client.c', flexalloc_common,
 ### Libraries ###
 library = both_libraries('flexalloc', [libflexalloc_files, flexalloc_daemon_files],
                          dependencies: xnvme_deps, install : true)
-install_headers(libflexalloc_headers)
+
+foreach header_file: [
+  'libflexalloc.h',
+  'flexalloc_shared.h',
+  'flexalloc_daemon_base.h',
+  ]
+  install_headers('src' / header_file)
+endforeach
+
+if get_option('fio_source_dir') != ''
+  subdir('fio-ioengine')
+else
+  message('***  fio engine build: NO  ****\n\t `meson --reconfigure -Dfio_source_dir=<fio source dir> <build-dir>` to enable')
+endif
 
 ### Tests ###
 flexalloc_testing = ['tests/flexalloc_tests_common.c', 'tests/flexalloc_tests_common.h']
