@@ -58,7 +58,7 @@ endforeach
 if get_option('fio_source_dir') != ''
   subdir('fio-ioengine')
 else
-  warning('fio engine build: NO\n\t `meson --reconfigure -Dfio_source_dir=<fio source dir> <build-dir>` to enable')
+  message('***  fio engine build: NO  ****\n\t `meson --reconfigure -Dfio_source_dir=<fio source dir> <build-dir>` to enable')
 endif
 
 ### Tests ###
