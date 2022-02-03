@@ -6,9 +6,6 @@ build
 *.build/
 debug
 
-# documentation
-apidocs
-
 # Prerequisites
 *.d
 
