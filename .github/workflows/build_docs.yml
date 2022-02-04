@@ -1,0 +1,50 @@
+name: Build docs
+
+on:
+  push:
+    branches:
+      - master
+      - jwd/sphinx
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Get source
+      uses: actions/checkout@v2
+
+    - name: Install doxygen
+      run: sudo apt-get install -y doxygen
+
+    - name: Prepare python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '>=3.9'
+
+    - name: Prepare Python virtual environment
+      uses: syphar/restore-virtualenv@v1
+      id: cache-docs-venv
+      with:
+        requirement_files: docs/requirements.txt
+
+    - name: Install requirements
+      run: pip install -r docs/requirements.txt
+      if: steps.cache-docs-venv.outputs.cache-hit != 'true'
+
+    - name: Generate docs
+      run: python docs/build_docs.py
+
+    - name: Publish docs
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs/build
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        force_orphan: true
+        publish_branch: gh-pages
