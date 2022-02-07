@@ -7,7 +7,8 @@
  */
 #include <stdlib.h>
 #include <assert.h>
-#include <libflexalloc.h>
+#include "libflexalloc.h"
+#include "flexalloc_daemon_base.h"
 
 #include <fio.h>
 #include <optgroup.h>
