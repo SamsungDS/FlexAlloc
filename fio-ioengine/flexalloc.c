@@ -20,10 +20,12 @@ struct flexalloc_data {
 	struct flexalloc *fs;
 	struct fla_pool *pool;
 	struct fla_object *object;
+	struct fla_daemon_client daemon;
 };
 
 struct flexalloc_options {
 	struct thread_data *td;
+	char *daemon_uri;
 	char *dev_uri;
 	char *md_dev_uri;
 	char *poolname;
@@ -36,7 +38,7 @@ struct fio_option fa_options[] = {
 		.lname		= "path to device node",
 		.type 		= FIO_OPT_STR_STORE,
 		.off1		= offsetof(struct flexalloc_options, dev_uri),
-		.help		= "Flexalloc file system device name (e.g., /dev/nvme0n1; required)",
+		.help		= "Flexalloc file system device name (e.g., /dev/nvme0n1)",
 		.category	= FIO_OPT_C_ENGINE,
 		.group		= FIO_OPT_G_INVALID,
 	},
@@ -46,7 +48,17 @@ struct fio_option fa_options[] = {
 		.lname		= "path to metadata device node",
 		.type 		= FIO_OPT_STR_STORE,
 		.off1		= offsetof(struct flexalloc_options, md_dev_uri),
-		.help		= "Flexalloc file system metadata device name (e.g., /dev/nvme0n2; optional)",
+		.help		= "Flexalloc file system metadata device name (e.g., /dev/nvme0n2)",
+		.category	= FIO_OPT_C_ENGINE,
+		.group		= FIO_OPT_G_INVALID,
+	},
+	{
+		.name		= "daemon_uri",
+		.alias		= "daemon_uri",
+		.lname		= "path to daemon UNIX socket",
+		.type 		= FIO_OPT_STR_STORE,
+		.off1		= offsetof(struct flexalloc_options, daemon_uri),
+		.help		= "Flexalloc file system metadata device name (e.g., /tmp/flexalloc.socket)",
 		.category	= FIO_OPT_C_ENGINE,
 		.group		= FIO_OPT_G_INVALID,
 	},
@@ -63,6 +75,11 @@ struct fio_option fa_options[] = {
 		.name	= NULL,
 	},
 };
+
+static int daemon_mode(struct flexalloc_options *opts)
+{
+	return opts->daemon_uri != NULL;
+}
 
 static enum fio_q_status fio_flexalloc_queue(struct thread_data *td,
 					struct io_u *io_u)
@@ -131,7 +148,7 @@ static int fio_flexalloc_object_close(struct thread_data *td, struct fio_file *f
 	return 0;
 }
 
-static void fio_flexalloc_cleanup(struct thread_data *td)
+static void fio_flexalloc_cleanup_direct(struct thread_data *td)
 {
 	struct flexalloc_data *fad = td->io_ops_data;
 	struct flexalloc_options *o = td->eo;
@@ -187,6 +204,25 @@ static void fio_flexalloc_cleanup(struct thread_data *td)
 	pthread_mutex_unlock(&fa_mutex);
 }
 
+static void fio_flexalloc_cleanup_daemon(struct thread_data *td)
+{
+	struct flexalloc_data *fad = td->io_ops_data;
+	if (fad->fs)
+		// if we failed to open the device, this field will not be set.
+		fla_close(fad->fs);
+	free(fad->object);
+	free(fad);
+}
+
+static void fio_flexalloc_cleanup(struct thread_data *td)
+{
+	struct flexalloc_options *o = td->eo;
+	if (daemon_mode(o))
+		fio_flexalloc_cleanup_daemon(td);
+	else
+		fio_flexalloc_cleanup_direct(td);
+}
+
 /*
  * This is a wrapper around fla_open(). Since we should open a file system
  * once only this will scan through all the other threads looking for an
@@ -197,7 +233,7 @@ static void fio_flexalloc_cleanup(struct thread_data *td)
  * FS open and pool creation are protected by a mutex even if they target
  * different devices.
  */
-static int fio_flexalloc_open(const char *dev_uri, const char *md_dev_uri, struct flexalloc **fs, int tnumber)
+static int fio_flexalloc_open_direct(const char *dev_uri, const char *md_dev_uri, int thread_number, struct flexalloc **fs)
 {
 	struct thread_data *td;
 	int i;
@@ -207,8 +243,8 @@ static int fio_flexalloc_open(const char *dev_uri, const char *md_dev_uri, struc
 		struct flexalloc_options *fao = td->eo;
 		struct flexalloc_data *fad = td->io_ops_data;
 
-		dprint(FD_IO, "flexalloc: thread_number self=%d, td=%d\n", tnumber, td->thread_number);
-		if (tnumber == td->thread_number)
+		dprint(FD_IO, "flexalloc: thread_number self=%d, td=%d\n", thread_number, td->thread_number);
+		if (thread_number == td->thread_number)
 			continue;
 
 		dprint(FD_IO, "flexalloc: td_num %d, o->ioengine=%s, ioengine.name=%s\n",
@@ -240,6 +276,18 @@ static int fio_flexalloc_open(const char *dev_uri, const char *md_dev_uri, struc
 	}
 }
 
+static int fio_flexalloc_open_daemon(struct flexalloc_data *data, struct flexalloc_options *opts)
+{
+	int err = 0;
+	err = fla_daemon_open(opts->daemon_uri, &data->daemon);
+	if (err) {
+		log_err("flexalloc: failed to open daemon socket '%s'\n", opts->daemon_uri);
+		return err;
+	}
+	data->fs = data->daemon.flexalloc;
+	return 0;
+}
+
 /*
  * Open the file system and acquire pool handle
  */
@@ -265,8 +313,15 @@ static int fio_flexalloc_init(struct thread_data *td)
 		ret = 1;
 	}
 
-	if (!o->dev_uri) {
-		log_err("flexalloc: dev_uri must be set\n");
+	if (o->daemon_uri && (o->dev_uri || o->md_dev_uri))
+	{
+		log_err("flexalloc: do not specify device path(s) if connecting to a daemon\n");
+		ret = 1;
+	}
+
+	if (o->md_dev_uri && !o->dev_uri)
+	{
+		log_err("flexalloc: cannot specify a metadata device without also specifying the data device (`dev_uri`)\n");
 		ret = 1;
 	}
 
@@ -280,11 +335,20 @@ static int fio_flexalloc_init(struct thread_data *td)
 	fad->object = calloc(td->o.nr_files, sizeof(*fad->object));
 	assert(fad->object);
 
-	pthread_mutex_lock(&fa_mutex);
-	ret = fio_flexalloc_open(o->dev_uri, o->md_dev_uri, &fad->fs, td->thread_number);
-	if (ret) {
-		log_err("flexalloc: unable to open file system\n");
-		goto done;
+	if (daemon_mode(o))
+	{
+		ret = fio_flexalloc_open_daemon(fad, o);
+		if (ret) {
+			log_err("flexalloc: unable to open file system\n");
+			goto done;
+		}
+	} else {
+		pthread_mutex_lock(&fa_mutex);
+		ret = fio_flexalloc_open_direct(o->dev_uri, o->md_dev_uri, td->thread_number, &fad->fs);
+		if (ret) {
+			log_err("flexalloc: unable to open file system\n");
+			goto done;
+		}
 	}
 
 	/*
@@ -308,7 +372,8 @@ static int fio_flexalloc_init(struct thread_data *td)
 	dprint(FD_FILE, "flexalloc: created pool %p with poolname %s\n", &fad->pool, pool_name);
 
 done:
-	pthread_mutex_unlock(&fa_mutex);
+	if (!daemon_mode(o))
+		pthread_mutex_unlock(&fa_mutex);
 	return ret;
 }
 
