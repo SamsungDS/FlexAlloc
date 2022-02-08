@@ -15,7 +15,6 @@ endif
 ### Dependencies ###
 xnvme_deps = dependency('xnvme', version : '>=0.0.28' )
 
-
 ### Files ###
 libflexalloc_header_dirs = include_directories('./src')
 flexalloc_util_files = ['src/flexalloc_util.c']
