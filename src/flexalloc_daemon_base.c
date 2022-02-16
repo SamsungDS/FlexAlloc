@@ -743,7 +743,7 @@ fla_daemon_pool_open_rsp(struct fla_daemon *daemon, int client_fd,
     goto exit;
 
 exit:
-  if (*handle != NULL) // TODO: change API to not allocate the handle
+  if (handle !=NULL && *handle != NULL) // TODO: change API to not allocate the handle
     free(*handle);
   return err;
 }
