@@ -835,7 +835,7 @@ fla_calc_objs_in_slab(struct flexalloc const * fs, uint32_t const obj_nlb)
   uint32_t obj_num;
   size_t unused_nlb, free_list_nlb;
 
-  if (!fla_geo_zoned(&fs->geo))
+  if (!fs->dev.md_dev)
   {
     for(obj_num = fs->geo.slab_nlb / obj_nlb ; obj_num > 0; --obj_num)
     {
