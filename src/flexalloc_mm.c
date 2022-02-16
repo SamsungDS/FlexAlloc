@@ -1065,7 +1065,7 @@ fla_pool_best_slab_list(const struct fla_slab_header* slab,
                         struct fla_pool_entry * pool_entry)
 {
   return slab->refcount == 0 ? &pool_entry->empty_slabs
-         : slab->refcount == pool_entry->slab_nobj ? &pool_entry->full_slabs
+         : slab->refcount + pool_entry->strp_num > pool_entry->slab_nobj ? &pool_entry->full_slabs
          : &pool_entry->partial_slabs;
 }
 
