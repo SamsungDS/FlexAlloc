@@ -33,6 +33,7 @@ main(int argc, char **argv)
   struct fla_ut_dev tdev = {0};
   struct fla_open_opts open_opts = {0};
 
+  open_opts.opts = NULL;
   err = fla_ut_dev_init(t_val.blk_num, &tdev);
   if (FLA_ERR(err, "fla_ut_dev_init()"))
     goto exit;
