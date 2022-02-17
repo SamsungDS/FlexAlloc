@@ -13,12 +13,13 @@ def open(dev_uri: str, md_dev_uri: str = None) -> FlexAlloc:
     cdef char *c_mdev_str
     if (md_dev_uri is not None):
         py_dev_mstr = md_dev_uri.encode("ascii")
+        c_mdev_str = py_dev_mstr
     else:
-        py_dev_mstr = "".encode("ascii")
+        c_mdev_str = NULL
 
-    c_mdev_str = py_dev_mstr
     oopts.dev_uri = c_dev_str
     oopts.md_dev_uri = c_mdev_str
+    oopts.opts = NULL;
     if fla_open(&oopts, &data):
         raise MemoryError("failed to open FlexAlloc system")
 

@@ -1634,7 +1634,7 @@ fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
     goto exit;
   }
 
-  err = fla_xne_dev_open(opts->dev_uri, &opts->opts, &dev);
+  err = fla_xne_dev_open(opts->dev_uri, opts->opts, &dev);
   if (FLA_ERR(err, "fla_xne_dev_open()"))
     goto free_fs;
 

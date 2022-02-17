@@ -24,7 +24,7 @@ struct fla_open_opts
 {
   const char *dev_uri;
   const char *md_dev_uri;
-  struct xnvme_opts opts;
+  struct xnvme_opts *opts;
 };
 
 /// flexalloc object handle

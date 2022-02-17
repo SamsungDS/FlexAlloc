@@ -88,7 +88,7 @@ cdef extern from "flexalloc.h" nogil:
     cdef struct fla_open_opts:
       char *dev_uri
       char *md_dev_uri
-      xnvme_opts opts
+      xnvme_opts *opts
 
 
 cdef class FlexAlloc:
