@@ -60,6 +60,10 @@ msg_handler(struct fla_daemon *d, int client_fd, struct fla_msg const * const re
     if (FLA_ERR(fla_daemon_sync_rsp(d, client_fd, recv, send), "fla_daemon_sync_rsp()"))
       return -1;
     break;
+  case FLA_MSG_CMD_SYNC_NO_RSPS:
+    if (FLA_ERR(fla_daemon_sync_rsp(d, client_fd, recv, NULL), "fla_daemon_sync_rsp()"))
+      return -1;
+    break;
   case FLA_MSG_CMD_POOL_GET_ROOT_OBJECT:
     if (FLA_ERR(fla_daemon_pool_get_root_object_rsp(d, client_fd, recv, send),
                 "fla_daemon_pool_get_root_object()"))

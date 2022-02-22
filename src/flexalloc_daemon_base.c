@@ -582,7 +582,7 @@ fla_daemon_close_rq(struct flexalloc *fs)
   if (client->sock_fd == 0)
     return 0; /* ensure operation idempotency */
 
-  client->send.hdr->cmd = FLA_MSG_CMD_SYNC;
+  client->send.hdr->cmd = FLA_MSG_CMD_SYNC_NO_RSPS;
   client->send.hdr->len = 0;
   err = fla_sock_send_msg(client->sock_fd, &client->send);
   if (FLA_ERR(err, "fla_sock_send_msg()"))
@@ -648,12 +648,15 @@ fla_daemon_sync_rsp(struct fla_daemon *daemon, int client_fd,
 {
   int err;
   err = daemon->flexalloc->fns.sync(daemon->flexalloc);
-  *((int *)send->data) = err;
 
-  send->hdr->len = sizeof(int);
-  err = fla_sock_send_msg(client_fd, send);
-  if (FLA_ERR(err, "fla_sock_send_msg()"))
-    goto exit;
+  if(send)
+  {
+    *((int *)send->data) = err;
+    send->hdr->len = sizeof(int);
+    err = fla_sock_send_msg(client_fd, send);
+    if (FLA_ERR(err, "fla_sock_send_msg()"))
+      goto exit;
+  }
 
 exit:
   return err;
