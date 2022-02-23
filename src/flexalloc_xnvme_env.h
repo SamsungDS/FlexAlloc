@@ -31,8 +31,8 @@ fla_xne_sync_seq_w_naddrs(struct xnvme_dev * dev, const uint64_t slba, const uin
                           void const * buf);
 
 int
-fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t nbytes,
-                        void const *buf, struct fla_sync_strp_params *sp, bool write);
+fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, uint64_t const offset, uint64_t nbytes,
+                        void const *buf, struct fla_sync_strp_params const * const sp, bool write);
 
 int
 /**

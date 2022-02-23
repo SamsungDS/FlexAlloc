@@ -192,61 +192,60 @@ exit:
 // Read or write out a larger chunk striped across multiple objects
 int
 fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t nbytes,
-                        void const *buf, struct fla_sync_strp_params *sp, bool write)
+                        void const *buf, struct fla_sync_strp_params const * const sp, bool write)
 {
+  int err;
   uint32_t nsid = xnvme_dev_get_nsid(dev);
   struct xnvme_queue *queue = NULL;
-  int err;
   struct fla_async_cb_args cb_args = { 0 };
   const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
-  uint32_t strp_nobjs = sp->strp_nobjs;
-  uint32_t strp_nbytes = sp->strp_nbytes;
-  uint64_t obj_len = sp->obj_len;
-  uint32_t strp_blks = (strp_nbytes / geo->lba_nbytes) - 1;
-  uint64_t bytes_xfer = 0, strp_offset = offset;
+  uint32_t strp_blks = (sp->strp_nbytes / geo->lba_nbytes) - 1;
+  uint64_t bytes_to_xfer = nbytes, strp_offset = offset, strp_to_xfer;
   char *strp_buf = (char *)buf;
 
-  // Nbytes must be a multiple of strp_nobjs * strp_nbytes
-  if (nbytes % (strp_nobjs * strp_nbytes))
+  // Nbytes must be a multiple of sp->strp_nobjs * strp_nbytes
+  /*if (nbytes % (sp->strp_nobjs * sp->strp_nbytes))
   {
     err = -1;
-    FLA_ERR(err, "Striped write must be a multiple of strp_nbytes and nbytes");
+    FLA_ERR(err, "Striped write must be a multiple of sp->strp_nbytes and nbytes");
     goto exit;
-  }
+  }*/
 
   // Make sure offset aligns on strp boundary
-  if (offset % strp_nbytes)
+  if (offset % sp->strp_nbytes)
   {
     err = -1;
     FLA_ERR(err, "Striped write offset must be aligned to strp sz");
     goto exit;
   }
 
-  if (nbytes/strp_nobjs < strp_nbytes)
+  /*if (nbytes/sp->strp_nobjs < sp->strp_nbytes)
   {
     err = -1;
-    FLA_ERR(err, "Num bytes not large enough for strp_nbytes * strp_nobjs");
+    FLA_ERR(err, "Num bytes not large enough for sp->strp_nbytes * sp->strp_nobjs");
     goto exit;
-  }
+  }*/
 
-  err = xnvme_queue_init(dev, strp_nobjs, 0, &queue);
+  err = xnvme_queue_init(dev, sp->strp_nobjs, 0, &queue);
   if (FLA_ERR(err, "xnvme_queue_init"))
     goto exit;
 
   xnvme_queue_set_cb(queue, fla_async_cb, &cb_args);
 
-  while (bytes_xfer != nbytes)
+  while (bytes_to_xfer > 0)
   {
-
-    for (uint32_t strp=0; strp < strp_nobjs;)
+    strp_to_xfer = bytes_to_xfer / sp->strp_nbytes;
+    for (uint32_t strp=0; strp < strp_to_xfer;)
     {
       struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
-      uint64_t slba = (strp_offset/geo->lba_nbytes) + (strp * obj_len);
+      uint64_t slba = (strp_offset/geo->lba_nbytes) + (strp * sp->obj_len);
 submit:
       if (write)
-        err = xnvme_nvm_write(ctx, nsid, slba, strp_blks, strp_buf + (strp * strp_nbytes), NULL);
+        err = xnvme_nvm_write(ctx, nsid, slba, strp_blks, strp_buf + (strp * sp->strp_nbytes),
+                              NULL);
       else
-        err = xnvme_nvm_read(ctx, nsid, slba, strp_blks, strp_buf + (strp * strp_nbytes), NULL);
+        err = xnvme_nvm_read(ctx, nsid, slba, strp_blks, strp_buf + (strp * sp->strp_nbytes),
+                             NULL);
 
       switch (err)
       {
@@ -269,9 +268,9 @@ next:
     }
 
     err = xnvme_queue_wait(queue);
-    bytes_xfer += strp_nbytes * strp_nobjs;
-    strp_buf += strp_nbytes * strp_nobjs;
-    strp_offset += strp_nbytes;
+    bytes_to_xfer -=  sp->strp_nbytes * strp_to_xfer;
+    strp_buf += sp->strp_nbytes * sp->strp_nobjs;
+    strp_offset += sp->strp_nbytes;
     if (FLA_ERR(cb_args.ecount, "Error completing async IO\n"))
       goto exit;
 
