@@ -233,7 +233,8 @@ static void fio_flexalloc_cleanup(struct thread_data *td)
  * FS open and pool creation are protected by a mutex even if they target
  * different devices.
  */
-static int fio_flexalloc_open_direct(const char *dev_uri, const char *md_dev_uri, int thread_number, struct flexalloc **fs)
+static int fio_flexalloc_open_direct(const char *dev_uri, const char *md_dev_uri,
+    int thread_number, struct flexalloc **fs)
 {
 	struct thread_data *td;
 	int i;
@@ -267,13 +268,11 @@ static int fio_flexalloc_open_direct(const char *dev_uri, const char *md_dev_uri
 		}
 	}
 
-	if (md_dev_uri) {
-		dprint(FD_IO, "flexalloc: opening file system on %s with metadata on %s\n", dev_uri, md_dev_uri);
-		return fla_md_open(dev_uri, md_dev_uri, fs);
-	} else {
-		dprint(FD_IO, "flexalloc: opening file system on %s\n", dev_uri);
-		return fla_open(dev_uri, fs);
-	}
+	struct fla_open_opts open_opts = {0};
+	open_opts.dev_uri = dev_uri;
+	if(md_dev_uri)
+		open_opts.md_dev_uri = md_dev_uri;
+	return fla_open(&open_opts, fs);
 }
 
 static int fio_flexalloc_open_daemon(struct flexalloc_data *data, struct flexalloc_options *opts)
