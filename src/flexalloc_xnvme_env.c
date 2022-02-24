@@ -198,6 +198,7 @@ fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t n
   uint32_t nsid = xnvme_dev_get_nsid(dev);
   struct xnvme_queue *queue = NULL;
   struct fla_async_cb_args cb_args = { 0 };
+  struct xnvme_cmd_ctx * ctx;
   const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
   uint32_t strp_blks = (sp->strp_nbytes / geo->lba_nbytes) - 1;
   uint64_t bytes_to_xfer = nbytes, strp_offset = offset, strp_to_xfer;
@@ -208,18 +209,19 @@ fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t n
     if (FLA_ERR(nbytes % (sp->strp_nobjs * sp->strp_nbytes) > 0,
                 "Striped write must be a multiple of sp->strp_nbytes and nbytes")
         || FLA_ERR(nbytes/sp->strp_nobjs < sp->strp_nbytes,
-                   "Num bytes not large enough for sp->strp_nbytes * sp->strp_nobjs"))
+                   "Num bytes not large enough for sp->strp_nbytes * sp->strp_nobjs")
+        || FLA_ERR(offset % sp->strp_nbytes > 0,
+                   "Striped write offset must be aligned to strp sz"))
     {
       err = -1;
       goto exit;
     }
   }
 
-  // Make sure offset aligns on strp boundary
-  if (offset % sp->strp_nbytes)
+  if (FLA_ERR(nbytes % sp->strp_nbytes > 0,
+              "Striped transfer must be a multiple of stripe number of bytes"))
   {
     err = -1;
-    FLA_ERR(err, "Striped write offset must be aligned to strp sz");
     goto exit;
   }
 
@@ -234,8 +236,8 @@ fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t n
     strp_to_xfer = bytes_to_xfer / sp->strp_nbytes;
     for (uint32_t strp=0; strp < strp_to_xfer;)
     {
-      struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
       uint64_t slba = (strp_offset/geo->lba_nbytes) + (strp * sp->obj_len);
+      ctx = xnvme_queue_get_cmd_ctx(queue);
 submit:
       if (write)
         err = xnvme_nvm_write(ctx, nsid, slba, strp_blks, strp_buf + (strp * sp->strp_nbytes),
