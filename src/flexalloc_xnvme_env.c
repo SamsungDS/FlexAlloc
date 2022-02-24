@@ -203,13 +203,17 @@ fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t n
   uint64_t bytes_to_xfer = nbytes, strp_offset = offset, strp_to_xfer;
   char *strp_buf = (char *)buf;
 
-  // Nbytes must be a multiple of sp->strp_nobjs * strp_nbytes
-  /*if (nbytes % (sp->strp_nobjs * sp->strp_nbytes))
+  if (write)
   {
-    err = -1;
-    FLA_ERR(err, "Striped write must be a multiple of sp->strp_nbytes and nbytes");
-    goto exit;
-  }*/
+    if (FLA_ERR(nbytes % (sp->strp_nobjs * sp->strp_nbytes) > 0,
+                "Striped write must be a multiple of sp->strp_nbytes and nbytes")
+        || FLA_ERR(nbytes/sp->strp_nobjs < sp->strp_nbytes,
+                   "Num bytes not large enough for sp->strp_nbytes * sp->strp_nobjs"))
+    {
+      err = -1;
+      goto exit;
+    }
+  }
 
   // Make sure offset aligns on strp boundary
   if (offset % sp->strp_nbytes)
@@ -218,13 +222,6 @@ fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t n
     FLA_ERR(err, "Striped write offset must be aligned to strp sz");
     goto exit;
   }
-
-  /*if (nbytes/sp->strp_nobjs < sp->strp_nbytes)
-  {
-    err = -1;
-    FLA_ERR(err, "Num bytes not large enough for sp->strp_nbytes * sp->strp_nobjs");
-    goto exit;
-  }*/
 
   err = xnvme_queue_init(dev, sp->strp_nobjs, 0, &queue);
   if (FLA_ERR(err, "xnvme_queue_init"))
