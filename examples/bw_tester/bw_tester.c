@@ -71,6 +71,8 @@ int main(int argc, char **argv)
   char *dev, *md_dev;
   uint64_t num_writes, obj_nlb, strp_nobjs, strp_nbytes, wrt_nbytes, num_strp_objs;
   bool verify;
+  struct fla_open_opts open_opts = {0};
+  struct xnvme_opts x_opts = xnvme_opts_default();
 
   if (argc != 10) {
     printf("Usage:%s\n", USAGE);
@@ -90,7 +92,11 @@ int main(int argc, char **argv)
   if (num_strp_objs == 0) // Fill until failure when num_strp_objs == 0
     num_strp_objs = num_strp_objs - 1;
 
-  ret = fla_md_open(dev, md_dev, &fs);
+  open_opts.dev_uri = dev;
+  open_opts.md_dev_uri = md_dev;
+  open_opts.opts = &x_opts;
+  open_opts.opts->async = "io_uring_cmd";
+  ret = fla_open(&open_opts, &fs);
   if (ret) {
     printf("Error on open\n");
     goto exit;
