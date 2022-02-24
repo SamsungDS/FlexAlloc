@@ -95,14 +95,17 @@ struct fla_pool_entry
   ///
   /// Pools can have any valid flexalloc object set as a root object
   uint64_t root_obj_hndl;
+
   /// Num of objects to stripe across
   ///
   /// Pools may optionally hand out striped objects
-  uint32_t strp_num;
+
+  uint32_t strp_nobjs;
   /// Size of each stripe chunk
   ///
-  /// Must be set if we ste strp_num
-  uint32_t strp_sz;
+  /// Must be set if we set strp_nobjs
+
+  uint32_t strp_nbytes;
   /// Human-readable cache identifier
   ///
   /// The cache name is primarily used for debugging statistics

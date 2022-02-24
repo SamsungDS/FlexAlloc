@@ -295,13 +295,13 @@ fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct
  *
  * @param fs flexalloc system handle
  * @param pool_handle flexalloc pool handle to set as being striped
- * @param strp_num number of objects to stripe across
- * @param strp_sz size of each stripe chunk in bytes
+ * @param strp_nobjs number of objects to stripe across
+ * @param strp_nbytes size of each stripe chunk in bytes
  * @return int indicating if pool striping parameters were applied
  */
 int
-fla_pool_set_strp(struct flexalloc *fs, struct fla_pool const *pool_handle, uint32_t strp_num,
-                  uint32_t strp_sz);
+fla_pool_set_strp(struct flexalloc *fs, struct fla_pool const *pool_handle, uint32_t strp_nobjs,
+                  uint32_t strp_nbytes);
 
 #ifdef __cplusplus
 }

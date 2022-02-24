@@ -12,9 +12,9 @@
 
 struct fla_sync_strp_params
 {
-  uint32_t strp_num;
-  uint32_t strp_sz;
-  uint64_t obj_len;
+  uint32_t strp_nobjs;
+  uint32_t strp_nbytes;
+  uint64_t obj_nlbs;
 };
 
 /**

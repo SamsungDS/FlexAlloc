@@ -89,7 +89,7 @@ fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct
   uint64_t obj_slba = fla_object_slba(fs, obj, pool_handle);
   uint32_t obj_zn = obj_slba / fs->geo.nzsect;
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
-  uint32_t strps = pool_entry->strp_num;
+  uint32_t strps = pool_entry->strp_nobjs;
 
   for (uint32_t strp = 0; strp < strps; strp++)
   {
