@@ -739,8 +739,8 @@ fla_print_pool_entry(struct flexalloc *fs, struct fla_pool *pool)
   fprintf(stderr, "Pool Entry %p\n", pool_entry);
   fprintf(stderr, "--> obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
   fprintf(stderr, "--> root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
-  fprintf(stderr, "--> strp_num : %"PRIu32"\n", pool_entry->strp_num);
-  fprintf(stderr, "--> strp_sz : %"PRIu32"\n", pool_entry->strp_sz);
+  fprintf(stderr, "--> strp_nobjs : %"PRIu32"\n", pool_entry->strp_nobjs);
+  fprintf(stderr, "--> strp_nbytes : %"PRIu32"\n", pool_entry->strp_nbytes);
   fprintf(stderr, "--> PoolName : %s\n", pool_entry->name);
   fprintf(stderr, "--> Max Number of Objects In Slab %"PRIu32"\n", pool_entry->slab_nobj);
   for(size_t i = 0 ; i < 3 ; ++i)
@@ -808,23 +808,23 @@ fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int na
   pool_entry->full_slabs = FLA_LINKED_LIST_NULL;
   pool_entry->partial_slabs = FLA_LINKED_LIST_NULL;
   pool_entry->root_obj_hndl = FLA_ROOT_OBJ_NONE;
-  pool_entry->strp_num = 1; // By default we don't stripe across objects
+  pool_entry->strp_nobjs = 1; // By default we don't stripe across objects
 }
 
 int
-fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_num, uint32_t strp_sz)
+fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_nobjs, uint32_t strp_nbytes)
 {
   struct fla_pool_entry *pool_entry = &fs->pools.entries[ph->ndx];
   const struct xnvme_geo * geo = xnvme_dev_get_geo(fs->dev.dev);
 
-  if (FLA_ERR(strp_sz > geo->mdts_nbytes, "Strp sz > mdts for device"))
+  if (FLA_ERR(strp_nbytes > geo->mdts_nbytes, "Strp sz > mdts for device"))
     return -1;
 
-  if (FLA_ERR(strp_num > pool_entry->slab_nobj, "Strp sz > max obj in slab"))
+  if (FLA_ERR(strp_nobjs > pool_entry->slab_nobj, "Strp sz > max obj in slab"))
     return -1;
 
-  pool_entry->strp_num = strp_num;
-  pool_entry->strp_sz = strp_sz;
+  pool_entry->strp_nobjs = strp_nobjs;
+  pool_entry->strp_nbytes = strp_nbytes;
 
   return 0;
 }
@@ -1055,7 +1055,7 @@ fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab
     return err;
 
   pool_entry = &fs->pools.entries[slab->pool];
-  slab->refcount += pool_entry->strp_num;
+  slab->refcount += pool_entry->strp_nobjs;
 
   return err;
 }
@@ -1065,7 +1065,7 @@ fla_pool_best_slab_list(const struct fla_slab_header* slab,
                         struct fla_pool_entry * pool_entry)
 {
   return slab->refcount == 0 ? &pool_entry->empty_slabs
-         : slab->refcount + pool_entry->strp_num > pool_entry->slab_nobj ? &pool_entry->full_slabs
+         : slab->refcount + pool_entry->strp_nobjs > pool_entry->slab_nobj ? &pool_entry->full_slabs
          : &pool_entry->partial_slabs;
 }
 
@@ -1126,7 +1126,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
 
   from_head = fla_pool_best_slab_list(slab, pool_entry);
 
-  err = fla_slab_next_available_obj(fs, slab, obj, pool_entry->strp_num);
+  err = fla_slab_next_available_obj(fs, slab, obj, pool_entry->strp_nobjs);
   if(FLA_ERR(err, "fla_slab_next_available_obj()"))
   {
     goto exit;
@@ -1211,7 +1211,7 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
   if(FLA_ERR(err, "fla_slab_cache_obj_free()"))
     goto exit;
 
-  slab->refcount -= pool_entry->strp_num;
+  slab->refcount -= pool_entry->strp_nobjs;
   to_head = fla_pool_best_slab_list(slab, pool_entry);
 
   err = fla_hdll_remove(fs, slab, from_head);
@@ -1359,7 +1359,7 @@ fla_object_elba(struct flexalloc const * fs, struct fla_object const * obj,
 {
   const struct fla_pool_entry * pool_entry = &fs->pools.entries[pool_handle->ndx];
   return fla_geo_slab_lb_off(fs, obj->slab_id)
-    + (pool_entry->obj_nlb * (obj->entry_ndx + pool_entry->strp_num));
+    + (pool_entry->obj_nlb * (obj->entry_ndx + pool_entry->strp_nobjs));
 }
 
 uint64_t
@@ -1370,8 +1370,7 @@ fla_object_eoffset(struct flexalloc const * fs, struct fla_object const * obj,
 }
 
 int
-fla_object_read(const struct flexalloc * fs,
-                struct fla_pool const * pool_handle,
+fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle,
                 struct fla_object const * obj, void * buf, size_t r_offset, size_t r_len)
 {
   int err;
@@ -1381,7 +1380,7 @@ fla_object_read(const struct flexalloc * fs,
 
   obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
   obj_soffset = fla_object_soffset(fs, obj, pool_handle);
-  r_soffset = obj_soffset + (r_offset / pool_entry->strp_num);
+  r_soffset = obj_soffset + (r_offset / pool_entry->strp_nobjs);
   r_eoffset = r_soffset + r_len;
 
   slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
@@ -1391,12 +1390,12 @@ fla_object_read(const struct flexalloc * fs,
   if((err = FLA_ERR(obj_eoffset < r_eoffset, "Read outside of an object")))
     goto exit;
 
-  if (pool_entry->strp_num == 1)
+  if (pool_entry->strp_nobjs == 1)
     err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, r_soffset, r_len, buf);
   else
   {
-    sp.strp_num = pool_entry->strp_num;
-    sp.strp_sz = pool_entry->strp_sz;
+    sp.strp_nobjs = pool_entry->strp_nobjs;
+    sp.strp_nbytes = pool_entry->strp_nbytes;
     sp.obj_len = pool_entry->obj_nlb;
     err = fla_xne_sync_strp_seq_x(fs->dev.dev, r_soffset, r_len, buf, &sp, false);
   }
@@ -1420,7 +1419,7 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
 
   obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
   obj_soffset = fla_object_soffset(fs, obj, pool_handle);
-  w_soffset = obj_soffset + (w_offset / pool_entry->strp_num);
+  w_soffset = obj_soffset + (w_offset / pool_entry->strp_nobjs);
   w_eoffset = w_soffset + w_len;
   obj_zn = w_soffset / (fs->geo.nzsect * fla_fs_lb_nbytes(fs));
 
@@ -1434,12 +1433,12 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
     goto exit;
 
-  if (pool_entry->strp_num == 1)
+  if (pool_entry->strp_nobjs == 1)
     err = fla_xne_sync_seq_w_nbytes(fs->dev.dev, w_soffset, w_len, buf);
   else
   {
-    sp.strp_num = pool_entry->strp_num;
-    sp.strp_sz = pool_entry->strp_sz;
+    sp.strp_nobjs = pool_entry->strp_nobjs;
+    sp.strp_nbytes = pool_entry->strp_nbytes;
     sp.obj_len = pool_entry->obj_nlb;
     err = fla_xne_sync_strp_seq_x(fs->dev.dev, w_soffset, w_len, buf, &sp, true);
   }
