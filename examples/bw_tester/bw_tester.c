@@ -66,10 +66,10 @@ int main(int argc, char **argv)
   struct fla_object obj;
   int ret;
   char *dev, *md_dev;
-  uint64_t num_writes, obj_size, strp_num, strp_sz, wrt_sz;
+  uint64_t num_writes, obj_size, strp_num, strp_sz, wrt_sz, obj_num;
   bool verify;
 
-  if (argc != 9) {
+  if (argc != 10) {
     printf("Usage:%s\n", USAGE);
     return -1;
   }
@@ -82,6 +82,10 @@ int main(int argc, char **argv)
   strp_sz = atoi(argv[6]);
   wrt_sz = atoi(argv[7]);
   verify = atoi(argv[8]);
+  obj_num = atoi(argv[9]);
+
+  if (obj_num == 0) // Fill until failure when obj_num == 0
+    obj_num = obj_num - 1;
 
   ret = fla_md_open(dev, md_dev, &fs);
   if (ret) {
@@ -101,14 +105,22 @@ int main(int argc, char **argv)
     goto close;
   }
 
-  ret = fla_object_create(fs, pool, &obj);
-  if (ret) {
-    printf("Object create fails\n");
-    return ret;
-  }
+  for(int i = 0 ; i < obj_num ; ++i)
+  {
+    ret = fla_object_create(fs, pool, &obj);
+    if (ret) {
+      printf("Object create fails\n");
+      goto exit;
+    }
 
-  ret = r_w_obj(fs, pool, &obj, num_writes, wrt_sz, true, false);
-  ret = r_w_obj(fs, pool, &obj, num_writes, wrt_sz, false, verify);
+    ret = r_w_obj(fs, pool, &obj, num_writes, wrt_sz, true, false);
+    if(ret)
+      goto exit;
+
+    ret = r_w_obj(fs, pool, &obj, num_writes, wrt_sz, false, verify);
+    if(ret)
+      goto exit;
+  }
 
 close:
   fla_close(fs);
