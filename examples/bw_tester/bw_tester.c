@@ -55,9 +55,9 @@ int r_w_obj(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *obj,
   xnvme_timer_stop(&time);
 
   if (write)
-    xnvme_timer_bw_pr(&time, "wall-clock for writes %s ", wrt_nbytes * num);
+    xnvme_timer_bw_pr(&time, "wall-clock write", wrt_nbytes * num);
   else
-    xnvme_timer_bw_pr(&time, "wall-clock for reads %s ", wrt_nbytes * num);
+    xnvme_timer_bw_pr(&time, "wall-clock read", wrt_nbytes * num);
 
   return ret;
 }
