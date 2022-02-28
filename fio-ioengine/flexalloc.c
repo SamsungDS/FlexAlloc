@@ -307,7 +307,8 @@ static int fio_flexalloc_init(struct thread_data *td)
 		ret = 1;
 	}
 
-	if (!td->o.use_thread) {
+	/* threads are required when not in daemon mode */
+	if (!td->o.use_thread && !o->daemon_uri) {
 		log_err("flexalloc: thread=1 must be set for the flexalloc ioengine\n");
 		ret = 1;
 	}
@@ -337,17 +338,13 @@ static int fio_flexalloc_init(struct thread_data *td)
 	if (daemon_mode(o))
 	{
 		ret = fio_flexalloc_open_daemon(fad, o);
-		if (ret) {
-			log_err("flexalloc: unable to open file system\n");
-			goto done;
-		}
 	} else {
 		pthread_mutex_lock(&fa_mutex);
 		ret = fio_flexalloc_open_direct(o->dev_uri, o->md_dev_uri, td->thread_number, &fad->fs);
-		if (ret) {
-			log_err("flexalloc: unable to open file system\n");
-			goto done;
-		}
+	}
+	if (ret) {
+		log_err("flexalloc: unable to open file system\n");
+		goto done;
 	}
 
 	/*
