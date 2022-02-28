@@ -1,12 +1,14 @@
 # this assumes that a flexalloc file system
 # has been created on /dev/ram0
 [test]
-ioengine=external:./flexalloc.o
+ioengine=external:/usr/local/lib/x86_64-linux-gnu/libflexalloc-fio-engine.so
 rw=randwrite
 verify=crc32c
 direct=1				# required for buffer alignment
 thread=1				# required for sharing FS handles
+					# threads not required for daemon mode
 dev_uri=/dev/ram0			# device where FS resides
+#daemon_uri=/tmp/flexalloc.socket	# use this instead for daemon mode
 filesize=2M				# size of each object
 nrfiles=100				# number of objects
 poolname=testpool
