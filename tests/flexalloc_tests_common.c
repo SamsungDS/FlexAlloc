@@ -121,7 +121,7 @@ fla_ut_lpbk_dev_alloc(uint64_t block_size, uint64_t nblocks,
 
   // Free loop number file descriptor?
   devnr = ioctl(loop_ctrl_fd, LOOP_CTL_GET_FREE);
-  if((err = FLA_ERR_ERRNO(devnr==-1, "ioctl()")))
+  if((err = FLA_ERR_ERRNO(devnr==-1, "ioctl() LOOP_CTL_GET_FREE")))
   {
     goto close_loop_ctrl;
   }
@@ -147,13 +147,13 @@ fla_ut_lpbk_dev_alloc(uint64_t block_size, uint64_t nblocks,
   }
 
   err = ioctl((*loop)->dev_fd, LOOP_SET_FD, (*loop)->bfile_fd);
-  if((err = FLA_ERR_ERRNO(err == -1, "ioctl()")))
+  if((err = FLA_ERR_ERRNO(err == -1, "ioctl() LOOP_SET_FD")))
   {
     goto close_backing_file;
   }
 
   err = ioctl((*loop)->dev_fd, LOOP_SET_BLOCK_SIZE, (*loop)->block_size);
-  if((err = FLA_ERR_ERRNO(err, "ioctl()")))
+  if((err = FLA_ERR_ERRNO(err, "ioctl() LOOP_SET_BLOCK_SIZE")))
   {
     goto teardown_loop;
   }
@@ -558,7 +558,7 @@ fla_ut_dev_init(uint64_t disk_min_blocks, struct fla_ut_dev *dev)
 
     xnvme_dev_close(xdev);
     if (FLA_ERR(dev->nblocks < disk_min_blocks,
-                "fla_ut_fs_create() - backing device disk too small for test requirements"))
+                "Backing device disk too small for test requirements"))
     {
       return FLA_ERR_ERROR;
     }
@@ -567,6 +567,13 @@ fla_ut_dev_init(uint64_t disk_min_blocks, struct fla_ut_dev *dev)
   {
     dev->_is_loop = 1;
     dev->lb_nbytes = 512;
+    if(getenv("FLA_LOOP_LBS") != NULL)
+    {
+      errno = 0;
+      dev->lb_nbytes = strtol(getenv("FLA_LOOP_LBS"), NULL, 10);
+      if ((err = FLA_ERR(errno != 0,"Could not properly convert FLA_LOOP_LBS")))
+        return err;
+    }
     dev->nblocks = disk_min_blocks;
     err = fla_ut_lpbk_dev_alloc(dev->lb_nbytes, disk_min_blocks, &dev->_loop);
     if(FLA_ERR(err, "fla_ut_lpbk_dev_alloc()"))
