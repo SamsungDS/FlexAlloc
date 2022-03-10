@@ -218,8 +218,7 @@ fla_geo_init(const struct xnvme_dev *dev, uint32_t npools, uint32_t slab_nlb,
 
 int
 fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
-                  uint32_t npools,
-                  uint32_t slab_nlb, struct fla_geo *geo)
+                  uint32_t npools, uint32_t slab_nlb, struct fla_geo *geo)
 {
   /*
    * Calculate geometry of disk format given the SLAB size (in number of logical blocks)
@@ -245,27 +244,28 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
   }
   // estimate how many slabs we can get before knowing the overhead of the pool metadata
   if (!md_dev)
-    nslabs_approx = fla_nslabs_max(geo->nlb - geo->md_nlb, slab_nlb, lb_nbytes);
-  else
-    nslabs_approx = fla_nslabs_max_mddev(geo->nlb, slab_nlb, lb_nbytes, md_geo.nlb);
-
-  if (!nslabs_approx)
   {
-    // not enough blocks to allocate a single slab (and metadata)
-    FLA_ERR_PRINT("slab size too large - not enough space to allocate any slabs\n");
+    nslabs_approx = fla_nslabs_max(geo->nlb - geo->md_nlb, slab_nlb, lb_nbytes);
+  }
+  else
+  {
+    nslabs_approx = fla_nslabs_max_mddev(geo->nlb, slab_nlb, lb_nbytes, md_geo.nlb);
+  }
+
+  if (FLA_ERR(!nslabs_approx, "slab size too large - not enough space to allocate any slabs"))
+  {
     return -1;
   }
 
-  if (npools > nslabs_approx)
+  if (FLA_ERR(npools > nslabs_approx, "npools is too high"))
   {
-    // each pool will require 1+ slabs to function, having more pools than
-    // slabs cannot work.
-    FLA_ERR_PRINT("npools is too high\n");
     return -1;
   }
   else if (!npools)
+  {
     // no desired number of pools specified, assume a max of 1 pool per slab (worst-case)
     geo->npools = nslabs_approx;
+  }
 
   // calculate number of blocks required to support the pool entries
   fla_geo_pool_sgmt_calc(geo->npools, lb_nbytes, &geo->pool_sgmt);
@@ -281,23 +281,23 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
   else
   {
     geo->nslabs = fla_nslabs_max_mddev(geo->nlb, slab_nlb, lb_nbytes,
-                                       md_geo.nlb - geo->md_nlb - fla_geo_pool_sgmt_nblocks(&geo->pool_sgmt));
+                                       md_geo.nlb - geo->md_nlb -
+                                       fla_geo_pool_sgmt_nblocks(&geo->pool_sgmt));
   }
 
-  if (!geo->nslabs)
+  if (FLA_ERR(!geo->nslabs, "slab size too large, not enough space to allocate any slabs"))
   {
-    // no slabs could be allocated with what remained
-    FLA_ERR_PRINT("slab size too large, not enough space to allocate any slabs\n");
     return -1;
   }
 
   // calculate number of blocks required to support `nslabs` slab header entries
   fla_geo_slab_sgmt_calc(geo->nslabs, lb_nbytes, &geo->slab_sgmt);
 
-  if (npools > geo->nslabs)
-    // each pool will require 1+ slabs to function, having more pools than
-    // slabs cannot work.
+  if (FLA_ERR(npools > geo->nslabs,
+              "Each pool will require 1+ slabs. Having more pools than slabs is invalid"))
+  {
     return -1;
+  }
   else if (geo->npools > geo->nslabs)
   {
     // if npools was not specified, yet we inferred more pools than we can allocate

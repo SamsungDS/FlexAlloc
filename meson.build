@@ -85,9 +85,9 @@ xnvme_tests = {
 }
 
 core_tests = {
-  # 'ut_slab'
-  # : {'sources': 'tests/flexalloc_ut_slab.c',
-  #    'suite': 'core'},
+   'ut_slab'
+   : {'sources': 'tests/flexalloc_ut_slab.c',
+      'suite': 'core'},
   'rt_pool'
   : {'sources': 'tests/flexalloc_rt_pool.c',
      'suite': 'core'},

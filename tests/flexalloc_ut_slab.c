@@ -7,10 +7,9 @@
 
 struct test_vals
 {
-  uint64_t blk_num;
   uint32_t npools;
   uint32_t slab_nlb;
-  uint32_t nslabs;
+  uint32_t disk_min_lbs;
   uint32_t obj_nlb;
 };
 
@@ -18,16 +17,17 @@ static int test_slabs(const struct test_vals * test_vals);
 static int test_check_slab_pointers(struct flexalloc * fs, const uint32_t expected_size);
 
 #define FLA_UT_SLAB_NUMBER_OF_TESTS 4
+
 int
 main(int argc, char ** argv)
 {
   int err = 0;
   struct test_vals test_vals [FLA_UT_SLAB_NUMBER_OF_TESTS] =
   {
-    {.blk_num = 10, .npools = 2, .slab_nlb = 2, .nslabs = 2, .obj_nlb = 1 }
-    , {.blk_num = 20, .npools = 2, .slab_nlb = 2, .nslabs = 7, .obj_nlb = 1 }
-    , {.blk_num = 50, .npools = 2, .slab_nlb = 20, .nslabs = 2, .obj_nlb = 2 }
-    , {.blk_num = 20, .npools = 2, .slab_nlb = 5, .nslabs = 3, .obj_nlb = 1 }
+    {.npools = 2, .slab_nlb = 2, .disk_min_lbs = 9, .obj_nlb = 1 }
+    , {.npools = 2, .slab_nlb = 2, .disk_min_lbs = 21, .obj_nlb = 1 }
+    , {.npools = 2, .slab_nlb = 20, .disk_min_lbs = 50, .obj_nlb = 2 }
+    , {.npools = 2, .slab_nlb = 5, .disk_min_lbs = 18, .obj_nlb = 1 }
   };
 
   for(int i = 0 ; i < FLA_UT_SLAB_NUMBER_OF_TESTS ; ++i)
@@ -50,6 +50,14 @@ test_slabs(const struct test_vals * test_vals)
   struct fla_ut_dev dev;
   struct flexalloc *fs;
   struct fla_slab_header *slab_header, *slab_error;
+  uint64_t available_lb_for_slabs;
+  uint32_t expected_slabs;
+
+  err = fla_ut_dev_init(test_vals->disk_min_lbs, &dev);
+  if (FLA_ERR(err, "fla_ut_dev_init()"))
+  {
+    goto exit;
+  }
 
   slab_error = malloc(sizeof(struct fla_slab_header));
   if (FLA_ERR(!slab_error, "malloc()"))
@@ -57,22 +65,35 @@ test_slabs(const struct test_vals * test_vals)
     err = -ENOMEM;
     goto exit;
   }
-  err = fla_ut_fs_create(test_vals->blk_num, test_vals->slab_nlb, test_vals->npools, &dev, &fs);
+
+  fprintf(stderr, "slab_nlb %"PRIu32", npools %"PRIu32"\n", test_vals->slab_nlb, test_vals->npools);
+  err = fla_ut_fs_create(test_vals->slab_nlb, test_vals->npools, &dev, &fs);
   if (FLA_ERR(err, "fla_ut_fs_create()"))
   {
     goto free_slab_error;
   }
 
+
+  FLA_ASSERTF(test_vals->disk_min_lbs > fla_geo_slabs_lb_off(&fs->geo),
+              "Slabs start after disk has ended (%"PRIu64" > %"PRIu64"",
+              test_vals->disk_min_lbs, fla_geo_slabs_lb_off(&fs->geo));
+  available_lb_for_slabs = test_vals->disk_min_lbs - fla_geo_slabs_lb_off(&fs->geo);
+  expected_slabs = available_lb_for_slabs / test_vals->slab_nlb;
+
   /* Test values in struct fla_slabs */
-  err |= FLA_ASSERTF(*fs->slabs.fslab_num == test_vals->nslabs,
-                     "Unexpected number of free slabs (%d == %d)", *fs->slabs.fslab_num, test_vals->nslabs);
-  err |= FLA_ASSERTF(*fs->slabs.fslab_head == 0,
-                     "Unexpected head ID (%d == %d)", *fs->slabs.fslab_head, 0);
-  err |= FLA_ASSERTF(*fs->slabs.fslab_tail == test_vals->nslabs - 1,
-                     "Unexpected tail ID (%d == %d)", *fs->slabs.fslab_tail, test_vals->nslabs - 1);
+  err |= FLA_ASSERTF(*fs->slabs.fslab_num == expected_slabs,
+                     "Unexpected number of free slabs (%d == %d)",
+                     *fs->slabs.fslab_num, expected_slabs);
+
+  /*err |= FLA_ASSERTF(*fs->slabs.fslab_head == 0,
+                     "Unexpected head ID (%d == %d)", *fs->slabs.fslab_head, 0);*/
+
+  err |= FLA_ASSERTF(*fs->slabs.fslab_tail == expected_slabs - 1,
+                     "Unexpected tail ID (%d == %d)",
+                     *fs->slabs.fslab_tail, expected_slabs - 1);
 
   /* Acquire all the slabs and then release them all */
-  for(uint32_t slab_offset = 0 ; slab_offset < test_vals->nslabs ; ++slab_offset)
+  for(uint32_t slab_offset = 0 ; slab_offset < expected_slabs ; ++slab_offset)
   {
     slab_header = (void*)fs->slabs.headers + (slab_offset * sizeof(struct fla_slab_header));
 
@@ -91,9 +112,10 @@ test_slabs(const struct test_vals * test_vals)
       goto close_fs;
     }
 
-    const uint32_t free_slabs = test_vals->nslabs - (slab_offset + 1);
+    const uint32_t free_slabs = expected_slabs - (slab_offset + 1);
     err = FLA_ASSERTF(*fs->slabs.fslab_num == free_slabs,
-                      "Unexpected number of free slabs (%d == %d)", *fs->slabs.fslab_num, free_slabs);
+                      "Unexpected number of free slabs (%d == %d)",
+                      *fs->slabs.fslab_num, free_slabs);
     if(FLA_ERR(err, "FLA_ASSERTF()"))
     {
       goto close_fs;
@@ -114,26 +136,23 @@ test_slabs(const struct test_vals * test_vals)
     goto close_fs;
   }
 
-  for(uint32_t slab_offset = 0 ; slab_offset < test_vals->nslabs ; ++slab_offset)
+  for(uint32_t slab_offset = 0 ; slab_offset < expected_slabs ; ++slab_offset)
   {
     slab_header = (void*)fs->slabs.headers + (slab_offset * sizeof(struct fla_slab_header));
 
     err = fla_release_slab(fs, slab_header);
     if(FLA_ERR(err, "fla_release_slab()"))
-    {
       goto close_fs;
-    }
 
     err = FLA_ASSERTF(*fs->slabs.fslab_num == slab_offset + 1,
-                      "Unexpected number of free slabs (%d == %d)", *fs->slabs.fslab_num, slab_offset + 1);
+                      "Unexpected number of free slabs (%d == %d)",
+                      *fs->slabs.fslab_num, slab_offset + 1);
     if(FLA_ERR(err, "FLA_ASSERTF()"))
-    {
       goto close_fs;
-    }
   }
 
 close_fs:
-  ret = fla_ut_fs_teardown(&dev, fs);
+  ret = fla_ut_fs_teardown(fs);
   if (FLA_ERR(ret, "fla_ut_fs_teardown()"))
   {
     err = ret;
@@ -144,7 +163,6 @@ free_slab_error:
 
 exit:
   return err;
-
 }
 
 int
@@ -168,7 +186,8 @@ test_check_slab_pointers(struct flexalloc * fs, const uint32_t expected_size)
   }
 
   err = FLA_ASSERTF(size_from_head == expected_size,
-                    "Unexpected size when starting from head (%d == %d)", size_from_head, expected_size);
+                    "Unexpected size when starting from head (%d == %d)",
+                    size_from_head, expected_size);
 
   /* check prev pointers */
   curr_slab_id = *fs->slabs.fslab_tail;
@@ -181,7 +200,6 @@ test_check_slab_pointers(struct flexalloc * fs, const uint32_t expected_size)
     }
     curr_slab_id = curr_slab->prev;
     size_from_head++;
-
   }
 
 exit:
