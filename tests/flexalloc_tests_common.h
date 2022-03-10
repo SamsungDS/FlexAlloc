@@ -101,12 +101,7 @@ fla_ut_dev_teardown(struct fla_ut_dev *dev);
 /**
  * Create a flexalloc instance using device if FLA_TEST_DEV is set, otherwise using loopback.
  *
- * @param slab_min_512byte_blocks minimum number of blocks (in units of 512B)
- *        to allocate per slab.
- *        Note that this number will be rounded up to match a multiple of the
- *        device's logical block size. E.g. specifying a slab size of 7 512B
- *        blocks for devices whose LB is 4KiB (8*512B) causes over-provisioning
- *        of 512B per slab.
+ * @param slab_min_blocks minimum number of blocks
  * @param npools number of pools to allocate space for in flexalloc
  * @param dev contains information related to which device type was selected,
  *            fields not prepended by underscore may be read.
@@ -114,7 +109,7 @@ fla_ut_dev_teardown(struct fla_ut_dev *dev);
  * @return 0 on success, error otherwise.
  */
 int
-fla_ut_fs_create(uint32_t slab_min_512byte_blocks, uint32_t npools,
+fla_ut_fs_create(uint32_t slab_min_blocks, uint32_t npools,
                  struct fla_ut_dev *dev, struct flexalloc **fs);
 
 /**
