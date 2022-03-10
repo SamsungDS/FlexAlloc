@@ -309,25 +309,6 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
   return 0;
 }
 
-void
-fla_geo_print(struct flexalloc *fs)
-{
-  struct fla_geo * geo = &(fs->geo);
-  fprintf(stdout, "LBAs: %"PRIu64"\n", geo->nlb);
-  fprintf(stdout, "LBA width: %"PRIu32"B\n", geo->lb_nbytes);
-
-  fprintf(stdout, "md blocks: %"PRIu32"\n", geo->md_nlb);
-  fprintf(stdout, "pool segment:\n");
-  fprintf(stdout, "  * pools: %"PRIu32"\n", geo->npools);
-  fprintf(stdout, "  * freelist blocks: %"PRIu32"\n", geo->pool_sgmt.freelist_nlb);
-  fprintf(stdout, "  * htbl blocks: %"PRIu32"\n", geo->pool_sgmt.htbl_nlb);
-  fprintf(stdout, "  * entry blocks: %"PRIu32"\n", geo->pool_sgmt.entries_nlb);
-  fprintf(stdout, "  * total blocks: %"PRIu32"\n", fla_geo_pool_sgmt_nblocks(&geo->pool_sgmt));
-  fprintf(stdout, "slab segment:\n");
-  fprintf(stdout, "  * slabs: %"PRIu32"\n", geo->nslabs);
-  fprintf(stdout, "  * total blocks: %"PRIu32"\n", geo->slab_sgmt.slab_sgmt_nlb);
-}
-
 /// calculate disk offset, in logical blocks, of the start of the pools segment
 uint64_t
 fla_geo_pool_sgmt_lb_off(struct fla_geo const *geo)
@@ -728,38 +709,74 @@ fla_base_sync(struct flexalloc *fs)
 }
 
 void
-fla_print_pool_entry(struct flexalloc *fs, struct fla_pool *pool)
+fla_print_geo(struct flexalloc *fs)
+{
+  struct fla_geo * geo = &(fs->geo);
+  fprintf(stderr, "Flexalloc Geometry: \n");
+  fprintf(stderr, "|  LBAs: %"PRIu64"\n", geo->nlb);
+  fprintf(stderr, "|  LBA width: %"PRIu32"B\n", geo->lb_nbytes);
+  fprintf(stderr, "|  md blocks: %"PRIu32"\n", geo->md_nlb);
+  fprintf(stderr, "|  pool segment:\n");
+  fprintf(stderr, "|    * pools: %"PRIu32"\n", geo->npools);
+  fprintf(stderr, "|    * freelist blocks: %"PRIu32"\n", geo->pool_sgmt.freelist_nlb);
+  fprintf(stderr, "|    * htbl blocks: %"PRIu32"\n", geo->pool_sgmt.htbl_nlb);
+  fprintf(stderr, "|    * entry blocks: %"PRIu32"\n", geo->pool_sgmt.entries_nlb);
+  fprintf(stderr, "|    * total blocks: %"PRIu32"\n", fla_geo_pool_sgmt_nblocks(&geo->pool_sgmt));
+  fprintf(stderr, "|  slab segment:\n");
+  fprintf(stderr, "|    * slabs: %"PRIu32"\n", geo->nslabs);
+  fprintf(stderr, "|    * slab total blocks: %"PRIu32"\n", geo->slab_sgmt.slab_sgmt_nlb);
+  fprintf(stderr, "\n");
+}
+
+void
+fla_print_pool_entries(struct flexalloc *fs)
 {
   int err = 0;
   struct fla_slab_header * curr_slab;
-  struct fla_pool_entry * pool_entry = &fs->pools.entries[pool->ndx];
-  uint32_t * heads[3] = {&pool_entry->empty_slabs, &pool_entry->full_slabs, &pool_entry->partial_slabs};
+  uint32_t slab_heads[3];
   uint32_t tmp;
+  struct fla_pool_entry * pool_entry;
 
-  fprintf(stderr, "===============\n");
-  fprintf(stderr, "Pool Entry %p\n", pool_entry);
-  fprintf(stderr, "--> obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
-  fprintf(stderr, "--> root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
-  fprintf(stderr, "--> strp_num : %"PRIu32"\n", pool_entry->strp_num);
-  fprintf(stderr, "--> strp_sz : %"PRIu32"\n", pool_entry->strp_sz);
-  fprintf(stderr, "--> PoolName : %s\n", pool_entry->name);
-  fprintf(stderr, "--> Max Number of Objects In Slab %"PRIu32"\n", pool_entry->slab_nobj);
-  for(size_t i = 0 ; i < 3 ; ++i)
+  for (uint32_t npool = 0 ; npool < fs->geo.npools ; ++npool)
   {
-    fprintf(stderr, "* Head : %d, offset %ld\n", *heads[i], i);
-    tmp = *heads[i];
-    for(uint32_t j = 0 ; j < fs->geo.nslabs && tmp != FLA_LINKED_LIST_NULL; ++j)
-    {
-      curr_slab = fla_slab_header_ptr(tmp, fs);
-      if((err = FLA_ERR(!curr_slab, "fla_slab_header_ptr()")))
-        return;
+    pool_entry = &fs->pools.entries[npool];
 
-      fprintf(stderr, "`-->next : %"PRIu32", prev : %"PRIu32", refcount : %"PRIu32", ptr %p\n",
-              curr_slab->next, curr_slab->prev, curr_slab->refcount, curr_slab);
-      tmp = curr_slab->next;
+    slab_heads[0] = pool_entry->empty_slabs;
+    slab_heads[1] = pool_entry->full_slabs;
+    slab_heads[2] = pool_entry->partial_slabs;
+    if(pool_entry->obj_nlb == 0 && pool_entry->slab_nobj == 0)
+      continue; //as this pool has not been initialized
+
+    fprintf(stderr, "Pool Entry %"PRIu32"(%p)\n", npool, pool_entry);
+    fprintf(stderr, "|  obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
+    fprintf(stderr, "|  root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
+    fprintf(stderr, "|  strp_num : %"PRIu32"\n", pool_entry->strp_num);
+    fprintf(stderr, "|  strp_sz : %"PRIu32"\n", pool_entry->strp_sz);
+    fprintf(stderr, "|  PoolName : %s\n", pool_entry->name);
+    fprintf(stderr, "|  Max Number of Objects In Slab %"PRIu32"\n", pool_entry->slab_nobj);
+    fprintf(stderr, "|  Slabs:\n");
+    for(size_t i = 0 ; i < 3 ; ++i)
+    {
+      fprintf(stderr, "|    Head : %d, offset %ld\n", slab_heads[i], i);
+      tmp = slab_heads[i];
+      for(uint32_t j = 0 ; j < fs->geo.nslabs && tmp != FLA_LINKED_LIST_NULL; ++j)
+      {
+        curr_slab = fla_slab_header_ptr(tmp, fs);
+        if((err = FLA_ERR(!curr_slab, "fla_slab_header_ptr()")))
+          return;
+
+        fprintf(stderr, "|    -->next : %"PRIu32", prev : %"PRIu32", refcount : %"PRIu32"\n",
+                curr_slab->next, curr_slab->prev, curr_slab->refcount);
+        tmp = curr_slab->next;
+      }
     }
   }
-  fprintf(stderr, "===============\n");
+}
+
+void fla_print_fs(struct flexalloc *fs)
+{
+  fla_print_geo(fs);
+  fla_print_pool_entries(fs);
 }
 
 int
@@ -1122,6 +1139,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
     err = 0; //Ignore as it was already loaded.
   else if(FLA_ERR(err, "fla_slab_cache_elem_load()"))
   {
+    FLA_DBG_EXEC(fla_print_fs(fs));
     goto exit;
   }
 
