@@ -112,10 +112,13 @@ fla_err_errno_fl(const int condition, const char * message, const char * f,
   FLA_DBG_PRX;                                \
   fprintf(stderr, f, __VA_ARGS__);              \
   fflush(stderr);
+
+#define FLA_DBG_EXEC(statement) statement;
 #else
 #define FLA_DBG_PRX() ;
 #define FLA_DBG_PRINT(s) ;
 #define FLA_DBG_PRINTF(f, ...) ;
+#define FLA_DBG_EXEC(statement) ;
 #endif
 
 /* Ceiling division provided:
