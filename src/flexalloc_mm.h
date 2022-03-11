@@ -99,13 +99,15 @@ struct fla_pool_entry
   /// Num of objects to stripe across
   ///
   /// Pools may optionally hand out striped objects
-
   uint32_t strp_nobjs;
-  /// Size of each stripe chunk
-  ///
-  /// Must be set if we set strp_nobjs
 
+  /// Number of bytes of each stripe chunk
+  ///
+  /// When striped, each fla object is subdivided into stripe
+  /// subsection or chunks.
+  /// Must be set if we set strp_nobjs
   uint32_t strp_nbytes;
+
   /// Human-readable cache identifier
   ///
   /// The cache name is primarily used for debugging statistics
