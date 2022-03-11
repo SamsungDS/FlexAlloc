@@ -1396,11 +1396,10 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
   int err;
   uint64_t obj_eoffset, obj_soffset, r_soffset, r_eoffset, slab_eoffset;
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
-  struct fla_sync_strp_params sp;
 
   obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
   obj_soffset = fla_object_soffset(fs, obj, pool_handle);
-  r_soffset = obj_soffset + (r_offset / pool_entry->strp_nobjs);
+  r_soffset = obj_soffset + r_offset;
   r_eoffset = r_soffset + r_len;
 
   slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
@@ -1414,10 +1413,17 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
     err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, r_soffset, r_len, buf);
   else
   {
+    struct fla_strp_params sp;
     sp.strp_nobjs = pool_entry->strp_nobjs;
-    sp.strp_nbytes = pool_entry->strp_nbytes;
-    sp.obj_nlbs = pool_entry->obj_nlb;
-    err = fla_xne_sync_strp_seq_x(fs->dev.dev, r_soffset, r_len, buf, &sp, false);
+    sp.strp_chunk_nbytes = pool_entry->strp_nbytes;
+    sp.faobj_nlbs = pool_entry->obj_nlb;
+    sp.xfer_snbytes = r_offset;
+    sp.xfer_nbytes = r_len;
+    sp.strp_obj_tnbytes = (uint64_t)pool_entry->strp_nobjs * pool_entry->obj_nlb * fs->geo.lb_nbytes;
+    sp.strp_obj_start_nbytes = obj_soffset;
+    sp.dev_lba_nbytes = fs->geo.lb_nbytes;
+    sp.write = false;
+    err = fla_xne_async_strp_seq_x(fs->dev.dev, buf, &sp);
   }
 
   if(FLA_ERR(err, "fla_xne_sync_seq_r_nbytes()"))
@@ -1435,11 +1441,10 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   uint64_t obj_eoffset, obj_soffset, w_soffset, w_eoffset, slab_eoffset;
   uint32_t obj_zn;
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
-  struct fla_sync_strp_params sp;
 
   obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
   obj_soffset = fla_object_soffset(fs, obj, pool_handle);
-  w_soffset = obj_soffset + (w_offset / pool_entry->strp_nobjs);
+  w_soffset = obj_soffset + w_offset;
   w_eoffset = w_soffset + w_len;
   obj_zn = w_soffset / (fs->geo.nzsect * fla_fs_lb_nbytes(fs));
 
@@ -1457,10 +1462,17 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
     err = fla_xne_sync_seq_w_nbytes(fs->dev.dev, w_soffset, w_len, buf);
   else
   {
+    struct fla_strp_params sp;
     sp.strp_nobjs = pool_entry->strp_nobjs;
-    sp.strp_nbytes = pool_entry->strp_nbytes;
-    sp.obj_nlbs = pool_entry->obj_nlb;
-    err = fla_xne_sync_strp_seq_x(fs->dev.dev, w_soffset, w_len, buf, &sp, true);
+    sp.strp_chunk_nbytes = pool_entry->strp_nbytes;
+    sp.faobj_nlbs = pool_entry->obj_nlb;
+    sp.xfer_snbytes = w_offset;
+    sp.xfer_nbytes = w_len;
+    sp.strp_obj_tnbytes = (uint64_t)pool_entry->strp_nobjs * pool_entry->obj_nlb * fs->geo.lb_nbytes;
+    sp.strp_obj_start_nbytes = obj_soffset;
+    sp.dev_lba_nbytes = fs->geo.lb_nbytes;
+    sp.write = true;
+    err = fla_xne_async_strp_seq_x(fs->dev.dev, buf, &sp);
   }
 
   if(FLA_ERR(err, "fla_xne_sync_seq_w_nbytes()"))
@@ -1474,8 +1486,7 @@ exit:
 }
 
 int
-fla_object_unaligned_write(struct flexalloc * fs,
-                           struct fla_pool const * pool_handle,
+fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
                            struct fla_object const * obj, void const * w_buf, size_t obj_offset,
                            size_t len)
 {

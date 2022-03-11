@@ -10,11 +10,34 @@
 #include <libxnvme.h>
 #include <libxnvme_lba.h>
 
-struct fla_sync_strp_params
+struct fla_strp_params
 {
+  /// Num of objects to stripe across
   uint32_t strp_nobjs;
-  uint32_t strp_nbytes;
-  uint64_t obj_nlbs;
+
+  /// Number of bytes of each stripe chunk
+  uint32_t strp_chunk_nbytes;
+
+  /// Number of lbs in a non-striped object
+  uint64_t faobj_nlbs;
+
+  /// Start offset within object (slba == 0)
+  uint64_t xfer_snbytes;
+
+  /// Number of bytes to transfer
+  uint64_t xfer_nbytes;
+
+  /// Total bytes in a striped object
+  uint64_t strp_obj_tnbytes;
+
+  /// striped object offset within device
+  uint64_t strp_obj_start_nbytes;
+
+  /// the device logical block size
+  uint32_t dev_lba_nbytes;
+
+  /// Wether to write or not
+  bool write;
 };
 
 /**
@@ -31,8 +54,7 @@ fla_xne_sync_seq_w_naddrs(struct xnvme_dev * dev, const uint64_t slba, const uin
                           void const * buf);
 
 int
-fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t nbytes,
-                        void const *buf, struct fla_sync_strp_params *sp, bool write);
+fla_xne_async_strp_seq_x(struct xnvme_dev *dev, void const *buf, struct fla_strp_params *sp);
 
 int
 /**

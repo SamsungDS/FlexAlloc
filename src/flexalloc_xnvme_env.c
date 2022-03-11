@@ -15,29 +15,6 @@
 #include "flexalloc_xnvme_env.h"
 #include "flexalloc_util.h"
 
-struct fla_async_cb_args
-{
-  uint32_t ecount;
-  uint32_t completed;
-  uint32_t submitted;
-};
-
-static void
-fla_async_cb(struct xnvme_cmd_ctx *ctx, void *cb_arg)
-{
-  struct fla_async_cb_args *cb_args = cb_arg;
-
-  cb_args->completed++;
-
-  if (xnvme_cmd_ctx_cpl_status(ctx))
-  {
-    xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
-    cb_args->ecount++;
-  }
-
-  xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
-}
-
 uint32_t
 fla_xne_calc_mdts_naddrs(const struct xnvme_dev * dev)
 {
@@ -189,102 +166,227 @@ exit:
   return err;
 }
 
-// Read or write out a larger chunk striped across multiple objects
-int
-fla_xne_sync_strp_seq_x(struct xnvme_dev *dev, const uint64_t offset, uint64_t nbytes,
-                        void const *buf, struct fla_sync_strp_params *sp, bool write)
+struct fla_async_cb_args
 {
-  uint32_t nsid = xnvme_dev_get_nsid(dev);
-  struct xnvme_queue *queue = NULL;
+  uint32_t ecount;
+  uint32_t completed;
+  uint32_t submitted;
+};
+
+struct fla_async_strp_cb_args_common
+{
+  uint32_t nsid;
+  void * buf;
+  struct fla_strp_params *sp;
+};
+
+struct fla_async_strp_cb_args
+{
+  uint64_t slba;
+  uint16_t nlbs;
+  uint64_t sbuf_nbytes;
+  struct fla_async_cb_args cb_args;
+  struct fla_async_strp_cb_args_common * cmn_args;
+};
+
+
+/*
+ * We can represent a zero start address by chunks in the following manner:
+ * A = ((N*chunks) + left_over). N being the max number of chunks that can fit in A and
+ * left_over is the number of addresses that are "left over" after (N*chunks).
+ * This function changes N from being in chunks to being in translation_steps.
+ */
+static uint64_t
+calc_chunk_translation(uint64_t const zero_offset, uint64_t const chunk,
+                                   uint64_t const translation_step)
+{
+  uint64_t offset_in_chunk = zero_offset % chunk;
+  uint64_t offset_translation = ((zero_offset / chunk) * translation_step);
+  return  offset_in_chunk + offset_translation;
+}
+
+static uint64_t
+calc_strp_obj_slba(uint64_t const xfer_snbytes, struct fla_strp_params const * const sp)
+{
+  uint64_t chunks_in_faobs = calc_chunk_translation(xfer_snbytes, sp->strp_chunk_nbytes,
+                                                    sp->faobj_nlbs * sp->dev_lba_nbytes);
+  return calc_chunk_translation(chunks_in_faobs, sp->strp_obj_tnbytes, sp->strp_chunk_nbytes)
+                                / sp->dev_lba_nbytes;
+}
+
+static uint16_t
+calc_strp_obj_next_nbls(uint64_t sbuf_nbytes,
+                        struct fla_async_strp_cb_args_common const * const cmd_args)
+{
+  uint64_t nbytes_to_xfer = cmd_args->sp->xfer_nbytes - sbuf_nbytes;
+  return (fla_min(cmd_args->sp->strp_chunk_nbytes, nbytes_to_xfer) / cmd_args->sp->dev_lba_nbytes) - 1;
+}
+
+static uint16_t
+calc_strp_obj_first_nlbs(uint64_t const xfer_snbytes,
+                         struct fla_async_strp_cb_args_common const * const cmn_args)
+{
+  return (fla_min(cmn_args->sp->xfer_nbytes,
+                  cmn_args->sp->strp_chunk_nbytes - (xfer_snbytes % cmn_args->sp->strp_chunk_nbytes))
+          / cmn_args->sp->dev_lba_nbytes) - 1;
+}
+
+static uint64_t
+calc_strp_obj_next_sbuf_nbytes(uint64_t const curr_sbuf_nbytes, uint32_t const xfered_nbls,
+                               struct fla_async_strp_cb_args_common const * const cmn_args)
+{
+  return curr_sbuf_nbytes
+         // adjust for the already tranfered bytes
+         + ((xfered_nbls + 1) * cmn_args->sp->dev_lba_nbytes)
+
+         // In order to "wrap around" to the next strp_nbytes on the device we need to
+         // have transfered one strp_chunk_nbytes for each of the other non-striped
+         // objects (not counting the current one)
+         + (cmn_args->sp->strp_chunk_nbytes * (cmn_args->sp->strp_nobjs - 1));
+}
+
+/*
+ * This callback is a little tricky and deserves a little comment. It is designed
+ * to only tranfer data within a non-striped object. We can have a maximum of strp_nobjs of
+ * these callbacks going on in parallel. Here we advance two pointers: 1. the starting logical
+ * block addres (slba) and 2. the transfer buffer offset. Every time we advance the slba by
+ * one strp_nbytes we need to move the buffer by strp_nbytes * (strp_nobjs-1) in order to keep
+ * with the striping order. We stop when we have moved the buffer offset too far that it
+ * goes over the original xfer_nbytes. We also need to make sure that we don't transfer too
+ * many lbs and so we can our transfer to the xfer_nbytes.
+ */
+static void
+fla_async_strp_cb(struct xnvme_cmd_ctx * ctx, void * cb_arg)
+{
   int err;
-  struct fla_async_cb_args cb_args = { 0 };
-  const struct xnvme_geo *geo = xnvme_dev_get_geo(dev);
-  uint32_t strp_nobjs = sp->strp_nobjs;
-  uint32_t strp_nbytes = sp->strp_nbytes;
-  uint64_t obj_nlbs = sp->obj_nlbs;
-  uint32_t strp_blks = (strp_nbytes / geo->lba_nbytes) - 1;
-  uint64_t bytes_xfer = 0, strp_offset = offset;
-  char *strp_buf = (char *)buf;
+  struct fla_async_strp_cb_args *cb_args = cb_arg;
+  cb_args->cb_args.completed++;
 
-  // Nbytes must be a multiple of strp_nobjs * strp_nbytes
-  if (nbytes % (strp_nobjs * strp_nbytes))
+  if (xnvme_cmd_ctx_cpl_status(ctx))
   {
-    err = -1;
-    FLA_ERR(err, "Striped write must be a multiple of strp_nbytes and nbytes");
-    goto exit;
+    xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
+    cb_args->cb_args.ecount++;
   }
 
-  // Make sure offset aligns on strp boundary
-  if (offset % strp_nbytes)
-  {
-    err = -1;
-    FLA_ERR(err, "Striped write offset must be aligned to strp sz");
-    goto exit;
-  }
+  cb_args->sbuf_nbytes = calc_strp_obj_next_sbuf_nbytes(cb_args->sbuf_nbytes, cb_args->nlbs,
+                                                        cb_args->cmn_args);
 
-  if (nbytes/strp_nobjs < strp_nbytes)
+  if(cb_args->sbuf_nbytes < cb_args->cmn_args->sp->xfer_nbytes)
   {
-    err = -1;
-    FLA_ERR(err, "Num bytes not large enough for strp_nbytes * strp_nobjs");
-    goto exit;
-  }
+    cb_args->slba += cb_args->nlbs + 1;
+    cb_args->nlbs = calc_strp_obj_next_nbls(cb_args->sbuf_nbytes, cb_args->cmn_args);
 
-  err = xnvme_queue_init(dev, strp_nobjs, 0, &queue);
+    err = cb_args->cmn_args->sp->write
+          ? xnvme_nvm_write(ctx, cb_args->cmn_args->nsid, cb_args->slba, cb_args->nlbs,
+                            cb_args->cmn_args->buf + cb_args->sbuf_nbytes, NULL)
+          : xnvme_nvm_read(ctx, cb_args->cmn_args->nsid, cb_args->slba, cb_args->nlbs,
+                           cb_args->cmn_args->buf + cb_args->sbuf_nbytes, NULL);
+    switch (err)
+    {
+    case 0:
+      cb_args->cb_args.submitted +=1;
+      break;
+
+    case -EBUSY:
+    case -EAGAIN:
+    default:
+      FLA_ERR(1, cb_args->cmn_args->sp->write ? "xnvme_nvm_write error" : "xnvme_nvm_read error");
+      goto error;
+    }
+  }
+  else
+  {
+
+error:
+    xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
+  }
+}
+
+int
+fla_xne_async_strp_seq_x(struct xnvme_dev *dev, void const *buf, struct fla_strp_params *sp)
+{
+  int err = 0, ret;
+  struct xnvme_queue * queue = NULL;
+  struct fla_async_strp_cb_args *cb_arg;
+  struct xnvme_cmd_ctx *ctx;
+  struct fla_async_strp_cb_args cb_args [512] = {0};
+  struct fla_async_strp_cb_args_common cmn_args = {
+    .nsid = xnvme_dev_get_nsid(dev),
+    .buf = (char *)buf,
+    .sp = sp,
+  };
+
+  if ((err = FLA_ERR(sp->xfer_nbytes % sp->dev_lba_nbytes || sp->xfer_snbytes % sp->dev_lba_nbytes,
+          "Transfer bytes and start offset must be aligned to block size")))
+    goto exit;
+
+  /*
+   * 2 multiplier comes as a consequence when doing e.g. submission-upon-completion,
+   * the queue is filled up consuming all entries. Then when processing a completion,
+   * then the queue is not decremented until that completion-processing is done.
+   * Thus you need more space in the queue, you then need a double amount size the
+   * queue-size must be a power-of-2.
+   */
+  err = xnvme_queue_init(dev, sp->strp_nobjs * 2, 0, &queue);
   if (FLA_ERR(err, "xnvme_queue_init"))
     goto exit;
 
-  xnvme_queue_set_cb(queue, fla_async_cb, &cb_args);
-
-  while (bytes_xfer != nbytes)
+  uint64_t sbuf_nbytes = 0;
+  for(uint32_t i = 0 ; i < sp->strp_nobjs && sbuf_nbytes < sp->xfer_nbytes; ++i)
   {
+    ctx = xnvme_queue_get_cmd_ctx(queue);
+    if((err = FLA_ERR_ERRNO(!ctx, "xnvme_queue_get_cmd_ctx")))
+      goto close_queue;
 
-    for (uint32_t strp=0; strp < strp_nobjs;)
-    {
-      struct xnvme_cmd_ctx *ctx = xnvme_queue_get_cmd_ctx(queue);
-      uint64_t slba = (strp_offset/geo->lba_nbytes) + (strp * obj_nlbs);
+    uint16_t curr_nlbs = calc_strp_obj_first_nlbs(sbuf_nbytes + sp->xfer_snbytes, &cmn_args);
+    cb_arg = &cb_args[i];
+    cb_arg->cmn_args = &cmn_args;
+    cb_arg->nlbs = curr_nlbs;
+    cb_arg->slba = calc_strp_obj_slba(sbuf_nbytes + sp->xfer_snbytes, sp)
+                   + (sp->strp_obj_start_nbytes/sp->dev_lba_nbytes);
+    cb_arg->sbuf_nbytes = sbuf_nbytes;
+
+    xnvme_cmd_ctx_set_cb(ctx, fla_async_strp_cb, cb_arg);
+
 submit:
-      if (write)
-        err = xnvme_nvm_write(ctx, nsid, slba, strp_blks, strp_buf + (strp * strp_nbytes), NULL);
-      else
-        err = xnvme_nvm_read(ctx, nsid, slba, strp_blks, strp_buf + (strp * strp_nbytes), NULL);
+    err = sp->write
+          ? xnvme_nvm_write(ctx, cb_arg->cmn_args->nsid, cb_arg->slba, cb_arg->nlbs,
+                            cb_arg->cmn_args->buf + cb_arg->sbuf_nbytes, NULL)
+          : xnvme_nvm_read(ctx, cb_arg->cmn_args->nsid, cb_arg->slba, cb_arg->nlbs,
+                           cb_arg->cmn_args->buf + cb_arg->sbuf_nbytes, NULL);
 
-      switch (err)
-      {
-      case 0:
-        cb_args.submitted +=1;
-        goto next;
+    switch (err)
+    {
+    case 0:
+      cb_arg->cb_args.submitted +=1;
+      break;
 
-      case -EBUSY:
-      case -EAGAIN:
-        xnvme_queue_poke(queue, 0);
-        goto submit;
+    case -EBUSY:
+    case -EAGAIN:
+      xnvme_queue_poke(queue, 0);
+      goto submit;
 
-      default:
-        FLA_ERR(1, "Async submission error\n");
-        goto exit;
-      }
-
-next:
-      ++strp;
+    default:
+      FLA_ERR(1, "Async submission error\n");
+      goto close_queue;
     }
 
-    err = xnvme_queue_wait(queue);
-    bytes_xfer += strp_nbytes * strp_nobjs;
-    strp_buf += strp_nbytes * strp_nobjs;
-    strp_offset += strp_nbytes;
-    if (FLA_ERR(cb_args.ecount, "Error completing async IO\n"))
-      goto exit;
+    sbuf_nbytes += (curr_nlbs + 1) * sp->dev_lba_nbytes;
+  }
 
+close_queue:
+  ret = xnvme_queue_wait(queue);
+  if((err = FLA_ERR(ret < 0, "xnvme_queue_wait")))
+    goto exit;
+
+  if (queue)
+  {
+    ret = xnvme_queue_term(queue);
+    FLA_ERR(ret, "xnvme_queue_term");
   }
 
 exit:
-  if (queue)
-  {
-    int err_exit = xnvme_queue_term(queue);
-    FLA_ERR(err_exit, "xnvme_queue_term");
-  }
-
-  return err < 0 ? err : 0;
+  return err;
 }
 
 int
@@ -509,6 +611,7 @@ fla_xne_dev_open(const char *dev_uri, struct xnvme_opts *opts, struct xnvme_dev 
     err = 1001;
     return err;
   }
+
   return err;
 }
 
