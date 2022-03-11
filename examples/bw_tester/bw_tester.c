@@ -4,12 +4,13 @@
 #include <errno.h>
 #include <libflexalloc.h>
 #include <libxnvme.h>
+#include <unistd.h>
 
 #define POOL_NAME "TEST_POOL"
 #define USAGE "./bw_tester fla_dev fla_md_dev num_rw obj_size_blks strp_objs strp_nbytes wrt_nbytes verify num_strp_objs"
 
 int r_w_obj(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *obj,
-            uint64_t num, uint64_t wrt_nbytes, bool write, bool verify)
+            uint64_t num, uint64_t wrt_nbytes, bool write, bool verify, int rand_num)
 {
   int ret;
   char *buf;
@@ -24,7 +25,7 @@ int r_w_obj(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *obj,
   if (write)
   {
     for (uint64_t cur_byte = 0; cur_byte < wrt_nbytes; cur_byte++)
-      buf[cur_byte] = (char)cur_byte;
+      buf[cur_byte] = (char)cur_byte + rand_num;
   }
 
   xnvme_timer_start(&time);
@@ -42,7 +43,7 @@ int r_w_obj(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *obj,
     {
       for (uint64_t cur_byte = 0; cur_byte < wrt_nbytes; cur_byte++)
       {
-        if (buf[cur_byte] != (char)cur_byte)
+        if (buf[cur_byte] != (char)(cur_byte + rand_num))
         {
           printf("Data mismatch cur:%lu offset:%lu,expected:[%c],got:[%c]\n", cur, cur_byte,
                  (char)cur_byte, buf[cur_byte]);
@@ -114,19 +115,21 @@ int main(int argc, char **argv)
     goto close;
   }
 
+  srand(getpid());
   for(int i = 0 ; i < num_strp_objs ; ++i)
   {
+    int rand_num = rand();
     ret = fla_object_create(fs, pool, &obj);
     if (ret) {
       printf("Object create fails\n");
       goto close;
     }
 
-    ret = r_w_obj(fs, pool, &obj, num_writes, wrt_nbytes, true, false);
+    ret = r_w_obj(fs, pool, &obj, num_writes, wrt_nbytes, true, false, rand_num);
     if(ret)
       goto close;
 
-    ret = r_w_obj(fs, pool, &obj, num_writes, wrt_nbytes, false, verify);
+    ret = r_w_obj(fs, pool, &obj, num_writes, wrt_nbytes, false, verify, rand_num);
     if(ret)
       goto close;
   }
