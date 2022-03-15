@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "src/libflexalloc.h"
 #include "src/flexalloc.h"
 #include "src/flexalloc_util.h"
@@ -12,25 +13,48 @@ struct test_vals
   uint32_t npools;
   uint32_t slab_nlb;
   uint32_t obj_nlb;
+  uint32_t strp_nobj;
+  uint32_t strp_nlbs;
+  uint32_t xfer_snlb;
+  uint32_t xfer_nlbs;
+};
+
+#define NUM_TESTS 3
+struct test_vals tests[] =
+{
+  // Simple write all.
+  {
+    .blk_num = 40000, .slab_nlb = 4000, .npools = 1, .obj_nlb = 2,
+    .strp_nobj = 2, .strp_nlbs = 1, .xfer_snlb = 0, .xfer_nlbs = 4
+  },
+
+  // start from second chunk and warap around
+  {
+    .blk_num = 40000, .slab_nlb = 4000, .npools = 1, .obj_nlb = 16,
+    .strp_nobj = 4, .strp_nlbs = 4, .xfer_snlb = 4, .xfer_nlbs = 16
+  },
+
+  // several transfers in each object
+  {
+    .blk_num = 40000, .slab_nlb = 4000, .npools = 1, .obj_nlb = 16,
+    .strp_nobj = 4, .strp_nlbs = 4, .xfer_snlb = 4, .xfer_nlbs = 48
+  },
 };
 
 int
-main(int argc, char **argv)
+test_strp(struct test_vals test_vals)
 {
-  int err, ret;
-  char * pool_handle_name, * write_msg, *write_buf, *read_buf;
-  size_t write_msg_len, buf_len;
+  int err = 0, ret;
+  char * pool_handle_name, *write_buf, *read_buf;
+  size_t buf_len;
+  uint64_t xfer_offset;
   struct fla_ut_dev dev;
   struct flexalloc *fs = NULL;
   struct fla_pool *pool_handle;
   struct fla_object obj;
   struct fla_open_opts open_opts = {0};
-  struct test_vals test_vals
-      = {.blk_num = 40000, .slab_nlb = 4000, .npools = 1, .obj_nlb = 2};
 
   pool_handle_name = "mypool";
-  write_msg = "hello, world";
-  write_msg_len = strlen(write_msg);
 
   err = fla_ut_dev_init(test_vals.blk_num, &dev);
   if (FLA_ERR(err, "fla_ut_dev_init()"))
@@ -48,14 +72,16 @@ main(int argc, char **argv)
     goto teardown_ut_dev;
   }
 
-  buf_len = FLA_CEIL_DIV(write_msg_len, dev.lb_nbytes) * dev.lb_nbytes * 2;
+  buf_len = test_vals.xfer_nlbs * dev.lb_nbytes;
+  xfer_offset = test_vals.xfer_snlb * dev.lb_nbytes;
 
   err = fla_pool_create(fs, pool_handle_name, strlen(pool_handle_name), test_vals.obj_nlb,
                         &pool_handle);
   if(FLA_ERR(err, "fla_pool_create()"))
     goto teardown_ut_fs;
 
-  err = fla_pool_set_strp(fs, pool_handle, 2, dev.lb_nbytes);
+  err = fla_pool_set_strp(fs, pool_handle, test_vals.strp_nobj,
+                          dev.lb_nbytes * test_vals.strp_nlbs);
   if (FLA_ERR(err, "fla_pool_set_strp()"))
     goto release_pool;
 
@@ -67,10 +93,10 @@ main(int argc, char **argv)
   if((err = FLA_ERR(!write_buf, "fla_buf_alloc()")))
     goto release_object;
 
-  memcpy(write_buf, write_msg, write_msg_len);
-  write_buf[write_msg_len] = '\0';
+  fla_t_fill_buf_random(write_buf, buf_len);
+  write_buf[buf_len] = '\0';
 
-  err = fla_object_write(fs, pool_handle, &obj, write_buf, 0, buf_len);
+  err = fla_object_write(fs, pool_handle, &obj, write_buf, xfer_offset, buf_len);
   if(FLA_ERR(err, "fla_object_write()"))
     goto free_write_buffer;
 
@@ -96,8 +122,10 @@ main(int argc, char **argv)
   read_buf = fla_buf_alloc(fs, buf_len);
   if((err = FLA_ERR(!read_buf, "fla_buf_alloc()")))
     goto free_write_buffer;
+  memset(read_buf, 0, buf_len);
+  read_buf[buf_len] = '\0';
 
-  err = fla_object_read(fs, pool_handle, &obj, read_buf, 0, buf_len);
+  err = fla_object_read(fs, pool_handle, &obj, read_buf, xfer_offset, buf_len);
   if(FLA_ERR(err, "fla_obj_read()"))
     goto free_read_buffer;
 
@@ -152,5 +180,18 @@ teardown_ut_dev:
   }
 
 exit:
+  return err;
+}
+
+int
+main(int argc, char **argv)
+{
+  int err = 0;
+  // We seed the rand with pid so it produces different values always
+  srand(getpid());
+
+  for (int i = 0 ; i < NUM_TESTS ; ++i)
+    err |= test_strp(tests[i]);
+
   return err;
 }

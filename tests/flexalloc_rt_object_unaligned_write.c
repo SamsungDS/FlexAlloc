@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "libflexalloc.h"
 #include "flexalloc.h"
 #include "flexalloc_util.h"
@@ -44,6 +45,8 @@ main(int argc, char **argv)
   struct fs_test_vals fs_vals;
 
   fs_vals.pool_handle_name = "mypool";
+
+  srand(getpid());
 
   err = fla_ut_dev_init(test_vals.blk_num, &dev);
   if (FLA_ERR(err, "fla_ut_dev_init()"))
