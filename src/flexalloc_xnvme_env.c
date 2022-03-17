@@ -281,6 +281,7 @@ fla_async_strp_cb(struct xnvme_cmd_ctx * ctx, void * cb_arg)
                             cb_args->cmn_args->buf + cb_args->sbuf_nbytes, NULL)
           : xnvme_nvm_read(ctx, cb_args->cmn_args->nsid, cb_args->slba, cb_args->nlbs,
                            cb_args->cmn_args->buf + cb_args->sbuf_nbytes, NULL);
+
     switch (err)
     {
     case 0:
@@ -298,7 +299,8 @@ fla_async_strp_cb(struct xnvme_cmd_ctx * ctx, void * cb_arg)
   {
 
 error:
-    xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
+    err = xnvme_queue_put_cmd_ctx(ctx->async.queue, ctx);
+    FLA_ERR_ERRNO(err, "xnvme_queue_put_cmd_ctx");
   }
 }
 
@@ -363,7 +365,10 @@ submit:
 
     case -EBUSY:
     case -EAGAIN:
-      xnvme_queue_poke(queue, 0);
+      ret = xnvme_queue_poke(queue, 0);
+      if((err = FLA_ERR_ERRNO(ret < 0, "xnvme_queue_poke")))
+        goto close_queue;
+
       goto submit;
 
     default:
@@ -381,8 +386,16 @@ close_queue:
 
   if (queue)
   {
-    ret = xnvme_queue_term(queue);
-    FLA_ERR(ret, "xnvme_queue_term");
+    err = xnvme_queue_term(queue);
+    if(FLA_ERR(err, "xnvme_queue_term"))
+      goto exit;
+  }
+
+  for(uint32_t i = 0 ; i < sp->strp_nobjs; ++i)
+  {
+    cb_arg = &cb_args[i];
+    if ((err = FLA_ERR(cb_args->cb_args.ecount, "fla_xne_async_strp_seq_x")))
+      goto exit;
   }
 
 exit:
