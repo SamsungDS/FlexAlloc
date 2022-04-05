@@ -198,7 +198,7 @@ struct fla_async_strp_cb_args
  */
 static uint64_t
 calc_chunk_translation(uint64_t const zero_offset, uint64_t const chunk,
-                                   uint64_t const translation_step)
+                       uint64_t const translation_step)
 {
   uint64_t offset_in_chunk = zero_offset % chunk;
   uint64_t offset_translation = ((zero_offset / chunk) * translation_step);
@@ -209,9 +209,9 @@ static uint64_t
 calc_strp_obj_slba(uint64_t const xfer_snbytes, struct fla_strp_params const * const sp)
 {
   uint64_t chunks_in_faobs = calc_chunk_translation(xfer_snbytes, sp->strp_chunk_nbytes,
-                                                    sp->faobj_nlbs * sp->dev_lba_nbytes);
+                             sp->faobj_nlbs * sp->dev_lba_nbytes);
   return calc_chunk_translation(chunks_in_faobs, sp->strp_obj_tnbytes, sp->strp_chunk_nbytes)
-                                / sp->dev_lba_nbytes;
+         / sp->dev_lba_nbytes;
 }
 
 static uint16_t
@@ -219,7 +219,8 @@ calc_strp_obj_next_nbls(uint64_t sbuf_nbytes,
                         struct fla_async_strp_cb_args_common const * const cmd_args)
 {
   uint64_t nbytes_to_xfer = cmd_args->sp->xfer_nbytes - sbuf_nbytes;
-  return (fla_min(cmd_args->sp->strp_chunk_nbytes, nbytes_to_xfer) / cmd_args->sp->dev_lba_nbytes) - 1;
+  return (fla_min(cmd_args->sp->strp_chunk_nbytes,
+                  nbytes_to_xfer) / cmd_args->sp->dev_lba_nbytes) - 1;
 }
 
 static uint16_t
@@ -269,7 +270,7 @@ fla_async_strp_cb(struct xnvme_cmd_ctx * ctx, void * cb_arg)
   }
 
   cb_args->sbuf_nbytes = calc_strp_obj_next_sbuf_nbytes(cb_args->sbuf_nbytes, cb_args->nlbs,
-                                                        cb_args->cmn_args);
+                         cb_args->cmn_args);
 
   if(cb_args->sbuf_nbytes < cb_args->cmn_args->sp->xfer_nbytes)
   {
@@ -312,14 +313,15 @@ fla_xne_async_strp_seq_x(struct xnvme_dev *dev, void const *buf, struct fla_strp
   struct fla_async_strp_cb_args *cb_arg;
   struct xnvme_cmd_ctx *ctx;
   struct fla_async_strp_cb_args cb_args [512] = {0};
-  struct fla_async_strp_cb_args_common cmn_args = {
+  struct fla_async_strp_cb_args_common cmn_args =
+  {
     .nsid = xnvme_dev_get_nsid(dev),
     .buf = (char *)buf,
     .sp = sp,
   };
 
   if ((err = FLA_ERR(sp->xfer_nbytes % sp->dev_lba_nbytes || sp->xfer_snbytes % sp->dev_lba_nbytes,
-          "Transfer bytes and start offset must be aligned to block size")))
+                     "Transfer bytes and start offset must be aligned to block size")))
     goto exit;
 
   /*
