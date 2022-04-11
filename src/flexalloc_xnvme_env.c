@@ -653,11 +653,15 @@ fla_xne_dev_sanity_check(struct xnvme_dev const * dev, struct xnvme_dev const *m
   err |= geo->mdts_nbytes <= 512; /* TODO get rid of these magic values */
   if (md_dev)
     err |= md_geo->mdts_nbytes <= 512;
+  FLA_ERR(err, "The minimum data transfer value of dev or md_dev reported to be less " \
+          "than 512. This is most probably due to lack of administrative privileges. "\
+          " you can solve this by running with sudo for example.");
 
-  FLA_ERR(err, "The minimum data transfer value of dev or md_dev reported to be less than 512."
-          \
-          " This is most probably due to lack of administrative privileges. you can solve " \
-          " this by running with sudo for example.");
+  if (md_dev)
+  {
+    err |= fla_xne_dev_lba_nbytes(md_dev) != fla_xne_dev_lba_nbytes(dev);
+    FLA_ERR(err, "MD DEV LBA size != DEV LBA SIZE");
+  }
 
   return err;
 }

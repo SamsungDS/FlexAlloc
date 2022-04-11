@@ -13,7 +13,7 @@ struct test_vals
   uint32_t obj_nlb;
 };
 
-static int test_slabs(const struct test_vals * test_vals);
+static int test_slabs(struct test_vals * test_vals);
 static int test_check_slab_pointers(struct flexalloc * fs, const uint32_t expected_size);
 
 #define FLA_UT_SLAB_NUMBER_OF_TESTS 4
@@ -22,12 +22,13 @@ int
 main(int argc, char ** argv)
 {
   int err = 0;
+  bool fla_test_set = is_globalenv_set("FLA_TEST_DEV");
   struct test_vals test_vals [FLA_UT_SLAB_NUMBER_OF_TESTS] =
   {
-    {.npools = 2, .slab_nlb = 2, .disk_min_lbs = 9, .obj_nlb = 1 }
-    , {.npools = 2, .slab_nlb = 2, .disk_min_lbs = 21, .obj_nlb = 1 }
-    , {.npools = 2, .slab_nlb = 20, .disk_min_lbs = 50, .obj_nlb = 2 }
-    , {.npools = 2, .slab_nlb = 5, .disk_min_lbs = 18, .obj_nlb = 1 }
+    {.npools = 2, .slab_nlb = 2, .disk_min_lbs = fla_test_set?0:9, .obj_nlb = 1 }
+    , {.npools = 2, .slab_nlb = 2, .disk_min_lbs = fla_test_set?0:21, .obj_nlb = 1 }
+    , {.npools = 2, .slab_nlb = 20, .disk_min_lbs = fla_test_set?0:50, .obj_nlb = 2 }
+    , {.npools = 2, .slab_nlb = 5, .disk_min_lbs = fla_test_set?0:18, .obj_nlb = 1 }
   };
 
   for(int i = 0 ; i < FLA_UT_SLAB_NUMBER_OF_TESTS ; ++i)
@@ -44,7 +45,7 @@ exit:
 }
 
 int
-test_slabs(const struct test_vals * test_vals)
+test_slabs(struct test_vals * test_vals)
 {
   int err = 0, ret;
   struct fla_ut_dev dev;
@@ -59,6 +60,16 @@ test_slabs(const struct test_vals * test_vals)
     goto exit;
   }
 
+  /* Skip for ZNS.
+   * If we are testing ZNS, we will automatically modify slab size
+   * rendering all our tests useless.
+   */
+  if(dev._is_zns)
+    goto exit;
+
+  if(test_vals->disk_min_lbs == 0)
+    test_vals->disk_min_lbs = dev.nblocks;
+
   slab_error = malloc(sizeof(struct fla_slab_header));
   if (FLA_ERR(!slab_error, "malloc()"))
   {
@@ -66,13 +77,11 @@ test_slabs(const struct test_vals * test_vals)
     goto exit;
   }
 
-  fprintf(stderr, "slab_nlb %"PRIu32", npools %"PRIu32"\n", test_vals->slab_nlb, test_vals->npools);
   err = fla_ut_fs_create(test_vals->slab_nlb, test_vals->npools, &dev, &fs);
   if (FLA_ERR(err, "fla_ut_fs_create()"))
   {
     goto free_slab_error;
   }
-
 
   FLA_ASSERTF(test_vals->disk_min_lbs > fla_geo_slabs_lb_off(&fs->geo),
               "Slabs start after disk has ended (%"PRIu64" > %"PRIu64"",

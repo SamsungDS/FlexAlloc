@@ -62,7 +62,8 @@ test_strp(struct test_vals test_vals)
 
   if (dev._is_zns)
   {
-    test_vals.slab_nlb = dev.nsect_zn;
+    // *2 to give it extra room to execute
+    test_vals.slab_nlb = dev.nsect_zn * test_vals.strp_nobj * 2;
     test_vals.obj_nlb = dev.nsect_zn;
   }
 
@@ -129,9 +130,20 @@ test_strp(struct test_vals test_vals)
   if(FLA_ERR(err, "fla_obj_read()"))
     goto free_read_buffer;
 
-  // compare that the string (and terminating NULL) was read back
+  /*
+   * Compare that the string (and terminating NULL) was read back
+   *
+   * If we are on a ZNS drive and xfer_snlb > 0 the write should fail
+   * and the write_buf shall be different than read_buf
+   */
   err = memcmp(write_buf,  read_buf, buf_len + 1);
-  if(FLA_ERR(err, "memcmp() - failed to read back the written value"))
+  if(dev._is_zns)
+  {
+    if(test_vals.xfer_snlb > 0)
+      err = !(err != 0);
+  }
+
+  if(FLA_ERR(err, "Unexpected value for memcmp"))
     goto free_write_buffer;
 
   // Free the object, which should reset a zone

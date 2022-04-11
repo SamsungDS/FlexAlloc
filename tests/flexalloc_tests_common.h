@@ -56,6 +56,9 @@ struct fla_ut_dev
 
 #define FLA_TEST_SKIP_RETCODE 77
 
+bool
+is_globalenv_set(char const * glb);
+
 int
 fla_ut_lpbk_dev_alloc(uint64_t block_size, uint64_t nblocks, struct fla_ut_lpbk **loop);
 
