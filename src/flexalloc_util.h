@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 
 #define FLA_ERR_PRX fprintf(stderr, "flexalloc ERR ");
 
@@ -31,22 +32,27 @@
  * @brief Activates error handling if condition is non zero.
  *
  * @param condition zero means no error
- * @param message The message to use in case there is an error
  * @param f The file name where the error occured
  * @param l The line where the error occurred
- * @return condition is returned when errno is 0, otherwise errno is returned
+ * @param fmt The message to use in case there is an error
+ * @param ... vriadic args for fmt. Can be empty.
+ * @return condition is returned.
  */
 static inline int
-fla_err_fl(const int condition, const char * message, const char * f,
-           const int l )
+fla_err_fl(const int condition, const char * f, const int l, const char * fmt, ...)
 {
   if(condition && condition < 2001)
   {
-    FLA_ERR_PRINTF(" %s(%d) %s\n", f, l, message);
+    FLA_ERR_PRINTF(" %s(%d) ", f, l);
+    va_list arglist;
+    va_start(arglist, fmt);
+    vfprintf(stderr, fmt, arglist);
+    va_end(arglist);
+    fprintf(stderr, "\n");
   }
   return condition;
 }
-#define FLA_ERR(condition, message) fla_err_fl(condition, message, __FILE__, __LINE__)
+#define FLA_ERR(condition, ...) fla_err_fl(condition, __FILE__, __LINE__, __VA_ARGS__)
 
 /**
  * @brief Prints errno message if present.
