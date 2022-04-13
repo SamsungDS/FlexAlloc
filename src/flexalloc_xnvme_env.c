@@ -321,7 +321,9 @@ fla_xne_async_strp_seq_x(struct xnvme_dev *dev, void const *buf, struct fla_strp
   };
 
   if ((err = FLA_ERR(sp->xfer_nbytes % sp->dev_lba_nbytes || sp->xfer_snbytes % sp->dev_lba_nbytes,
-                     "Transfer bytes and start offset must be aligned to block size")))
+                     "Transfer bytes (%"PRIu64") and start offset (%"PRIu64") " \
+                     "must be aligned to block size (%"PRIu32")",
+                     sp->xfer_nbytes, sp->xfer_snbytes, sp->dev_lba_nbytes)))
     goto exit;
 
   /*
