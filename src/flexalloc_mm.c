@@ -1696,8 +1696,19 @@ fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
     goto free_dev_uri;
   }
 
+  if(md_dev != dev)
+  {
+    (*fs)->dev.md_dev_uri = strdup(opts->md_dev_uri);
+    if ((*fs)->dev.md_dev_uri == NULL)
+    {
+      err = -ENOMEM;
+      goto free_dev_uri;
+    }
+  }
+
   (*fs)->state |= FLA_STATE_OPEN;
   (*fs)->fns = base_fns;
+
   return 0;
 
 free_dev_uri:

@@ -158,4 +158,7 @@ strnlen(char *s, size_t maxlen);
 char *
 strdup(char const *s);
 
+char *
+strndup(char const *s, size_t const len);
+
 #endif /* __FLEXALLOC_UTIL_H */
