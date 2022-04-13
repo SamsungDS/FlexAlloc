@@ -493,8 +493,9 @@ int
 fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
 {
   int err;
-  struct xnvme_dev *dev = NULL;
+  struct xnvme_dev *dev = NULL, *md_dev = NULL;
   char *read_ptr = client->recv.data;
+  size_t dev_uri_len, md_dev_uri_len;
 
   memset(client->send.data, 0, FLA_MSG_DATA_MAX);
   memset(client->recv.data, 0, FLA_MSG_DATA_MAX);
@@ -510,12 +511,28 @@ fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
   client->flexalloc->dev.lb_nbytes = client->flexalloc->geo.lb_nbytes;
   read_ptr += sizeof(struct fla_geo);
 
-  read_ptr += sizeof(size_t); // ignore string length field
-  client->flexalloc->dev.dev_uri = strdup(read_ptr);
+  memcpy(&dev_uri_len, read_ptr, sizeof(size_t));
+  read_ptr += sizeof(size_t);
+  client->flexalloc->dev.dev_uri = strndup(read_ptr, dev_uri_len);
   if (!client->flexalloc->dev.dev_uri)
   {
     err = -ENOMEM;
     return err;
+  }
+
+  read_ptr += dev_uri_len;
+  memcpy(&md_dev_uri_len, read_ptr, sizeof(size_t));
+  if(md_dev_uri_len == 0)
+    client->flexalloc->dev.md_dev_uri = NULL;
+  else
+  {
+    read_ptr += sizeof(size_t);
+    client->flexalloc->dev.md_dev_uri = strndup(read_ptr, md_dev_uri_len);
+    if (!client->flexalloc->dev.md_dev_uri)
+    {
+      err = -ENOMEM;
+      goto free_dev_uri;
+    }
   }
 
   client->flexalloc->pools.entries = calloc(sizeof(struct fla_pool_entry),
@@ -523,20 +540,35 @@ fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
   if (!client->flexalloc->pools.entries)
   {
     err = -ENOMEM;
-    goto free_dev_uri;
+    goto free_md_dev_uri;
   }
 
   err = fla_xne_dev_open(client->flexalloc->dev.dev_uri, NULL, &dev);
   if (FLA_ERR(err, "fla_xne_dev_open() - failed to open device"))
     goto free_pool_entry_array;
-
   client->flexalloc->dev.dev = dev;
+
+  if(md_dev_uri_len > 0)
+  {
+    err = fla_xne_dev_open(client->flexalloc->dev.md_dev_uri, NULL, &md_dev);
+    if (FLA_ERR(err, "fla_xne_dev_open() - failed to open device"))
+      goto free_pool_entry_array;
+    client->flexalloc->dev.md_dev = md_dev;
+  }
 
   return 0;
 
 free_pool_entry_array:
   free(client->flexalloc->pools.entries);
   client->flexalloc->pools.entries = NULL;
+
+free_md_dev_uri:
+  if(client->flexalloc->dev.md_dev_uri)
+  {
+    free(client->flexalloc->dev.md_dev_uri);
+    client->flexalloc->dev.md_dev = NULL;
+  }
+
 free_dev_uri:
   free(client->flexalloc->dev.dev_uri);
   client->flexalloc->dev.dev_uri = NULL;
@@ -551,7 +583,7 @@ fla_daemon_fs_init_rsp(struct fla_daemon *daemon, int client_fd,
 {
   // geo, dev_uri, md_uri
   char *write_ptr = send->data;
-  size_t str_len;
+  size_t dev_uri_len, md_dev_uri_len;
   int err = 0;
   struct flexalloc *fs = daemon->flexalloc;
 
@@ -559,12 +591,22 @@ fla_daemon_fs_init_rsp(struct fla_daemon *daemon, int client_fd,
   memcpy(write_ptr, &fs->geo, sizeof(struct fla_geo));
   write_ptr += sizeof(struct fla_geo);
 
-  str_len = strlen(fs->dev.dev_uri) + 1;
-  memcpy(write_ptr, &str_len, sizeof(size_t));
+  dev_uri_len = strlen(fs->dev.dev_uri) + 1;
+  memcpy(write_ptr, &dev_uri_len, sizeof(size_t));
   write_ptr += sizeof(size_t);
-  memcpy(write_ptr, fs->dev.dev_uri, str_len);
+  memcpy(write_ptr, fs->dev.dev_uri, dev_uri_len);
+  write_ptr += dev_uri_len;
 
-  send->hdr->len = sizeof(struct fla_geo) + sizeof(size_t) + str_len;
+  md_dev_uri_len = fs->dev.md_dev_uri ? strlen(fs->dev.md_dev_uri) : 0;
+  memcpy(write_ptr, &md_dev_uri_len, sizeof(size_t));
+  if(md_dev_uri_len > 0)
+  {
+    write_ptr += sizeof(size_t);
+    memcpy(write_ptr, fs->dev.md_dev_uri, md_dev_uri_len);
+  }
+
+  send->hdr->len = sizeof(struct fla_geo)
+                   + sizeof(size_t) + dev_uri_len + sizeof(size_t) + md_dev_uri_len;
 
   if (FLA_ERR(err = fla_sock_send_msg(client_fd, send), "fla_sock_send_msg()"))
     goto exit;
@@ -603,6 +645,9 @@ fla_daemon_close_rq(struct flexalloc *fs)
   free(fs->dev.dev_uri);
   fs->dev.dev_uri = NULL;
 
+  if(fs->dev.md_dev_uri != NULL)
+    free(fs->dev.md_dev_uri);
+  fs->dev.md_dev = NULL;
   fla_fs_free(client->flexalloc);
   return 0;
 }

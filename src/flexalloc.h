@@ -29,6 +29,7 @@ struct fla_dev
   struct xnvme_dev *dev;
   char * dev_uri;
   struct xnvme_dev *md_dev;
+  char * md_dev_uri;
   uint32_t lb_nbytes;
 };
 

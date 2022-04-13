@@ -3,6 +3,8 @@
 #include "src/flexalloc_cli_common.h"
 #include "src/flexalloc_util.h"
 #include "libflexalloc.h"
+#include <bits/getopt_core.h>
+#include <bits/getopt_ext.h>
 #include <stdlib.h>
 #include <inttypes.h>
 
@@ -103,6 +105,11 @@ static struct cli_option options[] =
     .arg_ex = "DEVICE"
   },
   {
+    .base = {"md_device", optional_argument, NULL, 'm'},
+    .description = "path to metadata device\n",
+    .arg_ex = "DEVICE"
+  },
+  {
     .base = {NULL, 0, NULL, 0}
   }
 };
@@ -123,6 +130,7 @@ main(int argc, char **argv)
   int opt_idx = 0;
   char *socket_path = NULL;
   char *device = NULL;
+  char *md_device = NULL;
   struct fla_daemon daemon;
   int const n_opts = sizeof(options)/sizeof(struct cli_option);
   struct option long_options[n_opts];
@@ -133,7 +141,7 @@ main(int argc, char **argv)
     memcpy(long_options+i, &options[i].base, sizeof(struct option));
   }
 
-  while ((c = getopt_long(argc, argv, "vs:d:", long_options, &opt_idx)) != -1)
+  while ((c = getopt_long(argc, argv, "vs:d:m:", long_options, &opt_idx)) != -1)
   {
     switch (c)
     {
@@ -142,6 +150,9 @@ main(int argc, char **argv)
       break;
     case 'd':
       device = optarg;
+      break;
+    case 'm':
+      md_device = optarg;
       break;
     default:
       break;
@@ -170,6 +181,7 @@ main(int argc, char **argv)
   daemon.identity.version = FLA_SYS_FLEXALLOC_V1;
 
   fla_oopts.dev_uri = device;
+  fla_oopts.md_dev_uri = md_device;
   err = fla_open(&fla_oopts, &daemon.flexalloc);
   if (FLA_ERR(err, "fla_open()"))
     goto exit;
