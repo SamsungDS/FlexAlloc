@@ -864,7 +864,10 @@ fla_daemon_pool_create_rsp(struct fla_daemon *daemon, int client_fd,
   *((int *)send->data) = err;
 
   if (FLA_ERR(err, "pool_create()"))
+  {
     send->hdr->len = sizeof(int);
+    handle = NULL; //handle is undefined when there is an error
+  }
   else
   {
     send->hdr->len = sizeof(int) + sizeof(struct fla_pool) + sizeof(struct fla_pool_entry);
