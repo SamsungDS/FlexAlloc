@@ -13,9 +13,8 @@ strnlen(char *s, size_t maxlen)
 }
 
 char *
-strdup(char const *s)
+strndup(char const *s, size_t const len)
 {
-  size_t len = strlen(s);
   char *new_s = malloc(len + 1);
   if (new_s == NULL)
   {
@@ -27,3 +26,11 @@ strdup(char const *s)
 
   return new_s;
 }
+
+char *
+strdup(char const *s)
+{
+  size_t len = strlen(s);
+  return strndup(s, len);
+}
+
