@@ -165,12 +165,13 @@ static int fio_flexalloc_object_close(struct thread_data *td, struct fio_file *f
 	 * here because doing so would make the object handle invalid
 	 */
 
-	int err;
+	/*int err;
 	struct flexalloc_data *fad = td->io_ops_data;
 	err = fla_object_close(fad->fs, fad->pool, &fad->object[f->fileno]);
 	dprint(FD_FILE, "flexalloc: closing file %s pool %p\n", f->file_name, fad->pool);
 
-	return err;
+	return err;*/
+  return 0;
 }
 
 static void fio_flexalloc_cleanup_direct(struct thread_data *td)

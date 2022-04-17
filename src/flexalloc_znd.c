@@ -12,6 +12,7 @@ fla_znd_manage_zones_object_finish(struct flexalloc *fs, struct fla_pool const *
   uint64_t obj_slba = fla_object_slba(fs, obj, pool_handle);
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
 
+  //fprintf(stderr, "sending a finish to obj %"PRIu32", slabid %"PRIu32"\n", obj->entry_ndx, obj->slab_id);
   for (uint32_t strp = 0; strp < pool_entry->strp_nobjs; strp++)
   {
     err = fla_xne_dev_znd_send_mgmt(fs->dev.dev, obj_slba + (fs->geo.nzsect * strp),
@@ -30,6 +31,7 @@ fla_znd_manage_zones_object_reset(struct flexalloc *fs, struct fla_pool const *p
   uint64_t obj_slba = fla_object_slba(fs, obj, pool_handle);
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
 
+  //fprintf(stderr, "sending a reset to obj %"PRIu32", slabid %"PRIu32"\n", obj->entry_ndx, obj->slab_id);
   for (uint32_t strp = 0; strp < pool_entry->strp_nobjs; strp++)
   {
 

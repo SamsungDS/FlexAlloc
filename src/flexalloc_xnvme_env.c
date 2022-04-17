@@ -621,6 +621,7 @@ fla_xne_dev_open(const char *dev_uri, struct xnvme_opts *opts, struct xnvme_dev 
     opts = &default_opts;
     opts->direct = 1;
   }
+  opts->async = "io_uring_cmd";
 
   *dev = xnvme_dev_open(dev_uri, opts);
   if (FLA_ERR(!(*dev), "xnvme_dev_open()"))

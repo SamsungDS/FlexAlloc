@@ -348,9 +348,7 @@ fla_geo_slab_lb_off(struct flexalloc const *fs, uint32_t slab_id)
 
   slab_base = slabs_base + (slab_id * fs->geo.slab_nlb);
   if (fla_geo_zoned(&fs->geo) && slab_base % fs->geo.nzsect)
-  {
     slab_base += (slab_base % fs->geo.nzsect);
-  }
 
   return slab_base;
 }
@@ -1139,6 +1137,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
   {
     goto exit;
   }
+  //fprintf(stderr, "creating obj %"PRIu32", slab_id %"PRIu32"\n", obj->entry_ndx, obj->slab_id);
 
   to_head = fla_pool_best_slab_list(slab, pool_entry);
 
@@ -1419,13 +1418,27 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   w_soffset = obj_soffset + w_offset;
   w_eoffset = w_soffset + w_len;
 
+  if(fla_geo_zoned(&fs->geo) && w_offset == 0)
+  {
+    for(uint32_t i = 0 ; i < pool_entry->strp_nobjs ; ++i)
+    {
+      struct fla_object o = {0};
+      o.entry_ndx = obj->entry_ndx + i;
+      o.slab_id = obj->slab_id;
+      err = fla_znd_manage_zones_object_reset(fs, pool_handle, &o);
+      FLA_ERR(err, "fla_znd_manage_zones_object_reset()");
+    }
+  }
+
+  //fprintf(stderr, "writing Obj : %"PRIu32", slabid : %"PRIu32"\n", obj->entry_ndx, obj->slab_id);
   slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
   if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Write outside slab" \
                     "slab_eoffset : %"PRIu64", obj_eoffset : %"PRIu64" ",
                     slab_eoffset, obj_eoffset)))
     goto exit;
 
-  if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
+  if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object" \
+          "obj_eoffset : %"PRIu32", w_eoffset : %"PRIu32" ", obj_eoffset, w_eoffset)))
     goto exit;
 
   if (pool_entry->strp_nobjs == 1)
@@ -1445,7 +1458,9 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
     err = fla_xne_async_strp_seq_x(fs->dev.dev, buf, &sp);
   }
 
-  if(FLA_ERR(err, "fla_xne_sync_seq_w_nbytes()"))
+  if(FLA_ERR(err, "fla_xne_sync_seq_w_nbytes() pool: %"PRIu32", obj : %"PRIu32", "
+        "w_offset : %"PRIu64", w_len : %"PRIu64"",
+        pool_handle->ndx, obj->entry_ndx, w_offset, w_len))
     goto exit;
 
 exit:
@@ -1617,7 +1632,7 @@ fla_object_close(struct flexalloc *fs, struct fla_pool const *pool_handle, struc
   if (fla_fs_zns(fs))
   {
     err = fla_znd_manage_zones_object_finish(fs, pool_handle, obj);
-    if (FLA_ERR(err, "fla_znd_manage_zones_object_finish()"))
+    if (FLA_ERR(err, "fla_znd_manage_zones_object_reset()"))
       return err;
   }
 
