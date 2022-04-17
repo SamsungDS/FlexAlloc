@@ -382,8 +382,8 @@ submit:
   }
 
 close_queue:
-  ret = xnvme_queue_wait(queue);
-  if((err = FLA_ERR(ret < 0, "xnvme_queue_wait")))
+  ret = xnvme_queue_drain(queue);
+  if((err = FLA_ERR(ret < 0, "xnvme_queue_drain")))
     goto exit;
 
   if (queue)
@@ -396,7 +396,9 @@ close_queue:
   for(uint32_t i = 0 ; i < sp->strp_nobjs; ++i)
   {
     cb_arg = &cb_args[i];
-    if ((err = FLA_ERR(cb_args->cb_args.ecount, "fla_xne_async_strp_seq_x")))
+    if ((err = FLA_ERR(cb_args->cb_args.ecount, "fla_xne_async_strp_seq_x()" \
+            " ecount : %"PRIu32", completed : %"PRIu32", submitted : %"PRIu32"",
+            cb_args->cb_args.ecount, cb_args->cb_args.completed, cb_args->cb_args.submitted)))
       goto exit;
   }
 
