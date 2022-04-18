@@ -76,6 +76,8 @@ struct fla_fns
   int (*pool_create)(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
                      struct fla_pool **pool);
   int (*pool_destroy)(struct flexalloc *fs, struct fla_pool *pool);
+  int (*pool_set_strp)(struct flexalloc *fs, struct fla_pool *pool, uint32_t strp_nobjs,
+                       uint32_t strp_nbytes);
   int (*object_open)(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *object);
   int (*object_create)(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *object);
   int (*object_destroy)(struct flexalloc *fs, struct fla_pool *pool, struct fla_object *object);

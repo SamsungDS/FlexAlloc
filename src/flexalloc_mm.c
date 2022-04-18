@@ -833,10 +833,10 @@ fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int na
 }
 
 int
-fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *ph, uint32_t strp_nobjs,
-                  uint32_t strp_nbytes)
+fla_base_pool_set_strp(struct flexalloc *fs, struct fla_pool *pool, uint32_t strp_nobjs,
+                       uint32_t strp_nbytes)
 {
-  struct fla_pool_entry *pool_entry = &fs->pools.entries[ph->ndx];
+  struct fla_pool_entry *pool_entry = &fs->pools.entries[pool->ndx];
   const struct xnvme_geo * geo = xnvme_dev_get_geo(fs->dev.dev);
 
   if (FLA_ERR(strp_nbytes > geo->mdts_nbytes, "Strp sz > mdts for device"))
@@ -1454,7 +1454,7 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
     fla_znd_manage_zones(fs, obj_zn);
 
   slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
-  if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Write outside a slab")))
+  if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Write outside slab")))
     goto exit;
 
   if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
@@ -1641,6 +1641,7 @@ struct fla_fns base_fns =
   .pool_close = &fla_base_pool_close,
   .pool_create = &fla_base_pool_create,
   .pool_destroy = &fla_base_pool_destroy,
+  .pool_set_strp = &fla_base_pool_set_strp,
   .object_open = &fla_base_object_open,
   .object_create = &fla_base_object_create,
   .object_destroy = &fla_base_object_destroy,

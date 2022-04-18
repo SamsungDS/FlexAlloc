@@ -109,7 +109,7 @@ int main(int argc, char **argv)
     goto close;
   }
 
-  ret = fla_pool_set_strp(fs, pool, strp_nobjs, strp_nbytes);
+  ret = fla_pool_set_strp(fs, pool->ndx, strp_nobjs, strp_nbytes);
   if (ret) {
     printf("Error setting pool strp sz\n");
     goto close;

@@ -300,7 +300,7 @@ fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct
  * @return int indicating if pool striping parameters were applied
  */
 int
-fla_pool_set_strp(struct flexalloc *fs, struct fla_pool const *pool_handle, uint32_t strp_nobjs,
+fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *pool, uint32_t strp_nobjs,
                   uint32_t strp_nbytes);
 
 #ifdef __cplusplus
