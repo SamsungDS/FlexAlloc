@@ -85,6 +85,11 @@ msg_handler(struct fla_daemon *d, int client_fd, struct fla_msg const * const re
     if (FLA_ERR(fla_daemon_fs_init_rsp(d, client_fd, recv, send), "fla_daemon_init_info()"))
       return -1;
     break;
+  case FLA_MSG_CMD_POOL_SET_STRP:
+    FLA_DBG_PRINT("FLA_MSG_CMD_POOL_SET_STRP\n");
+    if(FLA_ERR(fla_daemon_pool_set_strp_rsp(d, client_fd, recv, send), "fla_daemon_pool_set_strp_rsp()"))
+      return -1;
+    break;
   default:
     FLA_ERR_PRINTF("socket %d: malformed message, msg cmd %"PRIu32"\n", client_fd, recv->hdr->cmd);
     return -1;

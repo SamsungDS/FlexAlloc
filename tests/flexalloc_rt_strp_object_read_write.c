@@ -81,7 +81,7 @@ test_strp(struct test_vals test_vals)
   if(FLA_ERR(err, "fla_pool_create()"))
     goto teardown_ut_fs;
 
-  err = fla_pool_set_strp(fs, pool_handle, test_vals.strp_nobj,
+  err = fla_pool_set_strp(fs, pool_handle->ndx, test_vals.strp_nobj,
                           dev.lb_nbytes * test_vals.strp_nlbs);
   if (FLA_ERR(err, "fla_pool_set_strp()"))
     goto release_pool;

@@ -793,6 +793,63 @@ fla_daemon_pool_close_rq(struct flexalloc *fs, struct fla_pool *handle)
 }
 
 int
+fla_daemon_pool_set_strp_rq(struct flexalloc *fs, uint32_t const pool_ndx, uint32_t strp_nobjs,
+                            uint32_t strp_nbytes)
+{
+  int err;
+  struct fla_daemon_client * client = fla_get_client(fs);
+  struct fla_pool_entry * pool_entry;
+
+  // write message to buffer
+  *((uint32_t *)client->send.data) = pool_ndx;
+  *((uint32_t *)client->send.data + 1) = strp_nobjs;
+  *((uint32_t *)client->send.data + 2) = strp_nbytes;
+
+  client->send.hdr->len = sizeof(uint32_t) * 3;
+  client->send.hdr->cmd = FLA_MSG_CMD_POOL_SET_STRP;
+
+  err = fla_send_recv(client);
+  if (FLA_ERR(err, "fla_send_recv()"))
+    goto exit;
+
+  // did operation succeed ?
+  err = *((int *)client->recv.data);
+  if (FLA_ERR(err, "pool_set_strp()"))
+    goto exit;
+
+  pool_entry = &fs->pools.entries[pool_ndx];
+  pool_entry->strp_nobjs = strp_nobjs;
+  pool_entry->strp_nbytes = strp_nbytes;
+
+exit:
+  return err;
+}
+
+int
+fla_daemon_pool_set_strp_rsp(struct fla_daemon *daemon, int client_fd,
+                           struct fla_msg const * const recv,
+                           struct fla_msg const * const send)
+{
+  int err;
+  uint32_t pool_ndx, strp_nobjs, strp_nbytes;
+
+  pool_ndx = *((uint32_t*)recv->data);
+  strp_nobjs = *((uint32_t*)(recv->data + sizeof(uint32_t)));
+  strp_nbytes = *((uint32_t*)(recv->data + (2*sizeof(uint32_t))));
+
+  err = daemon->flexalloc->fns.pool_set_strp(daemon->flexalloc, pool_ndx, strp_nobjs, strp_nbytes);
+  *((int *)send->data) = err;
+  send->hdr->len = sizeof(err);
+  FLA_ERR(err, "pool_set_strp()");
+
+  if (FLA_ERR((err = fla_sock_send_msg(client_fd, send)), "fla_sock_send_msg()"))
+    goto exit;
+
+exit:
+  return err;
+}
+
+int
 fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, uint32_t obj_nlb,
                           struct fla_pool **handle)
 {
@@ -1206,6 +1263,7 @@ struct fla_fns client_fns =
   .pool_open = &fla_daemon_pool_open_rq,
   .pool_close = &fla_daemon_pool_close_rq,
   .pool_create = &fla_daemon_pool_create_rq,
+  .pool_set_strp = &fla_daemon_pool_set_strp_rq,
   .pool_destroy = &fla_daemon_pool_destroy_rq,
   .object_open = &fla_daemon_object_open_rq,
   .object_create = &fla_daemon_object_create_rq,

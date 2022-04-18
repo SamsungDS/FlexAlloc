@@ -42,6 +42,7 @@ struct fla_msg
 #define FLA_MSG_CMD_POOL_OPEN 3
 #define FLA_MSG_CMD_POOL_CLOSE 4
 #define FLA_MSG_CMD_POOL_CREATE 5
+#define FLA_MSG_CMD_POOL_SET_STRP 13
 #define FLA_MSG_CMD_POOL_DESTROY 6
 #define FLA_MSG_CMD_POOL_SET_ROOT_OBJECT 7
 #define FLA_MSG_CMD_POOL_GET_ROOT_OBJECT 8
@@ -305,6 +306,15 @@ fla_daemon_pool_get_root_object_rsp(struct fla_daemon *daemon, int client_fd,
 int
 fla_daemon_open(const char * socket_path, struct fla_daemon_client * client);
 
+
+int
+fla_daemon_pool_set_strp_rq(struct flexalloc *fs, uint32_t const pool_ndx, uint32_t strp_nobjs,
+                            uint32_t strp_nbytes);
+
+int
+fla_daemon_pool_set_strp_rsp(struct fla_daemon *daemon, int client_fd,
+                           struct fla_msg const * const recv,
+                           struct fla_msg const * const send);
 #ifdef __cplusplus
 }
 #endif
