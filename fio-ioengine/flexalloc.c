@@ -29,6 +29,8 @@ struct flexalloc_options {
 	char *dev_uri;
 	char *md_dev_uri;
 	char *poolname;
+	int strp_nobj;
+	int strp_nbyte;
 };
 
 struct fio_option fa_options[] = {
@@ -70,6 +72,24 @@ struct fio_option fa_options[] = {
 		.off1		= offsetof(struct flexalloc_options, poolname),
 		.category	= FIO_OPT_C_ENGINE,
 		.group		= FIO_OPT_G_FILENAME,
+	},
+	{
+		.name		= "strp_nobj",
+		.lname		= "Number of FLA objects in striped object",
+		.type		= FIO_OPT_INT,
+		.help		= "Number of FLA objects in striped object",
+		.off1		= offsetof(struct flexalloc_options, strp_nobj),
+		.category	= FIO_OPT_C_ENGINE,
+		.group		= FIO_OPT_G_INVALID,
+	},
+	{
+		.name		= "strp_nbyte",
+		.lname		= "Stripe size within fla object",
+		.type		= FIO_OPT_INT,
+		.help		= "Stripe size within fla object",
+		.off1		= offsetof(struct flexalloc_options, strp_nbyte),
+		.category	= FIO_OPT_C_ENGINE,
+		.group		= FIO_OPT_G_INVALID,
 	},
 	{
 		.name	= NULL,
@@ -363,6 +383,15 @@ static int fio_flexalloc_init(struct thread_data *td)
 	if (ret) {
 		log_err("flexalloc: error creating pool %s\n", pool_name);
 		goto done;
+	}
+
+	if(o->strp_nobj && o->strp_nbyte) {
+		ret = fla_pool_set_strp(fad->fs, fad->pool, o->strp_nobj, o->strp_nbyte);
+		if (ret) {
+			log_err("Could not stripe the pool strp_nobj : %d, strp_nbyte : %d", 
+					o->strp_nobj, o->strp_nbyte);
+			goto done;
+		}
 	}
 
 	dprint(FD_FILE, "flexalloc: created pool %p with poolname %s\n", &fad->pool, pool_name);

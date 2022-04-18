@@ -90,3 +90,10 @@ fla_pool_get_root_object(struct flexalloc const * const fs,
 {
   return fs->fns.pool_get_root_object(fs, pool, object);
 }
+
+int
+fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *pool, uint32_t strp_nobjs,
+                  uint32_t strp_nbytes)
+{
+  return fs->fns.pool_set_strp(fs, pool, strp_nobjs, strp_nbytes);
+}
