@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdarg.h>
 
+#define FLA_ERR_MIN_NOPRINT 2001
 #define FLA_ERR_PRX fprintf(stderr, "flexalloc ERR ");
 
 #define FLA_ERR_PRINT(s)                      \
@@ -41,7 +42,7 @@
 static inline int
 fla_err_fl(const int condition, const char * f, const int l, const char * fmt, ...)
 {
-  if(condition && condition < 2001)
+  if(condition && condition < FLA_ERR_MIN_NOPRINT)
   {
     FLA_ERR_PRINTF(" %s(%d) ", f, l);
     va_list arglist;
