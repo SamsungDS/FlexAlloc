@@ -21,9 +21,9 @@
 #define FLA_NAME_SIZE 128
 #define FLA_NAME_SIZE_POOL 112
 
-// -------------------------------
 #define FLA_ROOT_OBJ_NONE UINT64_MAX
 
+#define FLA_MDTS_MIN_NBYTES 512
 
 /// mkfs file system initialization parameters
 struct fla_mkfs_p
