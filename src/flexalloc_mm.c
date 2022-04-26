@@ -26,6 +26,37 @@ fla_geo_zoned(const struct fla_geo *geo)
   return geo->type == XNVME_GEO_ZONED;
 }
 
+static int
+fla_dev_sanity_check(struct xnvme_dev const * dev, struct xnvme_dev const *md_dev)
+{
+  int err = 0;
+  uint32_t mdts_nbytes;
+
+  /*
+   * xNVMe's linux backend can potentially fallback on an incorrect minimum data transfer
+   * (mdts) value if application is not executed with admin privileges. Check here that we
+   * have an mdts of FLA_MDTS_MIN_NBYTES bytes.
+   */
+  mdts_nbytes = fla_xne_dev_mdts_nbytes(dev);
+  err |= mdts_nbytes <= FLA_MDTS_MIN_NBYTES;
+  if (md_dev)
+  {
+    mdts_nbytes = fla_xne_dev_mdts_nbytes(md_dev);
+    err |= mdts_nbytes <= FLA_MDTS_MIN_NBYTES;
+  }
+  FLA_ERR(err, "The minimum data transfer value of dev or md_dev reported to be less " \
+          "than %d. This is most probably due to lack of administrative privileges. "\
+          " you can solve this by running with sudo for example.", FLA_MDTS_MIN_NBYTES);
+
+  if (md_dev)
+  {
+    err |= fla_xne_dev_lba_nbytes(md_dev) != fla_xne_dev_lba_nbytes(dev);
+    FLA_ERR(err, "MD DEV LBA size != DEV LBA SIZE");
+  }
+
+  return err;
+}
+
 void
 print_slab_sgmt(const struct flexalloc * fs)
 {
@@ -511,8 +542,8 @@ fla_mkfs(struct fla_mkfs_p *p)
   if (FLA_ERR(err, "fla_xne_dev_mkfs_prepare"))
     return err;
 
-  err = fla_xne_dev_sanity_check(dev, md_dev);
-  if(FLA_ERR(err, "fla_xne_dev_sanity_check()"))
+  err = fla_dev_sanity_check(dev, md_dev);
+  if(FLA_ERR(err, "fla_dev_sanity_check()"))
     goto exit;
 
 
@@ -601,7 +632,7 @@ fla_super_read(struct xnvme_dev *dev, size_t lb_nbytes, struct fla_super **super
   if (FLA_ERR(err, "fla_xne_sync_seq_r_nbytes()"))
     goto free_super;
 
-  // TODO: Should this be placed in fla_xne_dev_sanity_check
+  // TODO: Should this be placed in fla_dev_sanity_check
   if ((*super)->magic != FLA_MAGIC)
   {
     err = 22;
@@ -1679,8 +1710,8 @@ fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
   else
     md_dev = dev;
 
-  err = fla_xne_dev_sanity_check(dev, md_dev);
-  if(FLA_ERR(err, "fla_xne_dev_sanity_check()"))
+  err = fla_dev_sanity_check(dev, md_dev);
+  if(FLA_ERR(err, "fla_dev_sanity_check()"))
     goto xnvme_dev_close;
 
   err = fla_super_read(md_dev, fla_xne_dev_lba_nbytes(dev), &super);
