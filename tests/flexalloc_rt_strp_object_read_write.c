@@ -60,6 +60,10 @@ test_strp(struct test_vals test_vals)
   if (FLA_ERR(err, "fla_ut_dev_init()"))
     goto exit;
 
+  // Ignore test with real devices
+  if(test_vals.blk_num != dev.nblocks)
+    goto teardown_ut_dev;
+
   if (dev._is_zns)
   {
     // why *2? -> To run these tests we need at least one striped object. The
