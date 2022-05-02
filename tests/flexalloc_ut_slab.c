@@ -69,16 +69,6 @@ test_slabs(struct test_vals * test_vals)
   if(dev._is_zns)
     goto exit;
 
-  /* Skip real devs
-   * The way we test slabs requires us to create slab sizes of 2 lbs
-   * For devices with lots of lbs, it takes too long. Skip it while
-   * we come up with a better way of doing things.
-   * if(test_vals->disk_min_lbs == 0)
-   *   test_vals->disk_min_lbs = dev.nblocks;
-   */
-  if(test_vals->disk_min_lbs != dev.nblocks)
-    goto exit;
-
   slab_error = malloc(sizeof(struct fla_slab_header));
   if (FLA_ERR(!slab_error, "malloc()"))
   {
