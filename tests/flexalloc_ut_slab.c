@@ -68,13 +68,13 @@ test_slabs(struct test_vals * test_vals)
    * rendering all our tests useless.
    */
   if(dev._is_zns)
-    goto exit;
+    goto teardown_ut_dev;
 
   slab_error = malloc(sizeof(struct fla_slab_header));
   if (FLA_ERR(!slab_error, "malloc()"))
   {
     err = -ENOMEM;
-    goto exit;
+    goto teardown_ut_dev;
   }
 
   slab_nlb = (uint32_t)(test_vals->min_disk_lbs * test_vals->slab_size_p);
@@ -167,6 +167,13 @@ close_fs:
 
 free_slab_error:
   free(slab_error);
+
+teardown_ut_dev:
+  ret = fla_ut_dev_teardown(&dev);
+  if (FLA_ERR(err, "fla_ut_dev_teardown()"))
+  {
+    err |= ret;
+  }
 
 exit:
   return err;
