@@ -3,6 +3,7 @@
 // Copyright (C) 2021 Adam Manzanares <a.manzanares@samsung.com>
 
 #define _XOPEN_SOURCE 500
+#include <libxnvme.h>
 #include <libxnvme_geo.h>
 #include "tests/flexalloc_tests_common.h"
 #include "flexalloc_xnvme_env.h"
@@ -530,6 +531,7 @@ int
 fla_ut_dev_init(uint64_t disk_min_blocks, struct fla_ut_dev *dev)
 {
   struct xnvme_dev *xdev;
+  struct xnvme_opts * xnvme_opts = NULL;
   int err = 0;
   dev->_is_zns = 0;
   dev->_md_dev_uri = NULL;
@@ -539,7 +541,16 @@ fla_ut_dev_init(uint64_t disk_min_blocks, struct fla_ut_dev *dev)
     dev->_dev_uri = getenv("FLA_TEST_DEV");
     dev->_md_dev_uri = getenv("FLA_TEST_MD_DEV");
     dev->_is_loop = 0;
-    err = fla_xne_dev_open(dev->_dev_uri, NULL, &xdev);
+
+    if (strncmp("dev/ng", dev->_dev_uri, 6) == 0)
+    {
+      struct xnvme_opts default_opts = xnvme_opts_default();
+      xnvme_opts = &default_opts;
+      xnvme_opts->direct = 1;
+      xnvme_opts->async = "io_uring_cmd";
+    }
+
+    err = fla_xne_dev_open(dev->_dev_uri, xnvme_opts, &xdev);
     if (FLA_ERR(err, "fla_xne_dev_open()"))
     {
       return FLA_ERR_ERROR;
