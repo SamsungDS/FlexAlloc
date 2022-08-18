@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,37 +10,59 @@
 
 struct test_vals
 {
-  uint64_t blk_num;
-  uint32_t npools;
-  uint32_t slab_nlb;
-  uint32_t obj_nlb;
-  uint32_t strp_nobj;
+  uint32_t obj_nstrp;
   uint32_t strp_nlbs;
+  uint32_t npools;
+  uint32_t strp_nobj;
+
+  uint32_t obj_nlb;
+  uint32_t slab_nlb;
+  uint32_t blk_nlbs;
+
   uint32_t xfer_snlb;
   uint32_t xfer_nlbs;
+  uint32_t xfer_snstrps;
+  uint32_t xfer_nstrps;
 };
 
-#define NUM_TESTS 3
+#define NUM_TESTS 1
 struct test_vals tests[] =
 {
   // Simple write all.
   {
-    .blk_num = 40000, .slab_nlb = 4000, .npools = 1, .obj_nlb = 2,
-    .strp_nobj = 2, .strp_nlbs = 1, .xfer_snlb = 0, .xfer_nlbs = 4
+    .obj_nstrp = 3072, .strp_nlbs = 2, .npools = 1, .strp_nobj = 2,
+    .obj_nlb = 0, .blk_nlbs = 0, .slab_nlb = 0,
+    .xfer_snlb = 0, .xfer_nlbs = 0,
+    .xfer_snstrps = 0, .xfer_nstrps = 4,
   },
 
   // start from second chunk and wrap around
   {
-    .blk_num = 40000, .slab_nlb = 4000, .npools = 1, .obj_nlb = 16,
-    .strp_nobj = 4, .strp_nlbs = 4, .xfer_snlb = 4, .xfer_nlbs = 16
+    .obj_nstrp = 3072, .strp_nlbs = 4, .npools = 1, .strp_nobj = 4,
+    .obj_nlb = 0, .blk_nlbs = 0, .slab_nlb = 0,
+    .xfer_snlb = 0, .xfer_nlbs = 0,
+    .xfer_snstrps = 1, .xfer_nstrps = 1
   },
 
   // several transfers in each object
   {
-    .blk_num = 40000, .slab_nlb = 4000, .npools = 1, .obj_nlb = 16,
-    .strp_nobj = 4, .strp_nlbs = 4, .xfer_snlb = 4, .xfer_nlbs = 48
+    .obj_nstrp = 3072, .strp_nlbs = 4, .npools = 1, .strp_nobj = 4,
+    .obj_nlb = 0, .blk_nlbs = 0, .slab_nlb = 0,
+    .xfer_snlb = 4, .xfer_nlbs = 48,
+    .xfer_snstrps = 0, .xfer_nstrps = 3072 * 2
   },
 };
+
+bool should_write_fail(struct fla_ut_dev * dev, struct test_vals * test_vals)
+{
+  if(dev->_is_zns)
+  {
+    if(test_vals->xfer_snstrps > test_vals->obj_nstrp)
+      return true;
+  }
+  return false;
+}
+
 
 int
 test_strp(struct test_vals test_vals)
@@ -56,24 +79,34 @@ test_strp(struct test_vals test_vals)
 
   pool_handle_name = "mypool";
 
-  err = fla_ut_dev_init(test_vals.blk_num, &dev);
+  if(FLA_ERR(test_vals.xfer_nstrps < 1, "Test needs to transfer more than zero lbs"))
+      goto exit;
+
+  test_vals.obj_nlb = test_vals.obj_nstrp * test_vals.strp_nlbs;
+  test_vals.slab_nlb = test_vals.obj_nlb * test_vals.strp_nobj * 4;
+  test_vals.blk_nlbs = test_vals.slab_nlb * 10;
+
+  err = fla_ut_dev_init(test_vals.blk_nlbs, &dev);
   if (FLA_ERR(err, "fla_ut_dev_init()"))
     goto exit;
 
-  // Ignore test with real devices
-  if(test_vals.blk_num != dev.nblocks)
-    goto teardown_ut_dev;
-
-  if (dev._is_zns)
+  if(test_vals.blk_nlbs != dev.nblocks)
   {
-    // why *2? -> To run these tests we need at least one striped object. The
-    // slab must have enough space to fit the striped object (nsect_zn *
-    // strp_nobj) and the metadata. We can calculate the meatadata and grow it
-    // by that size or take out the big hammer and just double the size. I
-    // chose the latter.
-    test_vals.slab_nlb = dev.nsect_zn * test_vals.strp_nobj * 2;
+    // "Real" device
+    if(!dev._is_zns)
+      goto teardown_ut_dev; // ignore non ZNS for now.
+
     test_vals.obj_nlb = dev.nsect_zn;
+    if (test_vals.obj_nlb % test_vals.obj_nstrp > 0)
+      goto teardown_ut_dev; // zone must be a multiple obj_nstrp
+    test_vals.strp_nlbs = test_vals.obj_nlb / test_vals.obj_nstrp;
+
+    test_vals.slab_nlb = test_vals.obj_nlb * test_vals.strp_nobj * 4;
+    test_vals.blk_nlbs = dev.nblocks;
   }
+
+  test_vals.xfer_snlb = test_vals.xfer_snstrps * test_vals.strp_nlbs;
+  test_vals.xfer_nlbs = test_vals.xfer_nstrps * test_vals.strp_nlbs;
 
   err = fla_ut_fs_create(test_vals.slab_nlb, test_vals.npools, &dev, &fs);
   if (FLA_ERR(err, "fla_ut_fs_create()"))
@@ -99,13 +132,19 @@ test_strp(struct test_vals test_vals)
     goto release_pool;
 
   write_buf = fla_buf_alloc(fs, buf_len);
-  if((err = FLA_ERR(!write_buf, "fla_buf_alloc()")))
+  if((err = FLA_ERR(!write_buf, "fla_buf_alloc(): buf_len :%"PRIu64"")))
     goto release_object;
 
   fla_t_fill_buf_random(write_buf, buf_len);
   write_buf[buf_len] = '\0';
 
   err = fla_object_write(fs, pool_handle, &obj, write_buf, xfer_offset, buf_len);
+  if(should_write_fail(&dev, &test_vals) && err == 0)
+  {
+    FLA_ERR(1, "fla_object_write(): Expected write failure, got success");
+    goto free_write_buffer;
+  }
+
   if(FLA_ERR(err, "fla_object_write()"))
     goto free_write_buffer;
 
@@ -138,18 +177,8 @@ test_strp(struct test_vals test_vals)
   if(FLA_ERR(err, "fla_obj_read()"))
     goto free_read_buffer;
 
-  /*
-   * Compare that the string (and terminating NULL) was read back
-   *
-   * If we are on a ZNS drive and xfer_snlb > 0 the write should fail
-   * and the write_buf shall be different than read_buf
-   */
+  // Compare that the string (and terminating NULL) was read back
   err = memcmp(write_buf,  read_buf, buf_len + 1);
-  if(dev._is_zns)
-  {
-    if(test_vals.xfer_snlb > 0)
-      err = !(err != 0);
-  }
 
   if(FLA_ERR(err, "Unexpected value for memcmp"))
     goto free_write_buffer;
