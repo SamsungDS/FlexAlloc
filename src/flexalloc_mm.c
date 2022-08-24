@@ -58,28 +58,31 @@ fla_dev_sanity_check(struct xnvme_dev const * dev, struct xnvme_dev const *md_de
 }
 
 void
-print_slab_sgmt(const struct flexalloc * fs)
+print_slab_sgmt(const struct flexalloc * fs, uint32_t from , uint32_t to)
 {
   struct fla_slab_header * slab;
 
   fprintf(stderr, "%s\n", "--------------------------------");
-  fprintf(stderr, "Slabs number : %d\n", *fs->slabs.fslab_num);
-  fprintf(stderr, "Slabs head : %d\n", *fs->slabs.fslab_head);
-  fprintf(stderr, "Slabs tail : %d\n", *fs->slabs.fslab_tail);
+  fprintf(stderr, "Slabs number : %"PRIu32"\n", *fs->slabs.fslab_num);
+  fprintf(stderr, "Slabs head : %"PRIu32"\n", *fs->slabs.fslab_head);
+  fprintf(stderr, "Slabs tail : %"PRIu32"\n", *fs->slabs.fslab_tail);
   fprintf(stderr, "Header ptr : %p\n", fs->slabs.headers);
 
-  /*for(int i = 0 ; i < 1024 ; ++i)
-  {
-    fprintf(stderr, "%0x", (char)*((char*)fs->slabs.headers + i));
-  }
-  fprintf(stderr, "\n");*/
+  if (to == 0)
+    to = fs->geo.nslabs;
 
-  for(uint32_t i = 0 ; i < fs->geo.nslabs ; ++i)
+  if (from >= to)
+  {
+    fprintf(stderr, "from (%"PRIu32") is greater than to (%"PRIu32")\n", from, to);
+    return;
+  }
+
+  for(uint32_t i = from ; i < to ; ++i)
   {
     slab = fs->slabs.headers + i;
-    fprintf(stderr, "slab number %d\n", i);
-    fprintf(stderr, "next : %d\n", slab->next);
-    fprintf(stderr, "prev : %d\n", slab->prev);
+    fprintf(stderr, "slab number %"PRIu32", ", i);
+    fprintf(stderr, "next : %"PRIu32", ", slab->next);
+    fprintf(stderr, "prev : %"PRIu32"\n", slab->prev);
   }
   fprintf(stderr, "%s\n", "--------------------------------");
 
