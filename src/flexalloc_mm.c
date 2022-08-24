@@ -946,11 +946,12 @@ fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint3
   if ((err = FLA_ERR(entry_ndx < 0, "failed to allocate pool entry")))
     goto free_handle;
 
+  pool_entry = &fs->pools.entries[entry_ndx];
+
   err = htbl_insert(&fs->pools.htbl, name, entry_ndx);
   if (FLA_ERR(err, "failed to create pool entry in hash table"))
     goto free_freelist_entry;
 
-  pool_entry = &fs->pools.entries[entry_ndx];
   fla_pool_entry_reset(pool_entry, name, name_len, obj_nlb, slab_nobj);
 
   (*handle)->ndx = entry_ndx;
@@ -959,7 +960,7 @@ fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint3
   return 0;
 
 free_freelist_entry:
-  fla_flist_entry_free(fs->pools.freelist, entry_ndx);
+  fla_flist_entries_free(fs->pools.freelist, entry_ndx, pool_entry->strp_nobjs);
 
 free_handle:
   free(*handle);
@@ -1001,7 +1002,7 @@ fla_base_pool_destroy(struct flexalloc *fs, struct fla_pool * handle)
   if(FLA_ERR(err, "fla_pool_release_all_slabs()"))
     goto exit;
 
-  err = fla_flist_entry_free(fs->pools.freelist, handle->ndx);
+  err = fla_flist_entries_free(fs->pools.freelist, handle->ndx, pool_entry->strp_nobjs);
   if (FLA_ERR(err,
               "could not clear pool freelist entry - probably inconsistency in the metadat"))
     /*
@@ -1241,7 +1242,7 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
   pool_entry = &fs->pools.entries[pool_handle->ndx];
   from_head = fla_pool_best_slab_list(slab, pool_entry);
 
-  err = fla_slab_cache_obj_free(&fs->slab_cache, obj);
+  err = fla_slab_cache_obj_free(&fs->slab_cache, obj, pool_entry->strp_nobjs);
   if(FLA_ERR(err, "fla_slab_cache_obj_free()"))
     goto exit;
 

@@ -146,4 +146,8 @@ fla_flist_entries_alloc(freelist_t flist, unsigned int num);
 int
 fla_flist_entry_free(freelist_t flist, uint32_t ndx);
 
+
+int
+fla_flist_entries_free(freelist_t flist, uint32_t ndx, unsigned int num);
+
 #endif // __FLEXALLOC_FREELIST_H_

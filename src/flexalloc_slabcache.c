@@ -235,7 +235,7 @@ fla_slab_cache_obj_alloc(struct fla_slab_flist_cache *cache, uint32_t slab_id,
 
 int
 fla_slab_cache_obj_free(struct fla_slab_flist_cache *cache,
-                        struct fla_object * obj_id)
+                        struct fla_object * obj_id, uint32_t num_objs)
 {
   struct fla_slab_flist_cache_elem *e = &cache->_head[obj_id->slab_id];
   int err;
@@ -243,8 +243,8 @@ fla_slab_cache_obj_free(struct fla_slab_flist_cache *cache,
   if (e->state == FLA_SLAB_CACHE_ELEM_STALE)
     return FLA_SLAB_CACHE_INVALID_STATE;
 
-  err = fla_flist_entry_free(e->freelist, obj_id->entry_ndx);
-  if (FLA_ERR(err, "fla_flist_entry_free() - failed to free object in freelist"))
+  err = fla_flist_entries_free(e->freelist, obj_id->entry_ndx, num_objs);
+  if (FLA_ERR(err, "fla_flist_entries_free() - failed to free object in freelist"))
     goto exit;
 
   e->state = FLA_SLAB_CACHE_ELEM_DIRTY;
