@@ -142,7 +142,7 @@ fla_flist_entry_free(freelist_t flist, uint32_t ndx)
   if (ndx > *flist)
     return -1;
 
-  while (ndx > sizeof(uint32_t) * CHAR_BIT)
+  while (ndx >= sizeof(uint32_t) * CHAR_BIT)
   {
     elem++;
     ndx -= sizeof(uint32_t) * CHAR_BIT;
