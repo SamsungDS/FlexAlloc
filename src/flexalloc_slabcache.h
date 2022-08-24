@@ -193,12 +193,13 @@ fla_slab_cache_obj_alloc(struct fla_slab_flist_cache *cache, uint32_t slab_id,
  *
  * @param cache slab freelist cache
  * @param obj_id object id, uniquely identifying the object and its parent slab
+ * @param strp_nobjs Number of objects to stripe accross
  *
  * @return On success 0, otherwise an error occurred and the entry was not freed.
  */
 int
 fla_slab_cache_obj_free(struct fla_slab_flist_cache *cache,
-                        struct fla_object * obj_id);
+                        struct fla_object * obj_id, uint32_t strp_nobjs);
 
 /**
  * Flush all dirty cache entries to disk.

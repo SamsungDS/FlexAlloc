@@ -150,3 +150,14 @@ fla_flist_entry_free(freelist_t flist, uint32_t ndx)
   *elem |= 1 << ndx;
   return 0;
 }
+
+int
+fla_flist_entries_free(freelist_t flist, uint32_t ndx, unsigned int num)
+{
+  for(uint32_t i = 0 ; i < num ; ++i)
+  {
+    if(fla_flist_entry_free(flist, ndx+i))
+      return -1;
+  }
+  return 0;
+}
