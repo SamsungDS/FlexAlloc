@@ -165,10 +165,11 @@ fla_object_destroy(struct flexalloc *fs, struct fla_pool * pool,
                    struct fla_object * object);
 
 /**
- *
- * @brief Close a flexalloc object
+ * @brief Seal a flexalloc object
  *
  * Runs logic signifying that the object will not be actively used.
+ * Seal is different from close in contexts like ZNS where objects
+ * cannot just re-open.
  * Might be a noop.
  *
  * @param fs flexalloc system handle
@@ -177,7 +178,8 @@ fla_object_destroy(struct flexalloc *fs, struct fla_pool * pool,
  * @return 0 on success. non zero otherwise.
  */
 int
-fla_object_close(struct flexalloc *fs, struct fla_pool const *pool_handle, struct fla_object *obj);
+fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle,
+                struct fla_object *obj);
 
 /**
  * @brief Allocate an aligned (to underlying file system) buffer

@@ -133,7 +133,7 @@ int main(int argc, char **argv)
     if(ret)
       goto close;
 
-    ret = fla_object_close(fs , pool, &obj);
+    ret = fla_object_seal(fs , pool, &obj);
     if(ret)
       goto close;
   }

@@ -1649,7 +1649,7 @@ struct fla_fns base_fns =
 };
 
 int
-fla_object_close(struct flexalloc *fs, struct fla_pool const *pool_handle, struct fla_object *obj)
+fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct fla_object *obj)
 {
   int err = 0;
 
