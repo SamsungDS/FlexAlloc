@@ -103,15 +103,20 @@ int main(int argc, char **argv)
     goto exit;
   }
 
-  ret = fla_pool_create(fs, POOL_NAME, strlen(POOL_NAME), obj_nlb, &pool);
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = 0,
+    .name = POOL_NAME,
+    .name_len = strlen(POOL_NAME),
+    .obj_nlb = obj_nlb,
+    .strp_nobjs = strp_nobjs,
+    .strp_nbytes = strp_nbytes,
+  };
+
+
+  ret = fla_pool_create(fs, &pool_arg, &pool);
   if (ret) {
     printf("Error on pool create\n");
-    goto close;
-  }
-
-  ret = fla_pool_set_strp(fs, pool->ndx, strp_nobjs, strp_nbytes);
-  if (ret) {
-    printf("Error setting pool strp sz\n");
     goto close;
   }
 

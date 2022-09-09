@@ -65,6 +65,7 @@ else
   message('***  fio engine build: NO  ****\n\t `meson --reconfigure -Dfio_source_dir=<fio source dir> <build-dir>` to enable')
 endif
 
+subdir('examples/bw_tester')
 ### Tests ###
 flexalloc_testing = ['tests/flexalloc_tests_common.c', 'tests/flexalloc_tests_common.h']
 libflexalloc_t_files = ['src/libflexalloc_t.c', 'src/libflexalloc_t.h']
