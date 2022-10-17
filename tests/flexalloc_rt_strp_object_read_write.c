@@ -53,7 +53,8 @@ struct test_vals tests[] =
   },
 };
 
-bool should_write_fail(struct fla_ut_dev * dev, struct test_vals * test_vals)
+bool
+should_write_fail(struct fla_ut_dev * dev, struct test_vals * test_vals)
 {
   if(dev->_is_zns)
   {
@@ -80,7 +81,7 @@ test_strp(struct test_vals test_vals)
   pool_handle_name = "mypool";
 
   if(FLA_ERR(test_vals.xfer_nstrps < 1, "Test needs to transfer more than zero lbs"))
-      goto exit;
+    goto exit;
 
   test_vals.obj_nlb = test_vals.obj_nstrp * test_vals.strp_nlbs;
   test_vals.slab_nlb = test_vals.obj_nlb * test_vals.strp_nobj * 4;

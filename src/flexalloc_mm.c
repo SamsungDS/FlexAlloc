@@ -58,7 +58,7 @@ fla_dev_sanity_check(struct xnvme_dev const * dev, struct xnvme_dev const *md_de
 }
 
 void
-print_slab_sgmt(const struct flexalloc * fs, uint32_t from , uint32_t to)
+print_slab_sgmt(const struct flexalloc * fs, uint32_t from, uint32_t to)
 {
   struct fla_slab_header * slab;
 
