@@ -1,7 +1,7 @@
 project('flexalloc', 'c', default_options : ['c_std=c11'])
 cc = meson.get_compiler('c')
 pymod = import('python')
-py = pymod.find_installation('python3', modules: ['pip', 'venv'], required: true)
+#py = pymod.find_installation('python3', modules: ['pip', 'venv'], required: true)
 
 
 add_project_arguments('-DFLEXALLOC_VERBOSITY=' + get_option('FLEXALLOC_VERBOSITY').to_string(), language : 'c')
@@ -66,15 +66,12 @@ utils_tests = {
   #   'suite': 'utils'},
   'ut_hash'
   : {'sources': 'tests/flexalloc_ut_hash.c',
-     'is_parallel': true,
      'suite': 'utils'},
   'ut_bits'
   : {'sources': 'tests/flexalloc_ut_bits.c',
-     'is_parallel': true,
      'suite': 'utils'},
   'ut_freelist'
   : {'sources': 'tests/flexalloc_ut_freelist.c',
-     'is_parallel': true,
      'suite': 'utils'}
 }
 
@@ -85,30 +82,30 @@ xnvme_tests = {
 }
 
 core_tests = {
-   'ut_slab'
-   : {'sources': 'tests/flexalloc_ut_slab.c',
-      'suite': 'core'},
+  'ut_slab'
+  : {'sources': 'tests/flexalloc_ut_slab.c',
+     'suite': 'core'},
   'rt_pool'
   : {'sources': 'tests/flexalloc_rt_pool.c',
      'suite': 'core'},
   'rt_object_allocate'
   : {'sources': 'tests/flexalloc_rt_object_allocate.c',
-    'suite': 'core'},
+     'suite': 'core'},
   'rt_object_read_write'
   : {'sources': 'tests/flexalloc_rt_object_read_write.c',
-    'suite' : 'core'},
-  'rt_strp_object_read_write'
-  : {'sources': 'tests/flexalloc_rt_strp_object_read_write.c',
-    'suite' : 'core'},
+     'suite': 'core'},
+  #  'rt_strp_object_read_write'
+  #  : {'sources': 'tests/flexalloc_rt_strp_object_read_write.c',
+  #  'suite': 'core'},
   'rt_object_unaligned_write'
   : {'sources': 'tests/flexalloc_rt_object_unaligned_write.c',
-    'suite' : 'core'},
+     'suite': 'core'},
   'rt_object_overread_overwrite'
   : {'sources': 'tests/flexalloc_rt_object_overread_overwrite.c',
-    'suite' : 'core'},
+     'suite': 'core'},
   'rt_multi_pool_read_write'
   : {'sources': 'tests/flexalloc_rt_multi_pool_read_write.c',
-    'suite' : 'core'}
+     'suite': 'core'},
 }
 
 lib_tests = {
@@ -130,8 +127,8 @@ foreach suite : suites
 
     t_deps = xnvme_deps
     t_sources = opts.get('sources', [])
-    t_opts = {'timeout': 60, 'is_parallel': false} + opts.get('test_opts', {})
-    t_suite = opts.get('suite', 'Default')
+    t_opts = {'timeout': 60, 'is_parallel': false, 'suite' : opts.get('suite', 'Default')} \
+      + opts.get('test_opts', {})
     t_link_args = opts.get('link_args', [])
     t_exec = 'test_' + opts.get('executable', t_name)
     t_exec_files = opts.get('exec_files', [flexalloc_common, flexalloc_testing, libflexalloc_files])
@@ -144,6 +141,7 @@ foreach suite : suites
     endif
     prog = executable(t_exec, [t_exec_files, t_sources],
       dependencies: t_deps, link_args : t_link_args, include_directories : 'src')
+    test(t_name, prog, kwargs : t_opts)
     c_test_progs += prog
 
     test_data = configuration_data()
@@ -151,33 +149,34 @@ foreach suite : suites
     configure_file(input : './tests/flexalloc_pyt.py.in',
       output : t_exec + '.py',
       configuration : test_data)
+
   endforeach
 endforeach
 
 ## Python Bindings && wheel ##
-tgt_build_py_bindings = custom_target(
-  'build_py_bindings',
-  output: 'dummy',
-  build_always: true,
-  command: [
-    meson.current_source_dir() + '/scripts/build_python_bindings.sh',
-  ],
-  env: {
-    'MESON_SOURCE_ROOT': meson.current_source_dir(),
-    'MESON_BUILD_ROOT': meson.current_build_dir(),
-    'PYTHON_BIN': py.full_path()
-  },
-  depends: [library],
-)
-
-run_target(
-  'run-tests',
-  command: [
-    meson.current_source_dir() + '/scripts/run_tests.sh',
-  ],
-  depends: [tgt_build_py_bindings, c_test_progs, daemon_exe],
-  env: {
-    'MESON_SOURCE_ROOT': meson.current_source_dir(),
-    'MESON_BUILD_ROOT': meson.current_build_dir(),
-    'PYTHON_BIN': py.full_path()
-  })
+#tgt_build_py_bindings = custom_target(
+#  'build_py_bindings',
+#  output: 'dummy',
+#  build_always: false,
+#  command: [
+#    meson.current_source_dir() + '/scripts/build_python_bindings.sh',
+#  ],
+#  env: {
+#    'MESON_SOURCE_ROOT': meson.current_source_dir(),
+#    'MESON_BUILD_ROOT': meson.current_build_dir(),
+#    'PYTHON_BIN': py.full_path()
+#  },
+#  depends: [library],
+#)
+#
+#run_target(
+#  'run-tests',
+#  command: [
+#    meson.current_source_dir() + '/scripts/run_tests.sh',
+#  ],
+#  depends: [tgt_build_py_bindings, c_test_progs, daemon_exe],
+#  env: {
+#    'MESON_SOURCE_ROOT': meson.current_source_dir(),
+#    'MESON_BUILD_ROOT': meson.current_build_dir(),
+#    'PYTHON_BIN': py.full_path()
+#  })
