@@ -161,3 +161,61 @@ fla_flist_entries_free(freelist_t flist, uint32_t ndx, unsigned int num)
   }
   return 0;
 }
+
+int
+fla_flist_search_wfunc(freelist_t flist, uint64_t flags, uint32_t *found,
+                       int(*f)(const uint32_t, va_list), ...)
+{
+  uint32_t elem_cpy, wndx = 0, ret;
+  uint32_t u32_elems = FLA_FREELIST_U32_ELEMS(*flist);
+  uint32_t len = *flist;
+  va_list ap;
+
+  if ((flags & FLA_FLIST_SEARCH_EXEC_FIRST) == 0)
+    return -EINVAL;
+
+  *found = 0;
+
+  for (uint32_t u32_elem = 0 ; u32_elem < u32_elems; u32_elem++)
+  {
+    elem_cpy = flist[1 + u32_elem];
+
+    /*
+     * There is a special case when we reach the end element where all the
+     * unused bits are NOT 1s but 0s. Here we need to set the unused 0s to ones
+     * so our stopping condition is valid.
+     */
+    if (u32_elem + 1 == u32_elems)
+    {
+      uint32_t used_spots = len % 32;
+      elem_cpy = elem_cpy | (~0 << used_spots);
+    }
+
+    // All free
+    if (elem_cpy == 0xFFFFFFFF)
+      continue;
+
+    /* For all the zero bits: isolate and exec f on the index. */
+    for (uint8_t j = 0; j < 32 && elem_cpy != 0xFFFFFFFF; ++j)
+    {
+      wndx = ~elem_cpy & (elem_cpy + 1);
+
+      va_start(ap, f);
+      ret = f(u32_elem * sizeof(uint32_t) * 8 + ntz(wndx), ap);
+      va_end(ap);
+
+      switch (ret)
+      {
+      case 1:
+        *found += ret;
+      //fall through
+      case 0:
+        elem_cpy |= wndx;
+        continue;
+      default:
+        return ret;
+      }
+    }
+  }
+  return 0;
+}

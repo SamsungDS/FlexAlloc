@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 typedef uint32_t * freelist_t;
 
@@ -149,5 +150,25 @@ fla_flist_entry_free(freelist_t flist, uint32_t ndx);
 
 int
 fla_flist_entries_free(freelist_t flist, uint32_t ndx, unsigned int num);
+
+/**
+ * Search all the used element by executing a function.
+ *
+ *
+ * @param flist freelist handle
+ * @param flags modifies how the function is executed.
+ *        When FLA_FLIST_SEARCH_EXEC_FIRST is set returns on first find
+ * @param found is the number of times f returned 1
+ * @param f The function that will be executed. Must Return < 0
+ *        on error, must return 0 when an element was not "found",
+ *        must return 1 when an element was "found".
+ * @param ... These are the variadic arguments that will be
+ *        forwarded to the f function.
+ * @return <0 if there is an error. 0 otherwise.
+ */
+int
+fla_flist_search_wfunc(freelist_t flist, uint64_t flags, uint32_t *found,
+                       int(*f)(const uint32_t, va_list), ...);
+#define FLA_FLIST_SEARCH_EXEC_FIRST 1 << 0
 
 #endif // __FLEXALLOC_FREELIST_H_
