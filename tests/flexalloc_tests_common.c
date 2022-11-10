@@ -558,7 +558,10 @@ fla_ut_dev_init(uint64_t disk_min_blocks, struct fla_ut_dev *dev)
 
     xnvme_dev_close(xdev);
     if (FLA_ERR(dev->nblocks < disk_min_blocks,
-                "Backing device disk too small for test requirements"))
+                "Backing device disk too small for test requirements. "
+                "You need at least %"PRIu64" lbas which translates to "
+                "%"PRIu64" Mb on this device.",
+                disk_min_blocks, disk_min_blocks * dev->lb_nbytes / (1024 * 1024)))
     {
       return FLA_ERR_ERROR;
     }
