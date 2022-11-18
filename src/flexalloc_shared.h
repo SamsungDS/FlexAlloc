@@ -100,6 +100,11 @@ fla_fs_set_user(void *user_data);
 void *
 fla_fs_get_user();
 
+enum fla_pool_entry_flags
+{
+  FLA_POOL_ENTRY_STRP
+};
+
 #ifdef __cplusplus
 }
 #endif

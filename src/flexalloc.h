@@ -14,6 +14,7 @@
 #include "flexalloc_shared.h"
 #include "flexalloc_freelist.h"
 #include "flexalloc_hash.h"
+#include "flexalloc_pool.h"
 
 /// flexalloc device handle
 struct fla_dev
@@ -33,17 +34,6 @@ struct fla_slab_flist_cache
   struct fla_slab_flist_cache_elem *_head;
 };
 
-struct fla_geo_pool_sgmt
-{
-  /// number of logical blocks for the freelist
-  uint32_t freelist_nlb;
-  /// number of logical blocks to contain the hash table
-  uint32_t htbl_nlb;
-  /// number of slots in the hash table
-  uint32_t htbl_tbl_size;
-  /// number of logical blocks to contain the pool entries
-  uint32_t entries_nlb;
-};
 
 struct fla_geo_slab_sgmt
 {
@@ -89,6 +79,9 @@ struct fla_pools
   struct fla_pool_htbl_header *htbl_hdr_buffer;
   /// array of pool entries
   struct fla_pool_entry *entries;
+  /// array of pool_entry functions in memeory
+  struct fla_pool_entry_fnc *entrie_funcs;
+
 };
 
 struct fla_slabs
@@ -124,4 +117,6 @@ struct flexalloc
   void *user_data;
 };
 
+uint32_t
+fla_calc_objs_in_slab(struct flexalloc const * fs, uint32_t const obj_nlb);
 #endif // __FLEXALLOC_H_

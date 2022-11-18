@@ -11,6 +11,7 @@
 #define __FLEXALLOC_MM_H_
 #include <stdint.h>
 #include "flexalloc.h"
+#include "flexalloc_pool.h"
 
 #define FLA_MAGIC 0x00534621 // 'flexalloc'
 #define FLA_FMT_VER 1
@@ -19,7 +20,6 @@
 #define FLA_STATE_OPEN 1U
 
 #define FLA_NAME_SIZE 128
-#define FLA_NAME_SIZE_POOL 112
 
 #define FLA_ROOT_OBJ_NONE UINT64_MAX
 
@@ -67,58 +67,6 @@ struct fla_slab_header
   uint32_t refcount; // TODO: should have a var in cache structure describing n_entries/slab
 };
 
-struct fla_pool_htbl_header
-{
-  /// number of slots in the hash table
-  uint32_t size;
-  /// number of elements presently inserted
-  uint32_t len;
-};
-
-struct fla_pool_entry
-{
-  /// identifier for each slab depending on its "fullness"
-  uint32_t empty_slabs;
-  uint32_t full_slabs;
-  uint32_t partial_slabs;
-
-  /// Number of LBA's used for each object in the cache
-  ///
-  /// Note that all objects in a cache have the same size.
-  /// Also note that this is rounded up to fit alignment requirements.
-  uint32_t obj_nlb;
-
-  /// Number of Objects that fit in each slab
-  uint32_t slab_nobj;
-
-  /// Root object that is optionally set
-  ///
-  /// Pools can have any valid flexalloc object set as a root object
-  uint64_t root_obj_hndl;
-
-  /// Num of objects to stripe across
-  ///
-  /// Pools may optionally hand out striped objects
-  uint32_t strp_nobjs;
-
-  /// Number of bytes of each stripe chunk
-  ///
-  /// When striped, each fla object is subdivided into stripe
-  /// subsection or chunks.
-  /// Must be set if we set strp_nobjs
-  uint32_t strp_nbytes;
-
-  /// Human-readable cache identifier
-  ///
-  /// The cache name is primarily used for debugging statistics
-  /// and when creating the read-only file system view.
-  // TODO get rid of 512B block assumption
-  char name[FLA_NAME_SIZE_POOL]; // maximize use of 512B block while having entries aligned by 8B
-
-  //TODO : add a struct nested inside fla_pool_entry which holds just the metadata
-  //       (everything but the name and name length). This will allow us to ignore the
-  //       name when we need to.
-};
 
 /// flexalloc super block structure
 ///
@@ -198,23 +146,6 @@ fla_flush(struct flexalloc *fs);
 void
 fla_close_noflush(struct flexalloc *fs);
 
-
-/**
- * @brief set initial pool_entry values for new/reset entry.
- *
- * Initializes the pool_entry as when newly acquired by a freshly created pool.
- * Chiefly, the name and obj_nlb entries are set while other accounting structures
- * are initialized to their default starting values.
- *
- * @param pool_entry the pool entry itself, should point to an entry in fs->pools.entries
- * @param name name given to the pool
- * @param name_len length of the pool name (should match strlen(name))
- * @param obj_nlb describes object size in the form of number of logical blocks
- * @param slab_nobj describes the number of objects of this pool that fit in a slab
- */
-void
-fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int name_len,
-                     uint32_t const obj_nlb, uint32_t const slab_nobj);
 
 /**
  * @brief Acquire the next free slab
