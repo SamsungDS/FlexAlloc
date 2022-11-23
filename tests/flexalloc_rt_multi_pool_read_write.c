@@ -57,9 +57,16 @@ main(int argc, char **argv)
 
   for (int pn = 0; pn < NUM_POOLS; pn++)
   {
+    struct fla_pool_create_arg pool_arg =
+    {
+      .flags = 0,
+      .name = pool_handle_names[pn],
+      .name_len = strlen(pool_handle_names[pn]),
+      .obj_nlb = t_val.obj_nlb,
+    };
+
     buf_len = FLA_CEIL_DIV(write_msg_lens[pn], t_val.blk_size) * t_val.blk_size;
-    err = fla_pool_create(fs, pool_handle_names[pn], strlen(pool_handle_names[pn]),
-                          t_val.obj_nlb, &pool_handle[pn]);
+    err = fla_pool_create(fs, &pool_arg, &pool_handle[pn]);
     if(FLA_ERR(err, "fla_pool_create()"))
       goto teardown_ut_fs;
 

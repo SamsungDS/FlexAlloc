@@ -118,15 +118,19 @@ test_strp(struct test_vals test_vals)
   buf_len = test_vals.xfer_nlbs * dev.lb_nbytes;
   xfer_offset = test_vals.xfer_snlb * dev.lb_nbytes;
 
-  err = fla_pool_create(fs, pool_handle_name, strlen(pool_handle_name), test_vals.obj_nlb,
-                        &pool_handle);
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = 0,
+    .name = pool_handle_name,
+    .name_len = strlen(pool_handle_name),
+    .obj_nlb = test_vals.obj_nlb,
+    .strp_nobjs = test_vals.strp_nobj,
+    .strp_nbytes = test_vals.strp_nlbs * dev.lb_nbytes,
+  };
+
+  err = fla_pool_create(fs, &pool_arg, &pool_handle);
   if(FLA_ERR(err, "fla_pool_create()"))
     goto teardown_ut_fs;
-
-  err = fla_pool_set_strp(fs, pool_handle, test_vals.strp_nobj,
-                          dev.lb_nbytes * test_vals.strp_nlbs);
-  if (FLA_ERR(err, "fla_pool_set_strp()"))
-    goto release_pool;
 
   err = fla_object_create(fs, pool_handle, &obj);
   if(FLA_ERR(err, "fla_object_create()"))

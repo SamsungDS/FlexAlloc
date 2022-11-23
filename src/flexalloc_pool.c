@@ -6,20 +6,6 @@
 #include "flexalloc_shared.h"
 
 void
-fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int name_len,
-                     uint32_t const obj_nlb, uint32_t const slab_nobj)
-{
-  memcpy(pool_entry->name, name, name_len);
-  pool_entry->obj_nlb = obj_nlb;
-  pool_entry->slab_nobj = slab_nobj;
-  pool_entry->empty_slabs = FLA_LINKED_LIST_NULL;
-  pool_entry->full_slabs = FLA_LINKED_LIST_NULL;
-  pool_entry->partial_slabs = FLA_LINKED_LIST_NULL;
-  pool_entry->root_obj_hndl = FLA_ROOT_OBJ_NONE;
-  pool_entry->strp_nobjs = 1; // By default we don't stripe across objects
-}
-
-void
 fla_geo_pool_sgmt_calc(uint32_t npools, uint32_t lb_nbytes,
                        struct fla_geo_pool_sgmt *geo)
 {
@@ -68,14 +54,14 @@ fla_mkfs_pool_sgmt_init(struct flexalloc *fs, struct fla_geo *geo)
   memset(fs->pools.entries, 0, (geo->lb_nbytes * geo->pool_sgmt.entries_nlb));
 }
 
-uint64_t
+static uint64_t
 get_slab_elba_default(struct fla_pool_entry const * pool_entry,
                       uint32_t const obj_ndx)
 {
-  return pool_entry->obj_nlb * obj_ndx;
+  return pool_entry->obj_nlb * (obj_ndx + 1);
 }
 
-uint64_t
+static uint64_t
 get_slab_elba_strp(struct fla_pool_entry const * pool_entry,
                    uint32_t const obj_ndx)
 {
@@ -83,17 +69,75 @@ get_slab_elba_strp(struct fla_pool_entry const * pool_entry,
   return pool_entry->obj_nlb * (obj_ndx + strp_ops->strp_nobjs);
 }
 
+static int
+fla_pool_entry_reset_default(struct fla_pool_entry *pool_entry,
+                             struct fla_pool_create_arg const *arg,
+                             uint32_t const slab_nobj)
+{
+  memcpy(pool_entry->name, arg->name, arg->name_len);
+  pool_entry->obj_nlb = arg->obj_nlb;
+  pool_entry->slab_nobj = slab_nobj;
+  pool_entry->empty_slabs = FLA_LINKED_LIST_NULL;
+  pool_entry->full_slabs = FLA_LINKED_LIST_NULL;
+  pool_entry->partial_slabs = FLA_LINKED_LIST_NULL;
+  pool_entry->root_obj_hndl = FLA_ROOT_OBJ_NONE;
+  return 0;
+}
+
+static int
+fla_pool_entry_reset_strp(struct fla_pool_entry *pool_entry,
+                          struct fla_pool_create_arg const *arg,
+                          uint32_t const slab_nobj)
+{
+  struct fla_pool_strp * strp_ops;
+
+  int err = fla_pool_entry_reset_default(pool_entry, arg, slab_nobj);
+  if (FLA_ERR(err, "fla_pool_entry_reset_default()"))
+    return err;
+
+  strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
+  strp_ops->strp_nobjs = arg->strp_nobjs;
+  strp_ops->strp_nbytes = arg->strp_nbytes;
+  return 0;
+}
+
+uint32_t
+fla_pool_num_fla_objs_strp(struct fla_pool_entry const * pool_entry)
+{
+  struct fla_pool_strp *strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
+  return strp_ops->strp_nobjs;
+}
+
+uint32_t
+fla_pool_num_fla_objs_default(struct fla_pool_entry const * pool_entry)
+{
+  return 1;
+}
+
+static int
+fla_pool_initialize_entrie_func_(struct fla_pools *pools, const uint32_t ndx)
+{
+  if ((pools->entries + ndx)->flags & FLA_POOL_ENTRY_STRP)
+  {
+    (pools->entrie_funcs + ndx)->get_slab_elba = get_slab_elba_strp;
+    (pools->entrie_funcs + ndx)->fla_pool_entry_reset = fla_pool_entry_reset_strp;
+    (pools->entrie_funcs + ndx)->fla_pool_num_fla_objs = fla_pool_num_fla_objs_strp;
+  }
+  else
+  {
+    (pools->entrie_funcs + ndx)->get_slab_elba = get_slab_elba_default;
+    (pools->entrie_funcs + ndx)->fla_pool_entry_reset = fla_pool_entry_reset_default;
+    (pools->entrie_funcs + ndx)->fla_pool_num_fla_objs = fla_pool_num_fla_objs_default;
+  }
+
+  return 0;
+}
 
 int
 fla_pool_initialize_entrie_func(const uint32_t ndx, va_list ag)
 {
   struct fla_pools *pools = va_arg(ag, struct fla_pools*);
-  if ((pools->entries + ndx)->flags & FLA_POOL_ENTRY_STRP)
-    (pools->entrie_funcs + ndx)->get_slab_elba = get_slab_elba_strp;
-  else
-    (pools->entrie_funcs + ndx)->get_slab_elba = get_slab_elba_default;
-
-  return 0;
+  return fla_pool_initialize_entrie_func_(pools, ndx);
 }
 
 int
@@ -148,8 +192,8 @@ fla_print_pool_entries(struct flexalloc *fs)
     fprintf(stderr, "Pool Entry %"PRIu32"(%p)\n", npool, pool_entry);
     fprintf(stderr, "|  obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
     fprintf(stderr, "|  root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
-    fprintf(stderr, "|  strp_nobjs : %"PRIu32"\n", pool_entry->strp_nobjs);
-    fprintf(stderr, "|  strp_nbytes : %"PRIu32"\n", pool_entry->strp_nbytes);
+    //fprintf(stderr, "|  strp_nobjs : %"PRIu32"\n", pool_entry->strp_nobjs);
+    //fprintf(stderr, "|  strp_nbytes : %"PRIu32"\n", pool_entry->strp_nbytes);
     fprintf(stderr, "|  PoolName : %s\n", pool_entry->name);
     fprintf(stderr, "|  Max Number of Objects In Slab %"PRIu32"\n", pool_entry->slab_nobj);
     fprintf(stderr, "|  Slabs:\n");
@@ -208,45 +252,21 @@ exit:
 }
 
 int
-fla_base_pool_set_strp(struct flexalloc *fs, struct fla_pool *pool, uint32_t strp_nobjs,
-                       uint32_t strp_nbytes)
-{
-  struct fla_pool_entry *pool_entry = &fs->pools.entries[pool->ndx];
-  const struct xnvme_geo * geo = xnvme_dev_get_geo(fs->dev.dev);
-  struct fla_pool_strp * strp_ops;
-
-  if (FLA_ERR(strp_nbytes > geo->mdts_nbytes, "Strp sz > mdts for device"))
-    return -1;
-
-  if (FLA_ERR(strp_nobjs > pool_entry->slab_nobj, "Strp sz > max obj in slab"))
-    return -1;
-
-  pool_entry->strp_nobjs = strp_nobjs;
-  pool_entry->strp_nbytes = strp_nbytes;
-
-
-  strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
-  strp_ops->strp_nbytes = strp_nbytes;
-  strp_ops->strp_nobjs = strp_nobjs;
-
-  return 0;
-}
-
-int
-fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
+fla_base_pool_create(struct flexalloc *fs, struct fla_pool_create_arg const *arg,
                      struct fla_pool **handle)
 {
   int err;
   struct fla_pool_entry *pool_entry;
+  struct fla_pool_entry_fnc *pool_func;
   int entry_ndx = 0;
   uint32_t slab_nobj;
 
   // Return pool if it exists
-  err = fla_base_pool_open(fs, name, handle);
+  err = fla_base_pool_open(fs, arg->name, handle);
   if(!err)
   {
     pool_entry = &fs->pools.entries[(*handle)->ndx];
-    if(pool_entry->obj_nlb != obj_nlb)
+    if(pool_entry->obj_nlb != arg->obj_nlb)
     {
       err = -EINVAL;
       goto free_handle;
@@ -254,17 +274,16 @@ fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint3
     return 0;
   }
 
-  if ((err = FLA_ERR(name_len >= FLA_NAME_SIZE_POOL, "pool name too long")))
+  if ((err = FLA_ERR(arg->name_len >= FLA_NAME_SIZE_POOL, "pool name too long")))
     goto exit;
 
-  slab_nobj = fla_calc_objs_in_slab(fs, obj_nlb);
+  slab_nobj = fla_calc_objs_in_slab(fs, arg->obj_nlb);
   if((err = FLA_ERR(slab_nobj < 1, "Object size is incompatible with slab size.")))
     goto exit;
 
-
   if (fs->geo.type == XNVME_GEO_ZONED)
   {
-    if ((err = FLA_ERR(obj_nlb != fs->geo.nzsect, "object sz != fomatted zone size")))
+    if ((err = FLA_ERR(arg->obj_nlb != fs->geo.nzsect, "object sz != fomatted zone size")))
       goto exit;
   }
 
@@ -278,22 +297,26 @@ fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint3
   entry_ndx = fla_flist_entries_alloc(fs->pools.freelist, 1);
   if ((err = FLA_ERR(entry_ndx < 0, "failed to allocate pool entry")))
     goto free_handle;
-
   pool_entry = &fs->pools.entries[entry_ndx];
 
-  err = htbl_insert(&fs->pools.htbl, name, entry_ndx);
+  err = fla_pool_initialize_entrie_func_(&fs->pools, entry_ndx);
+  if (FLA_ERR(err, "fla_pool_initialize_entrie_func_()"))
+    goto free_freelist_entry;
+  pool_func = (fs->pools.entrie_funcs + entry_ndx);
+
+  err = htbl_insert(&fs->pools.htbl, arg->name, entry_ndx);
   if (FLA_ERR(err, "failed to create pool entry in hash table"))
     goto free_freelist_entry;
 
-  fla_pool_entry_reset(pool_entry, name, name_len, obj_nlb, slab_nobj);
+  pool_func->fla_pool_entry_reset(pool_entry, arg, slab_nobj);
 
   (*handle)->ndx = entry_ndx;
-  (*handle)->h2 = FLA_HTBL_H2(name);
+  (*handle)->h2 = FLA_HTBL_H2(arg->name);
 
   return 0;
 
 free_freelist_entry:
-  fla_flist_entries_free(fs->pools.freelist, entry_ndx, pool_entry->strp_nobjs);
+  fla_flist_entries_free(fs->pools.freelist, entry_ndx, 1);
 
 free_handle:
   free(*handle);
@@ -335,7 +358,7 @@ fla_base_pool_destroy(struct flexalloc *fs, struct fla_pool * handle)
   if(FLA_ERR(err, "fla_pool_release_all_slabs()"))
     goto exit;
 
-  err = fla_flist_entries_free(fs->pools.freelist, handle->ndx, pool_entry->strp_nobjs);
+  err = fla_flist_entries_free(fs->pools.freelist, handle->ndx, 1);
   if (FLA_ERR(err,
               "could not clear pool freelist entry - probably inconsistency in the metadat"))
     /*

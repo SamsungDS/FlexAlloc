@@ -66,18 +66,6 @@ struct fla_pool_entry
   /// Pools can have any valid flexalloc object set as a root object
   uint64_t root_obj_hndl;
 
-  /// Num of objects to stripe across
-  ///
-  /// Pools may optionally hand out striped objects
-  uint32_t strp_nobjs;
-
-  /// Number of bytes of each stripe chunk
-  ///
-  /// When striped, each fla object is subdivided into stripe
-  /// subsection or chunks.
-  /// Must be set if we set strp_nobjs
-  uint32_t strp_nbytes;
-
   uint64_t flags;
   uint64_t usable;
 
@@ -97,24 +85,12 @@ struct fla_pool_entry_fnc
 {
   uint64_t (*get_slab_elba)(struct fla_pool_entry const * pool_entry,
                             uint32_t const obj_ndx);
-};
 
-/**
- * @brief set initial pool_entry values for new/reset entry.
- *
- * Initializes the pool_entry as when newly acquired by a freshly created pool.
- * Chiefly, the name and obj_nlb entries are set while other accounting structures
- * are initialized to their default starting values.
- *
- * @param pool_entry the pool entry itself, should point to an entry in fs->pools.entries
- * @param name name given to the pool
- * @param name_len length of the pool name (should match strlen(name))
- * @param obj_nlb describes object size in the form of number of logical blocks
- * @param slab_nobj describes the number of objects of this pool that fit in a slab
- */
-void
-fla_pool_entry_reset(struct fla_pool_entry *pool_entry, const char *name, int name_len,
-                     uint32_t const obj_nlb, uint32_t const slab_nobj);
+  int (*fla_pool_entry_reset)(struct fla_pool_entry *pool_entry,
+                              struct fla_pool_create_arg const *arg,
+                              uint32_t const slab_nobj);
+  uint32_t (*fla_pool_num_fla_objs)(struct fla_pool_entry const * pool_entry);
+};
 
 void
 fla_geo_pool_sgmt_calc(uint32_t npools, uint32_t lb_nbytes,
@@ -138,11 +114,7 @@ int
 fla_pool_release_all_slabs(struct flexalloc *fs, struct fla_pool_entry * pool_entry);
 
 int
-fla_base_pool_set_strp(struct flexalloc *fs, struct fla_pool *pool, uint32_t strp_nobjs,
-                       uint32_t strp_nbytes);
-
-int
-fla_base_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
+fla_base_pool_create(struct flexalloc *fs, struct fla_pool_create_arg const *,
                      struct fla_pool **handle);
 
 int

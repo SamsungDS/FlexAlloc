@@ -18,10 +18,9 @@ fla_sync(struct flexalloc *fs)
 }
 
 int
-fla_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
-                struct fla_pool **pool)
+fla_pool_create(struct flexalloc *fs, struct fla_pool_create_arg const *arg, struct fla_pool **pool)
 {
-  return fs->fns.pool_create(fs, name, name_len, obj_nlb, pool);
+  return fs->fns.pool_create(fs, arg, pool);
 }
 
 int
@@ -91,9 +90,3 @@ fla_pool_get_root_object(struct flexalloc const * const fs,
   return fs->fns.pool_get_root_object(fs, pool, object);
 }
 
-int
-fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *pool, uint32_t strp_nobjs,
-                  uint32_t strp_nbytes)
-{
-  return fs->fns.pool_set_strp(fs, pool, strp_nobjs, strp_nbytes);
-}

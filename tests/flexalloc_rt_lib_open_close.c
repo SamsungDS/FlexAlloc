@@ -38,11 +38,18 @@ main(int argc, char **argv)
   }
 
   pool_handle_name = "mypool";
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = 0,
+    .name = pool_handle_name,
+    .name_len = strlen(pool_handle_name),
+    .obj_nlb = tdev.nsect_zn
+  };
+
   if (!tdev._is_zns)
-    err = fla_pool_create(fs, pool_handle_name, strlen(pool_handle_name), 2, &pool_handle);
-  else
-    err = fla_pool_create(fs, pool_handle_name, strlen(pool_handle_name),
-                          tdev.nsect_zn, &pool_handle);
+    pool_arg.obj_nlb = 2;
+
+  err = fla_pool_create(fs, &pool_arg, &pool_handle);
 
   if(FLA_ERR(err, "fla_pool_create()"))
   {

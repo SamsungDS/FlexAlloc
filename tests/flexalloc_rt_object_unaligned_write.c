@@ -66,8 +66,15 @@ main(int argc, char **argv)
     goto teardown_ut_dev;
   }
 
-  err = fla_pool_create(fs_vals.fs, fs_vals.pool_handle_name, strlen(fs_vals.pool_handle_name),
-                        test_vals.obj_nlb, &fs_vals.pool_handle);
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = 0,
+    .name = fs_vals.pool_handle_name,
+    .name_len = strlen(fs_vals.pool_handle_name),
+    .obj_nlb = test_vals.obj_nlb,
+  };
+
+  err = fla_pool_create(fs_vals.fs, &pool_arg, &fs_vals.pool_handle);
   if(FLA_ERR(err, "fla_pool_create()"))
     goto teardown_ut_fs;
 

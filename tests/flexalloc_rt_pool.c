@@ -109,16 +109,21 @@ main(int argc, char **argv)
   // create pools
   for (unsigned int i = 0; i < pools_len; i++)
   {
+
+    struct fla_pool_create_arg pool_arg =
+    {
+      .flags = 0,
+      .name = pools[i].name,
+      .name_len = strlen(pools[i].name),
+      .obj_nlb = 2
+    };
+
     if (dev._is_zns)
     {
-      ret = fla_pool_create(fs, pools[i].name, strlen(pools[i].name), dev.nsect_zn,
-                            &pools[i].handle) == 0 ;
-    }
-    else
-    {
-      ret = fla_pool_create(fs, pools[i].name, strlen(pools[i].name), 2, &pools[i].handle) == 0;
+      pool_arg.obj_nlb = dev.nsect_zn;
     }
 
+    ret = fla_pool_create(fs, &pool_arg, &pools[i].handle) == 0 ;
     err |= FLA_ASSERTF(ret,
                        "fla_pool_create(fs, name: %s, len: %u, obj_nlb: %u, handle) - initial acquire failed",
                        pools[i].name, strlen(pools[i].name), i);

@@ -706,6 +706,7 @@ fla_print_fs(struct flexalloc *fs)
   fla_print_pool_entries(fs);
 }
 
+//TODO: We do not consider stripped objects here. We should do add to the pool strp indirection
 uint32_t
 fla_calc_objs_in_slab(struct flexalloc const * fs, uint32_t const obj_nlb)
 {
@@ -808,17 +809,21 @@ fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab
     return err;
 
   pool_entry = &fs->pools.entries[slab->pool];
-  slab->refcount += pool_entry->strp_nobjs;
+  slab->refcount += (fs->pools.entrie_funcs + slab->pool)->fla_pool_num_fla_objs(pool_entry);
 
   return err;
 }
 
-uint32_t*
-fla_pool_best_slab_list(const struct fla_slab_header* slab,
-                        struct fla_pool_entry * pool_entry)
+static uint32_t*
+fla_pool_best_slab_list(struct fla_slab_header const *slab,
+                        struct fla_pools const *pools)
 {
+  struct fla_pool_entry * pool_entry = pools->entries + slab->pool;
+  struct fla_pool_entry_fnc const * pool_entry_fnc = pools->entrie_funcs + slab->pool;
+  uint32_t num_fla_objs = pool_entry_fnc->fla_pool_num_fla_objs(pool_entry);
+
   return slab->refcount == 0 ? &pool_entry->empty_slabs
-         : slab->refcount + pool_entry->strp_nobjs > pool_entry->slab_nobj ? &pool_entry->full_slabs
+         : slab->refcount + num_fla_objs > pool_entry->slab_nobj ? &pool_entry->full_slabs
          : &pool_entry->partial_slabs;
 }
 
@@ -855,6 +860,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
   struct fla_slab_header * slab;
   struct fla_pool_entry * pool_entry;
   uint32_t * from_head, * to_head, slab_id;
+  struct fla_pool_entry_fnc const * pool_entry_fnc;
 
   pool_entry = &fs->pools.entries[pool_handle->ndx];
   err = fla_pool_next_available_slab(fs, pool_entry, &slab);
@@ -878,15 +884,18 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
     goto exit;
   }
 
-  from_head = fla_pool_best_slab_list(slab, pool_entry);
+  from_head = fla_pool_best_slab_list(slab, &fs->pools);
 
-  err = fla_slab_next_available_obj(fs, slab, obj, pool_entry->strp_nobjs);
+  pool_entry_fnc = fs->pools.entrie_funcs + slab->pool;
+  uint32_t num_fla_objs = pool_entry_fnc->fla_pool_num_fla_objs(pool_entry);
+
+  err = fla_slab_next_available_obj(fs, slab, obj, num_fla_objs);
   if(FLA_ERR(err, "fla_slab_next_available_obj()"))
   {
     goto exit;
   }
 
-  to_head = fla_pool_best_slab_list(slab, pool_entry);
+  to_head = fla_pool_best_slab_list(slab, &fs->pools);
 
   if(from_head != to_head)
   {
@@ -931,6 +940,7 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
   struct fla_slab_header * slab;
   struct fla_pool_entry * pool_entry;
   uint32_t * from_head, * to_head;
+  struct fla_pool_entry_fnc const * pool_entry_fnc;
 
   if (fla_geo_zoned(&fs->geo))
   {
@@ -944,14 +954,17 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
     goto exit;
 
   pool_entry = &fs->pools.entries[pool_handle->ndx];
-  from_head = fla_pool_best_slab_list(slab, pool_entry);
+  from_head = fla_pool_best_slab_list(slab, &fs->pools);
 
-  err = fla_slab_cache_obj_free(&fs->slab_cache, obj, pool_entry->strp_nobjs);
+  pool_entry_fnc = fs->pools.entrie_funcs + slab->pool;
+  uint32_t num_fla_objs = pool_entry_fnc->fla_pool_num_fla_objs(pool_entry);
+
+  err = fla_slab_cache_obj_free(&fs->slab_cache, obj, num_fla_objs);
   if(FLA_ERR(err, "fla_slab_cache_obj_free()"))
     goto exit;
 
-  slab->refcount -= pool_entry->strp_nobjs;
-  to_head = fla_pool_best_slab_list(slab, pool_entry);
+  slab->refcount -= num_fla_objs;
+  to_head = fla_pool_best_slab_list(slab, &fs->pools);
 
   err = fla_hdll_remove(fs, slab, from_head);
   if(FLA_ERR(err, "fla_hdll_remove()"))
@@ -1129,17 +1142,19 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
   if((err = FLA_ERR(obj_eoffset < r_eoffset, "Read outside of an object")))
     goto exit;
 
-  if (pool_entry->strp_nobjs == 1)
+  if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
     err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, r_soffset, r_len, buf);
   else
   {
+
+    struct fla_pool_strp *strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
     struct fla_strp_params sp;
-    sp.strp_nobjs = pool_entry->strp_nobjs;
-    sp.strp_chunk_nbytes = pool_entry->strp_nbytes;
+    sp.strp_nobjs = strp_ops->strp_nobjs;
+    sp.strp_chunk_nbytes = strp_ops->strp_nbytes;
     sp.faobj_nlbs = pool_entry->obj_nlb;
     sp.xfer_snbytes = r_offset;
     sp.xfer_nbytes = r_len;
-    sp.strp_obj_tnbytes = (uint64_t)pool_entry->strp_nobjs * pool_entry->obj_nlb * fs->geo.lb_nbytes;
+    sp.strp_obj_tnbytes = (uint64_t)strp_ops->strp_nobjs * pool_entry->obj_nlb * fs->geo.lb_nbytes;
     sp.strp_obj_start_nbytes = obj_soffset;
     sp.dev_lba_nbytes = fs->geo.lb_nbytes;
     sp.write = false;
@@ -1173,17 +1188,18 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
     goto exit;
 
-  if (pool_entry->strp_nobjs == 1)
+  if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
     err = fla_xne_sync_seq_w_nbytes(fs->dev.dev, w_soffset, w_len, buf);
   else
   {
+    struct fla_pool_strp *strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
     struct fla_strp_params sp;
-    sp.strp_nobjs = pool_entry->strp_nobjs;
-    sp.strp_chunk_nbytes = pool_entry->strp_nbytes;
+    sp.strp_nobjs = strp_ops->strp_nobjs;
+    sp.strp_chunk_nbytes = strp_ops->strp_nbytes;
     sp.faobj_nlbs = pool_entry->obj_nlb;
     sp.xfer_snbytes = w_offset;
     sp.xfer_nbytes = w_len;
-    sp.strp_obj_tnbytes = (uint64_t)pool_entry->strp_nobjs * pool_entry->obj_nlb * fs->geo.lb_nbytes;
+    sp.strp_obj_tnbytes = (uint64_t)strp_ops->strp_nobjs * pool_entry->obj_nlb * fs->geo.lb_nbytes;
     sp.strp_obj_start_nbytes = obj_soffset;
     sp.dev_lba_nbytes = fs->geo.lb_nbytes;
     sp.write = true;
@@ -1276,7 +1292,6 @@ struct fla_fns base_fns =
   .pool_close = &fla_base_pool_close,
   .pool_create = &fla_base_pool_create,
   .pool_destroy = &fla_base_pool_destroy,
-  .pool_set_strp = &fla_base_pool_set_strp,
   .object_open = &fla_base_object_open,
   .object_create = &fla_base_object_create,
   .object_destroy = &fla_base_object_destroy,

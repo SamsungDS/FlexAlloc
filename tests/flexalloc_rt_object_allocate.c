@@ -69,7 +69,15 @@ test_objects(struct test_vals * test_vals)
   if (FLA_ERR(err, "fla_ut_fs_create()"))
     goto teardown_ut_dev;
 
-  err = fla_pool_create(fs, pool_name, strlen(pool_name), test_vals->obj_nlb, &pool_handle);
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = 0,
+    .name = pool_name,
+    .name_len = strlen(pool_name),
+    .obj_nlb = test_vals->obj_nlb,
+  };
+
+  err = fla_pool_create(fs, &pool_arg, &pool_handle);
   if(FLA_ERR(err, "fla_pool_create()"))
     goto teardown_ut_fs;
 

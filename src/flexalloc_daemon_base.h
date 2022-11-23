@@ -42,7 +42,6 @@ struct fla_msg
 #define FLA_MSG_CMD_POOL_OPEN 3
 #define FLA_MSG_CMD_POOL_CLOSE 4
 #define FLA_MSG_CMD_POOL_CREATE 5
-#define FLA_MSG_CMD_POOL_SET_STRP 13
 #define FLA_MSG_CMD_POOL_DESTROY 6
 #define FLA_MSG_CMD_POOL_SET_ROOT_OBJECT 7
 #define FLA_MSG_CMD_POOL_GET_ROOT_OBJECT 8
@@ -239,7 +238,7 @@ fla_daemon_pool_close_rq(struct flexalloc *fs, struct fla_pool *handle);
 // no daemon_pool_rsp - no message is sent.
 
 int
-fla_daemon_pool_create_rq(struct flexalloc *fs, char const *name, int name_len, uint32_t obj_nlb,
+fla_daemon_pool_create_rq(struct flexalloc *fs, struct fla_pool_create_arg const *pool_arg,
                           struct fla_pool **handle);
 
 int
