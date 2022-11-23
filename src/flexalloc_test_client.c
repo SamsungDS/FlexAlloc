@@ -22,7 +22,9 @@ main(int argc, char **argv)
     return -1;
 
   // TODO: create variant program / option to open existing pool, check if it works
-  err = fla_pool_create(client.flexalloc, "hello", 6, 10, &pool);
+  struct fla_pool_create_arg pool_args = { .flags = 0, .name = "hello", .name_len = 6, .obj_nlb = 10 };
+
+  err = fla_pool_create(client.flexalloc, &pool_args, &pool);
   if (FLA_ERR(err, "fla_pool_create()"))
   {
     return -1;
@@ -33,7 +35,8 @@ main(int argc, char **argv)
   if (FLA_ERR(err, "fla_pool_destroy()"))
     return -1;
 
-  err = fla_pool_create(client.flexalloc, "hello", 5, 10, &pool);
+  pool_args.name_len = 5;
+  err = fla_pool_create(client.flexalloc, &pool_args, &pool);
   if (FLA_ERR(err, "fla_pool_create() 2"))
     return -1;
   fprintf(stderr, "pool{h2: %"PRIu64", ndx: %"PRIu32"}\n", pool->h2, pool->ndx);

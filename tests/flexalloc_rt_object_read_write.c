@@ -50,8 +50,15 @@ main(int argc, char **argv)
 
   buf_len = FLA_CEIL_DIV(write_msg_len, dev.lb_nbytes) * dev.lb_nbytes;
 
-  err = fla_pool_create(fs, pool_handle_name, strlen(pool_handle_name), test_vals.obj_nlb,
-                        &pool_handle);
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = 0,
+    .name = pool_handle_name,
+    .name_len = strlen(pool_handle_name),
+    .obj_nlb = test_vals.obj_nlb
+  };
+
+  err = fla_pool_create(fs, &pool_arg, &pool_handle);
   if(FLA_ERR(err, "fla_pool_create()"))
     goto teardown_ut_fs;
 

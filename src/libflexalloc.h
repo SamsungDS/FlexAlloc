@@ -75,7 +75,7 @@ fla_sync(struct flexalloc *fs);
  * is undefined.
  */
 int
-fla_pool_create(struct flexalloc *fs, const char *name, int name_len, uint32_t obj_nlb,
+fla_pool_create(struct flexalloc *fs, struct fla_pool_create_arg const *arg,
                 struct fla_pool **pool);
 
 /**
@@ -293,20 +293,6 @@ fla_fs_nzsect(struct flexalloc const * const fs);
 
 bool
 fla_fs_zns(struct flexalloc const *const fs);
-
-/**
- *
- * @brief Indicate that a pool should hand out striped objects
- *
- * @param fs flexalloc system handle
- * @param pool_handle flexalloc pool handle to set as being striped
- * @param strp_nobjs number of objects to stripe across
- * @param strp_nbytes size of each stripe chunk in bytes
- * @return int indicating if pool striping parameters were applied
- */
-int
-fla_pool_set_strp(struct flexalloc *fs, struct fla_pool *pool, uint32_t strp_nobjs,
-                  uint32_t strp_nbytes);
 
 #ifdef __cplusplus
 }
