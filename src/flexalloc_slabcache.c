@@ -148,8 +148,19 @@ fla_slab_cache_elem_load(struct fla_slab_flist_cache *cache, uint32_t slab_id,
   }
 
   slba = cache_entry_lb_slba(cache, slab_id, flist_nlb);
-  err = fla_xne_sync_seq_r_naddrs(md_dev, slba, flist_nlb, flist_buf);
-  if(FLA_ERR(err, "fla_xne_sync_seq_r_naddrs()"))
+
+  struct xnvme_lba_range range = xnvme_lba_range_from_slba_naddrs(md_dev, slba, flist_nlb);
+  if((err = FLA_ERR(range.attr.is_valid != 1, "xnvme_lba_range_from_slba_naddrs()")))
+    goto exit;
+  struct fla_xne_io xne_io =
+  {
+    .dev = md_dev,
+    .buf = flist_buf,
+    .lba_range = &range,
+  };
+
+  err = fla_xne_sync_seq_r_xneio(&xne_io);
+  if(FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
     goto free_io_buffer;
 
   // sanity-check - the caller should know the freelist length
@@ -190,8 +201,16 @@ fla_slab_cache_elem_flush(struct fla_slab_flist_cache *cache, uint32_t slab_id)
 
   flist_nlb = fla_slab_cache_flist_nlb(cache->_fs, fla_flist_len(e->freelist));
   slba = cache_entry_lb_slba(cache, slab_id, flist_nlb);
-  err = fla_xne_sync_seq_w_naddrs(md_dev, slba, flist_nlb, e->freelist);
-  if(FLA_ERR(err, "fla_xne_sync_seq_w_naddrs()"))
+
+  struct xnvme_lba_range range;
+  range = fla_xne_lba_range_from_slba_naddrs(md_dev, slba, flist_nlb);
+  if ((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+    goto exit;
+
+  struct fla_xne_io xne_io = {.dev = md_dev, .buf = e->freelist, .lba_range = &range};
+
+  err = fla_xne_sync_seq_w_xneio(&xne_io);
+  if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
     goto exit;
 
   e->state = FLA_SLAB_CACHE_ELEM_CLEAN;

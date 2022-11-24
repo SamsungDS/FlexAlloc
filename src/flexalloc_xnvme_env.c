@@ -26,7 +26,6 @@ struct xnvme_lba_range
 fla_xne_lba_range_from_slba_naddrs(struct xnvme_dev *dev, uint64_t slba, uint64_t naddrs)
 {
   return xnvme_lba_range_from_slba_naddrs(dev, slba, naddrs);
-
 }
 
 struct xnvme_lba_range
@@ -142,25 +141,6 @@ fla_xne_sync_seq_w(const struct xnvme_lba_range * lba_range,
     wbuf += (nlb+1)*geo->lba_nbytes;
   }
 #endif //FLA_XNVME_IGNORE_MDTS
-
-exit:
-  return err;
-}
-
-int
-fla_xne_sync_seq_w_naddrs(struct xnvme_dev * dev, const uint64_t slba, const uint64_t naddrs,
-                          void const * buf)
-{
-  int err;
-  struct xnvme_lba_range range;
-
-  range = fla_xne_lba_range_from_slba_naddrs(dev, slba, naddrs);
-  if ((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
-    goto exit;
-
-  err = fla_xne_sync_seq_w(&range, dev, buf);
-  if (FLA_ERR(err, "fla_xne_sync_seq_w()"))
-    goto exit;
 
 exit:
   return err;
@@ -306,7 +286,7 @@ error:
 }
 
 int
-fla_xne_async_strp_seq_x(struct xnvme_dev *dev, void const *buf, struct fla_strp_params *sp)
+fla_xne_async_strp_seq_xneio(struct fla_xne_io *xne_io)
 {
   int err = 0, ret;
   struct xnvme_queue * queue = NULL;
@@ -315,15 +295,17 @@ fla_xne_async_strp_seq_x(struct xnvme_dev *dev, void const *buf, struct fla_strp
   struct fla_async_strp_cb_args cb_args [512] = {0};
   struct fla_async_strp_cb_args_common cmn_args =
   {
-    .nsid = xnvme_dev_get_nsid(dev),
-    .buf = (char *)buf,
-    .sp = sp,
+    .nsid = xnvme_dev_get_nsid(xne_io->dev),
+    .buf = (char *)xne_io->buf,
+    .sp = xne_io->strp_params,
   };
 
-  if ((err = FLA_ERR(sp->xfer_nbytes % sp->dev_lba_nbytes || sp->xfer_snbytes % sp->dev_lba_nbytes,
+  if ((err = FLA_ERR(xne_io->strp_params->xfer_nbytes % xne_io->strp_params->dev_lba_nbytes
+                     || xne_io->strp_params->xfer_snbytes % xne_io->strp_params->dev_lba_nbytes,
                      "Transfer bytes (%"PRIu64") and start offset (%"PRIu64") " \
                      "must be aligned to block size (%"PRIu32")",
-                     sp->xfer_nbytes, sp->xfer_snbytes, sp->dev_lba_nbytes)))
+                     xne_io->strp_params->xfer_nbytes, xne_io->strp_params->xfer_snbytes,
+                     xne_io->strp_params->dev_lba_nbytes)))
     goto exit;
 
   /*
@@ -333,29 +315,33 @@ fla_xne_async_strp_seq_x(struct xnvme_dev *dev, void const *buf, struct fla_strp
    * Thus you need more space in the queue, you then need a double amount size the
    * queue-size must be a power-of-2.
    */
-  err = xnvme_queue_init(dev, sp->strp_nobjs * 2, 0, &queue);
+  err = xnvme_queue_init(xne_io->dev, xne_io->strp_params->strp_nobjs * 2, 0, &queue);
   if (FLA_ERR(err, "xnvme_queue_init"))
     goto exit;
 
   uint64_t sbuf_nbytes = 0;
-  for(uint32_t i = 0 ; i < sp->strp_nobjs && sbuf_nbytes < sp->xfer_nbytes; ++i)
+  for(uint32_t i = 0 ;
+      i < xne_io->strp_params->strp_nobjs && sbuf_nbytes < xne_io->strp_params->xfer_nbytes;
+      ++i)
   {
     ctx = xnvme_queue_get_cmd_ctx(queue);
     if((err = FLA_ERR_ERRNO(!ctx, "xnvme_queue_get_cmd_ctx")))
       goto close_queue;
 
-    uint16_t curr_nlbs = calc_strp_obj_first_nlbs(sbuf_nbytes + sp->xfer_snbytes, &cmn_args);
+    uint16_t curr_nlbs = calc_strp_obj_first_nlbs(sbuf_nbytes + xne_io->strp_params->xfer_snbytes,
+                         &cmn_args);
     cb_arg = &cb_args[i];
     cb_arg->cmn_args = &cmn_args;
     cb_arg->nlbs = curr_nlbs;
-    cb_arg->slba = calc_strp_obj_slba(sbuf_nbytes + sp->xfer_snbytes, sp)
-                   + (sp->strp_obj_start_nbytes/sp->dev_lba_nbytes);
+    cb_arg->slba = calc_strp_obj_slba(sbuf_nbytes + xne_io->strp_params->xfer_snbytes,
+                                      xne_io->strp_params)
+                   + (xne_io->strp_params->strp_obj_start_nbytes/xne_io->strp_params->dev_lba_nbytes);
     cb_arg->sbuf_nbytes = sbuf_nbytes;
 
     xnvme_cmd_ctx_set_cb(ctx, fla_async_strp_cb, cb_arg);
 
 submit:
-    err = sp->write
+    err = xne_io->strp_params->write
           ? xnvme_nvm_write(ctx, cb_arg->cmn_args->nsid, cb_arg->slba, cb_arg->nlbs,
                             cb_arg->cmn_args->buf + cb_arg->sbuf_nbytes, NULL)
           : xnvme_nvm_read(ctx, cb_arg->cmn_args->nsid, cb_arg->slba, cb_arg->nlbs,
@@ -380,7 +366,7 @@ submit:
       goto close_queue;
     }
 
-    sbuf_nbytes += (curr_nlbs + 1) * sp->dev_lba_nbytes;
+    sbuf_nbytes += (curr_nlbs + 1) * xne_io->strp_params->dev_lba_nbytes;
   }
 
 close_queue:
@@ -395,10 +381,10 @@ close_queue:
       goto exit;
   }
 
-  for(uint32_t i = 0 ; i < sp->strp_nobjs; ++i)
+  for(uint32_t i = 0 ; i < xne_io->strp_params->strp_nobjs; ++i)
   {
     cb_arg = &cb_args[i];
-    if ((err = FLA_ERR(cb_args->cb_args.ecount, "fla_xne_async_strp_seq_x")))
+    if ((err = FLA_ERR(cb_args->cb_args.ecount, "fla_xne_async_strp_seq_xneio")))
       goto exit;
   }
 
@@ -407,17 +393,11 @@ exit:
 }
 
 int
-fla_xne_sync_seq_w_nbytes(struct xnvme_dev * dev, const uint64_t offset, uint64_t nbytes,
-                          void const * buf)
+fla_xne_sync_seq_w_xneio(struct fla_xne_io *xne_io)
 {
   int err;
-  struct xnvme_lba_range range;
 
-  range = fla_xne_lba_range_from_offset_nbytes(dev, offset, nbytes);
-  if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
-    goto exit;
-
-  err = fla_xne_sync_seq_w(&range, dev, buf);
+  err = fla_xne_sync_seq_w(xne_io->lba_range, xne_io->dev, xne_io->buf);
   if (FLA_ERR(err, "fla_xne_sync_seq_w()"))
     goto exit;
 
@@ -426,7 +406,7 @@ exit:
 }
 
 
-int
+static int
 fla_xne_sync_seq_r(const struct xnvme_lba_range * lba_range,
                    struct xnvme_dev * xne_hdl, void * buf)
 {
@@ -474,40 +454,13 @@ exit:
 }
 
 int
-fla_xne_sync_seq_r_naddrs(struct xnvme_dev * dev, const uint64_t slba, const uint64_t naddrs,
-                          void * buf)
+fla_xne_sync_seq_r_xneio(struct fla_xne_io *xne_io)
 {
   int err;
-  struct xnvme_lba_range range;
 
-  range = fla_xne_lba_range_from_slba_naddrs(dev, slba, naddrs);
-  if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
-    goto exit;
+  err = fla_xne_sync_seq_r(xne_io->lba_range, xne_io->dev, xne_io->buf);
+  FLA_ERR(err, "fla_xne_sync_seq_w()");
 
-  err = fla_xne_sync_seq_r(&range, dev, buf);
-  if(FLA_ERR(err, "fla_xne_sync_seq_w()"))
-    goto exit;
-
-exit:
-  return err;
-}
-
-int
-fla_xne_sync_seq_r_nbytes(struct xnvme_dev * dev, const uint64_t offset, uint64_t nbytes,
-                          void * buf)
-{
-  int err;
-  struct xnvme_lba_range range;
-
-  range = fla_xne_lba_range_from_offset_nbytes(dev, offset, nbytes);
-  if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
-    goto exit;
-
-  err = fla_xne_sync_seq_r(&range, dev, buf);
-  if(FLA_ERR(err, "fla_xne_sync_seq_w()"))
-    goto exit;
-
-exit:
   return err;
 }
 
