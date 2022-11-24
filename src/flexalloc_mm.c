@@ -474,6 +474,8 @@ fla_mkfs(struct fla_mkfs_p *p)
   struct fla_geo geo;
   void *fla_md_buf;
   size_t fla_md_buf_len;
+  struct xnvme_lba_range lba_range;
+  struct fla_xne_io xne_io;
   int err;
 
   err = fla_xne_dev_open(p->dev_uri, NULL, &dev);
@@ -536,9 +538,16 @@ fla_mkfs(struct fla_mkfs_p *p)
   // initialize super
   fla_mkfs_super_init(fs, &geo);
 
-  err = fla_xne_sync_seq_w_nbytes(md_dev, FLA_SUPER_SLBA, fla_md_buf_len,
-                                  fla_md_buf);
-  if (FLA_ERR(err, "fla_xne_sync_seq_w_nbytes()"))
+  xne_io.dev = md_dev;
+  xne_io.buf = fla_md_buf;
+
+  lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, FLA_SUPER_SLBA, fla_md_buf_len);
+  if(( err = FLA_ERR(lba_range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
+    goto free_md;
+  xne_io.lba_range = &lba_range;
+
+  err = fla_xne_sync_seq_w_xneio(&xne_io);
+  if (FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
     goto free_md;
 
 
@@ -569,8 +578,14 @@ fla_super_read(struct xnvme_dev *dev, size_t lb_nbytes, struct fla_super **super
   }
 
   memset(*super, 0, lb_nbytes); // Keep valgrind happy
-  err = fla_xne_sync_seq_r_nbytes(dev, 0, lb_nbytes, *super);
-  if (FLA_ERR(err, "fla_xne_sync_seq_r_nbytes()"))
+  struct xnvme_lba_range range;
+  range = fla_xne_lba_range_from_offset_nbytes(dev, 0, lb_nbytes);
+  if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+    goto exit;
+  struct fla_xne_io xne_io = {.dev = dev, .buf = *super, .lba_range = &range};
+
+  err = fla_xne_sync_seq_r_xneio(&xne_io);
+  if (FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
     goto free_super;
 
   // TODO: Should this be placed in fla_dev_sanity_check
@@ -626,9 +641,15 @@ fla_flush(struct flexalloc *fs)
 
   // We have to copy over the pool hash table's metadata before flushing
   fs->pools.htbl_hdr_buffer->len = fs->pools.htbl.len;
-  err = fla_xne_sync_seq_w_naddrs(md_dev, FLA_SUPER_SLBA, fla_geo_nblocks(&fs->geo),
-                                  fs->fs_buffer);
-  if(FLA_ERR(err, "fla_xne_sync_seq_w_naddrs()"))
+
+  struct xnvme_lba_range range;
+  range = fla_xne_lba_range_from_slba_naddrs(md_dev, FLA_SUPER_SLBA, fla_geo_nblocks(&fs->geo));
+  if ((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+    goto exit;
+
+  struct fla_xne_io xne_io = {.dev = md_dev, .buf = fs->fs_buffer, .lba_range = &range};
+  err = fla_xne_sync_seq_w_xneio(&xne_io);
+  if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
     goto exit;
 
 exit:
@@ -1142,11 +1163,21 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
   if((err = FLA_ERR(obj_eoffset < r_eoffset, "Read outside of an object")))
     goto exit;
 
+  struct fla_xne_io xne_io;
   if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
-    err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, r_soffset, r_len, buf);
+  {
+    struct xnvme_lba_range range;
+    range = fla_xne_lba_range_from_offset_nbytes(fs->dev.dev, r_soffset, r_len);
+    if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+      goto exit;
+    xne_io.dev = fs->dev.dev;
+    xne_io.buf = buf;
+    xne_io.lba_range = &range;
+
+    err = fla_xne_sync_seq_r_xneio(&xne_io);
+  }
   else
   {
-
     struct fla_pool_strp *strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
     struct fla_strp_params sp;
     sp.strp_nobjs = strp_ops->strp_nobjs;
@@ -1158,10 +1189,13 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
     sp.strp_obj_start_nbytes = obj_soffset;
     sp.dev_lba_nbytes = fs->geo.lb_nbytes;
     sp.write = false;
-    err = fla_xne_async_strp_seq_x(fs->dev.dev, buf, &sp);
+    xne_io.dev = fs->dev.dev;
+    xne_io.buf = buf;
+    xne_io.strp_params = &sp;
+    err = fla_xne_async_strp_seq_xneio(&xne_io);
   }
 
-  if(FLA_ERR(err, "fla_xne_sync_seq_r_nbytes()"))
+  if(FLA_ERR(err, "fla_objec_read()"))
     goto exit;
 
 exit:
@@ -1175,6 +1209,7 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   int err = 0;
   uint64_t obj_eoffset, obj_soffset, w_soffset, w_eoffset, slab_eoffset;
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
+  struct fla_xne_io xne_io;
 
   obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
   obj_soffset = fla_object_soffset(fs, obj, pool_handle);
@@ -1188,8 +1223,18 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
     goto exit;
 
+  xne_io.dev = fs->dev.dev;
+  xne_io.buf = (void*)buf;
   if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
-    err = fla_xne_sync_seq_w_nbytes(fs->dev.dev, w_soffset, w_len, buf);
+  {
+    struct xnvme_lba_range lba_range;
+    lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, w_soffset, w_len);
+    if(( err = FLA_ERR(lba_range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
+      goto exit;
+    xne_io.lba_range = &lba_range;
+
+    err = fla_xne_sync_seq_w_xneio(&xne_io);
+  }
   else
   {
     struct fla_pool_strp *strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
@@ -1203,10 +1248,11 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
     sp.strp_obj_start_nbytes = obj_soffset;
     sp.dev_lba_nbytes = fs->geo.lb_nbytes;
     sp.write = true;
-    err = fla_xne_async_strp_seq_x(fs->dev.dev, buf, &sp);
+    xne_io.strp_params = &sp;
+    err = fla_xne_async_strp_seq_xneio(&xne_io);
   }
 
-  if(FLA_ERR(err, "fla_xne_sync_seq_w_nbytes()"))
+  if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
     goto exit;
 
 exit:
@@ -1235,28 +1281,47 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
     goto exit;
   }
 
+  struct xnvme_lba_range range;
+
   if(aligned_sb < orig_sb)
   {
-    err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, aligned_sb, fs->dev.lb_nbytes, bounce_buf);
-    if(FLA_ERR(err, "fla_xne_sync_seq_r_nbytes()"))
+    range = fla_xne_lba_range_from_offset_nbytes(fs->dev.dev, aligned_sb, fs->dev.lb_nbytes);
+    if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+      goto exit;
+    struct fla_xne_io xne_io = {.dev = fs->dev.dev, .buf = bounce_buf, .lba_range = &range};
+    err = fla_xne_sync_seq_r_xneio(&xne_io);
+    if(FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
       goto free_bounce_buf;
   }
 
   if(aligned_eb > orig_eb)
   {
+    range = fla_xne_lba_range_from_offset_nbytes(fs->dev.dev, aligned_eb - fs->dev.lb_nbytes,
+            fs->dev.lb_nbytes);
+    if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+      goto exit;
     buf = bounce_buf + bounce_buf_size - fs->dev.lb_nbytes;
-    err = fla_xne_sync_seq_r_nbytes(fs->dev.dev, aligned_eb - fs->dev.lb_nbytes,
-                                    fs->dev.lb_nbytes,
-                                    buf);
-    if(FLA_ERR(err, "fla_xne_sync_seq_r_nbytes()"))
+    struct fla_xne_io xne_io = {.dev = fs->dev.dev, .buf = buf, .lba_range = &range};
+
+    err = fla_xne_sync_seq_r_xneio(&xne_io);
+    if(FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
       goto free_bounce_buf;
   }
 
   buf = bounce_buf + (orig_sb - aligned_sb);
   memcpy(buf, w_buf, len);
 
-  err = fla_xne_sync_seq_w_nbytes(fs->dev.dev, aligned_sb, bounce_buf_size, bounce_buf);
-  if(FLA_ERR(err, "fla_xne_sync_seq_w_nbytes()"))
+  struct xnvme_lba_range lba_range;
+  struct fla_xne_io xne_io;
+  xne_io.dev = fs->dev.dev;
+  xne_io.buf = bounce_buf;
+  lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, aligned_sb, bounce_buf_size);
+  if(( err = FLA_ERR(lba_range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
+    goto free_bounce_buf;
+  xne_io.lba_range = &lba_range;
+
+  err = fla_xne_sync_seq_w_xneio(&xne_io);
+  if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
     goto free_bounce_buf;
 
 free_bounce_buf:
@@ -1365,7 +1430,14 @@ fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
   }
 
   memset(fla_md_buf, 0, fla_md_buf_len);
-  err = fla_xne_sync_seq_r_nbytes(md_dev, 0, fla_md_buf_len, fla_md_buf);
+
+  struct xnvme_lba_range range;
+  range = fla_xne_lba_range_from_offset_nbytes(md_dev, 0, fla_md_buf_len);
+  if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+    goto exit;
+  struct fla_xne_io xne_io = {.dev = md_dev, .buf = fla_md_buf, .lba_range = &range};
+
+  err = fla_xne_sync_seq_r_xneio(&xne_io);
   if (FLA_ERR(err, "fla_xne_sync_seq_r_nbyte_nbytess()"))
     goto free_md;
 

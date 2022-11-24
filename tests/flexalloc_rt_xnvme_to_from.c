@@ -89,9 +89,19 @@ test_from_stg(const int buf_size, const int blk_num, const int blk_size,
     {
       memset(buf, '0', buf_size);
 
-      // -1 because naddrs is a non zero value.
-      ret = fla_xne_sync_seq_r_naddrs(xnvme_dev, slba, elba - slba + 1, buf);
-      if(FLA_ERR(ret, "fla_xne_sync_seq_w()"))
+      struct xnvme_lba_range range = xnvme_lba_range_from_slba_naddrs(xnvme_dev, slba,
+                                     elba - slba + 1);
+      if((ret = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+        goto exit;
+      struct fla_xne_io xne_io =
+      {
+        .dev = xnvme_dev,
+        .buf = buf,
+        .lba_range = &range,
+      };
+
+      ret = fla_xne_sync_seq_r_xneio(&xne_io);
+      if(FLA_ERR(ret, "fla_xne_sync_seq_r_xneio()"))
         goto exit;
 
       num_ones = fla_ut_count_char_in_buf('1', buf, buf_size);
@@ -123,9 +133,14 @@ test_to_stg(const int buf_size, const int blk_num, const int blk_size,
       if(FLA_ERR(ret, "fla_ut_lpbk_overwrite()"))
         goto exit;
 
-      // -1 because naddrs is a non zero value.
-      ret = fla_xne_sync_seq_w_naddrs(xnvme_dev, slba, elba - slba + 1, buf);
-      if(FLA_ERR(ret, "fla_xne_sync_seq_w_naddrs()"))
+      struct xnvme_lba_range range;
+      range = fla_xne_lba_range_from_slba_naddrs(xnvme_dev, slba, elba - slba + 1);
+      if ((ret = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
+        goto exit;
+
+      struct fla_xne_io xne_io = {.dev = xnvme_dev, .buf = buf, .lba_range = &range};
+      ret = fla_xne_sync_seq_w_xneio(&xne_io);
+      if(FLA_ERR(ret, "fla_xne_sync_seq_w_xneio()"))
         goto exit;
 
       ret = fsync(lpbk->bfile_fd);

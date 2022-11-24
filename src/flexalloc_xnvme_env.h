@@ -40,60 +40,46 @@ struct fla_strp_params
   bool write;
 };
 
+struct fla_xne_io
+{
+  struct xnvme_dev *dev;
+  void *buf;
+  union
+  {
+    struct xnvme_lba_range * lba_range;
+    struct fla_strp_params * strp_params;
+  };
+};
+
+struct xnvme_lba_range
+fla_xne_lba_range_from_offset_nbytes(struct xnvme_dev *dev, uint64_t offset, uint64_t nbytes);
+
 /**
- * @brief Synchronous sequential write defined by lbs
+ * @brief Synchronous sequential write
  *
- * @param dev xnvme device
- * @param slba lba where to begin the write
- * @param naddrs Number of addresses to write
- * @param buf Buffer to write from
+ * @param xne_io contains dev, slba, naddrs and buf
  * @return Zero on success. non-zero on error.
  */
 int
-fla_xne_sync_seq_w_naddrs(struct xnvme_dev * dev, const uint64_t slba, const uint64_t naddrs,
-                          void const * buf);
+fla_xne_sync_seq_w_xneio(struct fla_xne_io *xne_io);
 
-int
-fla_xne_async_strp_seq_x(struct xnvme_dev *dev, void const *buf, struct fla_strp_params *sp);
-
-int
 /**
- * @brief Synchronous sequential write defined by bytes
+ * @brief asynchronous stripped sequential write
  *
- * @param dev xnvme device
- * @param offset Byte offset where to begin the write
- * @param nbytes Number of bytes to write
- * @param buf Buffer to write from
- * @return Zero on success. Non-zero on error.
+ * @param xne_io contains dev, slba, naddrs and buf
+ * @return Zero on success. non-zero on error.
  */
-fla_xne_sync_seq_w_nbytes(struct xnvme_dev * dev, const uint64_t offset, uint64_t nbytes,
-                          void const * buf);
+int
+fla_xne_async_strp_seq_xneio(struct fla_xne_io *xne_io);
 
 /**
  * @brief Synchronous sequential read from storage
  *
- * @param dev xnvme device
- * @param slba lba where to begin reading
- * @param naddrs Number of addresses to read
- * @param buf Buffer where to put the read bytes
+ * @param xne_io contains dev, slba, naddrs and buf
  * @return Zero on success. non-zero on error
  */
 int
-fla_xne_sync_seq_r_naddrs(struct xnvme_dev * dev, const uint64_t slba, const uint64_t naddrs,
-                          void * buf);
-
-/**
- * @brief Synchronous sequential read defined by bytes
- *
- * @param dev xnvme device
- * @param offset Byte offset where to begin reading
- * @param nbytes Number of bytes to read
- * @param buf Buffere where to put the read bytes
- * @return ZEro on success. non-zero on error.
- */
-int
-fla_xne_sync_seq_r_nbytes(struct xnvme_dev * dev, const uint64_t offset, uint64_t nbytes,
-                          void * buf);
+fla_xne_sync_seq_r_xneio(struct fla_xne_io *xne_io);
 
 /**
  * @brief Allocate a buffer with xnvme allocate
@@ -168,4 +154,6 @@ fla_xne_dev_mkfs_prepare(struct xnvme_dev *dev, char *md_dev_uri, struct xnvme_d
 int
 fla_xne_dev_sanity_check(struct xnvme_dev const * dev, struct xnvme_dev const * md_dev);
 
+struct xnvme_lba_range
+fla_xne_lba_range_from_slba_naddrs(struct xnvme_dev *dev, uint64_t slba, uint64_t naddrs);
 #endif /*__XNVME_ENV_H */
