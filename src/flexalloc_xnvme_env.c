@@ -511,50 +511,6 @@ exit:
   return err;
 }
 
-int
-fla_xne_write_zeroes(const struct xnvme_lba_range *lba_range,
-                     struct xnvme_dev *xne_hdl)
-{
-  struct xnvme_cmd_ctx ctx;
-  uint32_t nsid;
-  int err = 0;
-
-  nsid = xnvme_dev_get_nsid(xne_hdl);
-  ctx = xnvme_cmd_ctx_from_dev(xne_hdl);
-
-#ifdef FLA_XNVME_IGNORE_MDTS
-  err = xnvme_nvm_write_zeroes(&ctx, nsid, lba_range->slba, lba_range->naddrs - 1);
-  if (err || xnvme_cmd_ctx_cpl_status(&ctx))
-  {
-    xnvmec_perr("xnvme_nvm_write_zeroes()", err);
-    xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
-    err = err ? err : -EIO;
-    goto exit;
-  }
-#else
-  uint32_t nlb, mdts_naddrs;
-  mdts_naddrs = fla_xne_calc_mdts_naddrs(xne_hdl);
-
-  for (uint64_t slba = lba_range->slba; slba <= lba_range->elba; slba += mdts_naddrs)
-  {
-    /* mdtsnaddrs -1 because it is not a zero-based value */
-    nlb = XNVME_MIN(lba_range->elba - slba, mdts_naddrs - 1);
-
-    err = xnvme_nvm_write_zeroes(&ctx, nsid, slba, nlb);
-    if (err || xnvme_cmd_ctx_cpl_status(&ctx))
-    {
-      xnvmec_perr("xnvme_nvm_write_zeroes()", err);
-      xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
-      err = err ? err : -EIO;
-      goto exit;
-    }
-  }
-#endif //FLA_XNVME_IGNORE_MDTS
-
-exit:
-  return err;
-}
-
 void *
 fla_xne_alloc_buf(const struct xnvme_dev *dev, size_t nbytes)
 {
