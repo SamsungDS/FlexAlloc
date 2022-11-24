@@ -63,8 +63,6 @@ cdef extern from "flexalloc_xnvme_env.h" nogil:
             xnvme_dev *dev, const uint64_t slba, const uint64_t naddrs, const void *buf)
     int fla_xne_sync_seq_w_nbytes(
             xnvme_dev *dev, const uint64_t offset, uint64_t nbytes, const void *buf)
-    int fla_xne_write_zeroes(
-            const xnvme_lba_range *lba_range, xnvme_dev *dev)
     int fla_xne_sync_seq_r_naddrs(
             xnvme_dev *dev, uint64_t slba, uint64_t naddrs, void *buf)
     int fla_xnvme_sync_req_r_nbytes(

@@ -70,21 +70,6 @@ fla_xne_sync_seq_w_nbytes(struct xnvme_dev * dev, const uint64_t offset, uint64_
                           void const * buf);
 
 /**
- * @brief Write zeroes over range.
- *
- * Overwrites given logical block range with zeroes.
- * NOTE: subtracts 1 from lba_range->naddrs because xNVMe expects the
- * number of addresses value to be zero based.
- *
- * @param lba_range Xnvme structure defining the range of the write
- * @param xnvme_dev Xnvme device
- *
- * @return zero on success. non-zero on error
- */
-int
-fla_xne_write_zeroes(const struct xnvme_lba_range *lba_range, struct xnvme_dev *xne_hdl);
-
-/**
  * @brief Synchronous sequential read from storage
  *
  * @param dev xnvme device
