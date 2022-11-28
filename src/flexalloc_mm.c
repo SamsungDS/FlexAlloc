@@ -478,11 +478,11 @@ fla_mkfs(struct fla_mkfs_p *p)
   struct fla_xne_io xne_io;
   int err;
 
-  err = fla_xne_dev_open(p->dev_uri, NULL, &dev);
+  err = fla_xne_dev_open(p->open_opts.dev_uri, NULL, &dev);
   if (FLA_ERR(err, "failed to open device"))
     return -1;
 
-  err = fla_xne_dev_mkfs_prepare(dev, p->md_dev_uri, &md_dev);
+  err = fla_xne_dev_mkfs_prepare(dev, p->open_opts.md_dev_uri, &md_dev);
   if (FLA_ERR(err, "fla_xne_dev_mkfs_prepare"))
     return err;
 

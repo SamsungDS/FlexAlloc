@@ -144,7 +144,7 @@ uint32_t
 fla_xne_dev_get_znd_mor(struct xnvme_dev *dev);
 
 int
-fla_xne_dev_mkfs_prepare(struct xnvme_dev *dev, char *md_dev_uri, struct xnvme_dev **md_dev);
+fla_xne_dev_mkfs_prepare(struct xnvme_dev *dev, char const *md_dev_uri, struct xnvme_dev **md_dev);
 /**
  * @brief Check if parameters are within range
  *

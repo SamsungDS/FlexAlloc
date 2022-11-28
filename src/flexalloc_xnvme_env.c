@@ -35,7 +35,7 @@ fla_xne_lba_range_from_offset_nbytes(struct xnvme_dev *dev, uint64_t offset, uin
 }
 
 int
-fla_xne_dev_mkfs_prepare(struct xnvme_dev *dev, char *md_dev_uri, struct xnvme_dev **md_dev)
+fla_xne_dev_mkfs_prepare(struct xnvme_dev *dev, char const *md_dev_uri, struct xnvme_dev **md_dev)
 {
   int err = 0;
 

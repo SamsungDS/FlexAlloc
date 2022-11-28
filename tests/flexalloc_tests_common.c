@@ -483,7 +483,7 @@ fla_ut_lpbk_fs_create(uint64_t lb_nbytes, uint64_t nblocks, uint32_t slab_nlb,
     goto exit;
   }
 
-  mkfs_params.dev_uri = (*lpbk)->dev_name;
+  mkfs_params.open_opts.dev_uri = (*lpbk)->dev_name;
   mkfs_params.slab_nlb = slab_nlb;
   mkfs_params.npools = npools;
   err = fla_mkfs(&mkfs_params);
@@ -650,8 +650,8 @@ fla_ut_fs_create(uint32_t slab_min_blocks, uint32_t npools,
   }
 
   fla_t_round_slab_size(dev, &slab_min_blocks);
-  mkfs_params.dev_uri = (char *)dev->_dev_uri;
-  mkfs_params.md_dev_uri = (char *)dev->_md_dev_uri;
+  mkfs_params.open_opts.dev_uri = (char *)dev->_dev_uri;
+  mkfs_params.open_opts.md_dev_uri = (char *)dev->_md_dev_uri;
   mkfs_params.slab_nlb = slab_min_blocks;
   mkfs_params.npools = npools;
   err = fla_mkfs(&mkfs_params);

@@ -22,8 +22,8 @@ struct flexalloc;
 /// The xnvme open options are optionally set at open time as well
 struct fla_open_opts
 {
-  const char *dev_uri;
-  const char *md_dev_uri;
+  char const * dev_uri;
+  char const *md_dev_uri;
   struct xnvme_opts *opts;
 };
 
