@@ -467,6 +467,12 @@ fla_init(struct fla_geo *geo, struct xnvme_dev *dev, struct xnvme_dev *md_dev, v
 }
 
 int
+fla_noop_prep_ctx(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx)
+{
+  return 0;
+}
+
+int
 fla_mkfs(struct fla_mkfs_p *p)
 {
   struct xnvme_dev *dev = NULL, *md_dev = NULL;
@@ -541,6 +547,7 @@ fla_mkfs(struct fla_mkfs_p *p)
   xne_io.io_type = FLA_IO_MD_WRITE;
   xne_io.dev = md_dev;
   xne_io.buf = fla_md_buf;
+  xne_io.prep_ctx = fla_noop_prep_ctx;
 
   lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, FLA_SUPER_SLBA, fla_md_buf_len);
   if(( err = FLA_ERR(lba_range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
@@ -1194,6 +1201,7 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
     xne_io.dev = fs->dev.dev;
     xne_io.buf = buf;
     xne_io.strp_params = &sp;
+    xne_io.prep_ctx = fla_noop_prep_ctx;
     err = fla_xne_async_strp_seq_xneio(&xne_io);
   }
 
@@ -1228,6 +1236,7 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   xne_io.io_type = FLA_IO_DATA_WRITE;
   xne_io.dev = fs->dev.dev;
   xne_io.buf = (void*)buf;
+  xne_io.prep_ctx = fla_noop_prep_ctx;
   if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
   {
     struct xnvme_lba_range lba_range;
@@ -1319,6 +1328,7 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
   xne_io.io_type = FLA_IO_DATA_WRITE;
   xne_io.dev = fs->dev.dev;
   xne_io.buf = bounce_buf;
+  xne_io.prep_ctx = fla_noop_prep_ctx;
   lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, aligned_sb, bounce_buf_size);
   if(( err = FLA_ERR(lba_range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
     goto free_bounce_buf;

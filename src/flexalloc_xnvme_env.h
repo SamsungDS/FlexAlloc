@@ -58,6 +58,8 @@ struct fla_xne_io
     struct xnvme_lba_range * lba_range;
     struct fla_strp_params * strp_params;
   };
+
+  int (*prep_ctx)(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx);
 };
 
 struct xnvme_lba_range
