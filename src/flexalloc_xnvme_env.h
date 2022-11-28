@@ -40,8 +40,17 @@ struct fla_strp_params
   bool write;
 };
 
+enum fla_xne_io_type
+{
+  FLA_IO_DATA_WRITE = 0,
+  FLA_IO_MD_WRITE,
+  FLA_IO_MD_READ,
+  FLA_IO_DATA_READ,
+};
+
 struct fla_xne_io
 {
+  enum fla_xne_io_type io_type;
   struct xnvme_dev *dev;
   void *buf;
   union

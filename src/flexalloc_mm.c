@@ -538,6 +538,7 @@ fla_mkfs(struct fla_mkfs_p *p)
   // initialize super
   fla_mkfs_super_init(fs, &geo);
 
+  xne_io.io_type = FLA_IO_MD_WRITE;
   xne_io.dev = md_dev;
   xne_io.buf = fla_md_buf;
 
@@ -1182,6 +1183,7 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
     struct fla_strp_params sp;
     sp.strp_nobjs = strp_ops->strp_nobjs;
     sp.strp_chunk_nbytes = strp_ops->strp_nbytes;
+    xne_io.io_type = FLA_IO_DATA_READ;
     sp.faobj_nlbs = pool_entry->obj_nlb;
     sp.xfer_snbytes = r_offset;
     sp.xfer_nbytes = r_len;
@@ -1223,6 +1225,7 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
     goto exit;
 
+  xne_io.io_type = FLA_IO_DATA_WRITE;
   xne_io.dev = fs->dev.dev;
   xne_io.buf = (void*)buf;
   if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
@@ -1313,6 +1316,7 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
 
   struct xnvme_lba_range lba_range;
   struct fla_xne_io xne_io;
+  xne_io.io_type = FLA_IO_DATA_WRITE;
   xne_io.dev = fs->dev.dev;
   xne_io.buf = bounce_buf;
   lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, aligned_sb, bounce_buf_size);
