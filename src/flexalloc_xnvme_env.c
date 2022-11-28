@@ -98,22 +98,21 @@ fla_xne_dev_get_znd_mor(struct xnvme_dev *dev)
 
 int
 fla_xne_sync_seq_w(const struct xnvme_lba_range * lba_range,
-                   struct xnvme_dev * xne_hdl, const void * buf)
+                   struct xnvme_dev * xne_hdl, struct xnvme_cmd_ctx * ctx,
+                   const void * buf)
 {
   int err = 0;
   uint32_t nsid;
   const char * wbuf = buf;
-  struct xnvme_cmd_ctx ctx;
 
   nsid = xnvme_dev_get_nsid(xne_hdl);
-  ctx = xnvme_cmd_ctx_from_dev(xne_hdl);
 
 #ifdef FLA_XNVME_IGNORE_MDTS
-  err = xnvme_nvm_write(&ctx, nsid, lba_range->slba, lba_range->naddrs - 1, wbuf, NULL);
-  if (err || xnvme_cmd_ctx_cpl_status(&ctx))
+  err = xnvme_nvm_write(ctx, nsid, lba_range->slba, lba_range->naddrs - 1, wbuf, NULL);
+  if (err || xnvme_cmd_ctx_cpl_status(ctx))
   {
     xnvmec_perr("xnvme_nvm_write()", err);
-    xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+    xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
     err = err ? err : -EIO;
     goto exit;
   }
@@ -129,11 +128,11 @@ fla_xne_sync_seq_w(const struct xnvme_lba_range * lba_range,
     /* mdts_naddrs -1 because it is not a zero based value */
     nlb = XNVME_MIN(lba_range->elba - slba, mdts_naddrs - 1);
 
-    err = xnvme_nvm_write(&ctx, nsid, slba, nlb, wbuf, NULL);
-    if (err || xnvme_cmd_ctx_cpl_status(&ctx))
+    err = xnvme_nvm_write(ctx, nsid, slba, nlb, wbuf, NULL);
+    if (err || xnvme_cmd_ctx_cpl_status(ctx))
     {
       xnvmec_perr("xnvme_nvm_write()", err);
-      xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+      xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
       err = err ? err : -EIO;
       goto exit;
     }
@@ -397,7 +396,8 @@ fla_xne_sync_seq_w_xneio(struct fla_xne_io *xne_io)
 {
   int err;
 
-  err = fla_xne_sync_seq_w(xne_io->lba_range, xne_io->dev, xne_io->buf);
+  struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(xne_io->dev);
+  err = fla_xne_sync_seq_w(xne_io->lba_range, xne_io->dev, &ctx, xne_io->buf);
   if (FLA_ERR(err, "fla_xne_sync_seq_w()"))
     goto exit;
 
