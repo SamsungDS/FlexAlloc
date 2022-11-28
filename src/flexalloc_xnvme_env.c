@@ -327,6 +327,13 @@ fla_xne_async_strp_seq_xneio(struct fla_xne_io *xne_io)
     if((err = FLA_ERR_ERRNO(!ctx, "xnvme_queue_get_cmd_ctx")))
       goto close_queue;
 
+    if (xne_io->prep_ctx)
+    {
+      err = xne_io->prep_ctx(xne_io, ctx);
+      if(FLA_ERR(err, "prep_ctx()"))
+        goto close_queue;
+    }
+
     uint16_t curr_nlbs = calc_strp_obj_first_nlbs(sbuf_nbytes + xne_io->strp_params->xfer_snbytes,
                          &cmn_args);
     cb_arg = &cb_args[i];
@@ -397,6 +404,13 @@ fla_xne_sync_seq_w_xneio(struct fla_xne_io *xne_io)
   int err;
 
   struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(xne_io->dev);
+  if (xne_io->prep_ctx)
+  {
+    err = xne_io->prep_ctx(xne_io, &ctx);
+    if (FLA_ERR(err, "prep_ctx()"))
+      goto exit;
+  }
+
   err = fla_xne_sync_seq_w(xne_io->lba_range, xne_io->dev, &ctx, xne_io->buf);
   if (FLA_ERR(err, "fla_xne_sync_seq_w()"))
     goto exit;
