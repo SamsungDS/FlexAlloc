@@ -106,7 +106,7 @@ fla_mkfs_parse_args(int argc, char ** argv, struct fla_mkfs_p * p)
       p->npools = (int)arg_long;
       break;
     case 'm':
-      p->md_dev_uri = optarg;
+      p->open_opts.md_dev_uri = optarg;
       break;
     default:
       break;
@@ -120,7 +120,7 @@ fla_mkfs_parse_args(int argc, char ** argv, struct fla_mkfs_p * p)
     err = -1;
     goto exit;
   }
-  p->dev_uri = argv[optind++];
+  p->open_opts.dev_uri = argv[optind++];
 
   // TODO: ensure dev uri exists
 
@@ -162,8 +162,8 @@ main(int argc, char ** argv)
 
   struct fla_mkfs_p mkfs_params =
   {
-    .dev_uri = NULL,
-    .md_dev_uri = NULL,
+    .open_opts.dev_uri = NULL,
+    .open_opts.md_dev_uri = NULL,
     .slab_nlb = 0,
     .verbose = 0,
   };
@@ -179,11 +179,11 @@ main(int argc, char ** argv)
   }
 
   fprintf(stderr, "Opts:\n");
-  fprintf(stderr, "  dev_uri: %s\n", mkfs_params.dev_uri);
+  fprintf(stderr, "  dev_uri: %s\n", mkfs_params.open_opts.dev_uri);
   fprintf(stderr, "  slab_nlb: %"PRIu32"\n", mkfs_params.slab_nlb);
   fprintf(stderr, "  verbose: %"PRIu8"\n", mkfs_params.verbose);
-  if (mkfs_params.md_dev_uri)
-    fprintf(stderr, "  md_dev_uri: %s\n", mkfs_params.md_dev_uri);
+  if (mkfs_params.open_opts.md_dev_uri)
+    fprintf(stderr, "  md_dev_uri: %s\n", mkfs_params.open_opts.md_dev_uri);
 
   fla_mkfs(&mkfs_params);
 

@@ -28,10 +28,8 @@
 /// mkfs file system initialization parameters
 struct fla_mkfs_p
 {
-  /// device URI, e.g. "/dev/null"
-  char * dev_uri;
-  /// md device URI, e.g. "/dev/ng0n2"
-  char * md_dev_uri;
+  /// has dev URI and md dev URI.
+  struct fla_open_opts open_opts;
   /// size of each slab, in LBA's
   uint32_t slab_nlb;
   /// number of pools to support
