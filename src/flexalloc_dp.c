@@ -15,14 +15,14 @@ fla_init_dp(struct flexalloc *fs)
   switch (fs->fla_dp.dp_type)
   {
   case FLA_DP_FDP:
-    //err = fla_fdp_init(fs, 0);
+    err = fla_dp_fdp_init(fs, 0);
     break;
-  case FLA_DP_ZNS:
   case FLA_DP_DEFAULT:
     err = fla_dp_noop_init(fs, 0);
     FLA_ERR(err, "fla_dp_noop_init()");
 
     break;
+  case FLA_DP_ZNS:
   default:
     err = 1;
     FLA_ERR(err, "Invalid data placement type.");

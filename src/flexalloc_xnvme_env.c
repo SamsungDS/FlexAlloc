@@ -6,7 +6,6 @@
 #include <libxnvme_dev.h>
 #include <libxnvme_pp.h>
 #include <libxnvme_lba.h>
-#include <libxnvme_nvm.h>
 #include <libxnvme_znd.h>
 #include <libxnvmec.h>
 
@@ -14,6 +13,7 @@
 #include <stdint.h>
 #include "flexalloc_xnvme_env.h"
 #include "flexalloc_util.h"
+#include "flexalloc_dp_fdp.h"
 
 uint32_t
 fla_xne_calc_mdts_naddrs(const struct xnvme_dev * dev)
@@ -567,3 +567,42 @@ fla_xne_dev_close(struct xnvme_dev *dev)
 {
   xnvme_dev_close(dev);
 }
+
+int
+fla_xne_get_usable_pids(struct xnvme_dev *dev, uint32_t npids, uint32_t **pids)
+{
+  int err = 0;
+  struct xnvme_spec_ruhs *ruhs = NULL;
+  struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+  uint32_t nsid = xnvme_dev_get_nsid(dev);
+  uint32_t ruhs_nbytes = 0;
+
+  ruhs_nbytes = sizeof(*ruhs) + npids * sizeof(struct xnvme_spec_ruhs_desc);
+  ruhs = xnvme_buf_alloc(dev, ruhs_nbytes);
+  if (!ruhs)
+  {
+    err = -errno;
+    xnvmec_perr("xnvme_buf_alloc()", err);
+    goto exit;
+  }
+  memset(ruhs, 0, ruhs_nbytes);
+
+  err = xnvme_nvm_mgmt_recv(&ctx, nsid, XNVME_SPEC_IO_MGMT_RECV_RUHS, 0, ruhs, ruhs_nbytes);
+  if (err)
+  {
+    xnvmec_perr("xnvme_nvm_mgmt_recv()", err);
+    xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
+    err = err ? err : -EIO;
+    goto free_ruh_buffer;
+  }
+
+  for (int i = 0; i < npids; ++i)
+    *(*pids + i) = ruhs->desc[i].pi;
+
+free_ruh_buffer:
+  xnvme_buf_free(dev, ruhs);
+
+exit:
+  return err;
+}
+

@@ -15,6 +15,7 @@
 #include "flexalloc_freelist.h"
 #include "flexalloc_hash.h"
 #include "flexalloc_pool.h"
+#include "flexalloc_dp_fdp.h"
 #include "flexalloc_dp.h"
 #include "flexalloc_cs.h"
 
