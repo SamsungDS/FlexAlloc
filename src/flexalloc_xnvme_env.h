@@ -149,6 +149,12 @@ void
 fla_xne_dev_close(struct xnvme_dev *dev);
 
 int
+fla_xne_ctrl_idfy(struct xnvme_dev *dev, struct xnvme_spec_idfy *idfy_ctrlr);
+
+int
+fla_xne_feat_idfy(struct xnvme_dev *dev, uint32_t const endgid, uint32_t *dw0);
+
+int
 fla_xne_dev_znd_send_mgmt(struct xnvme_dev *dev, uint64_t slba,
                           enum xnvme_spec_znd_cmd_mgmt_send_action act, bool);
 
