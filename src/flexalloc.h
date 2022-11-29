@@ -15,6 +15,7 @@
 #include "flexalloc_freelist.h"
 #include "flexalloc_hash.h"
 #include "flexalloc_pool.h"
+#include "flexalloc_dp.h"
 
 /// flexalloc device handle
 struct fla_dev
@@ -93,6 +94,25 @@ struct fla_slabs
   uint32_t *fslab_tail;
 };
 
+struct fla_dp_fncs
+{
+  int (*init_dp)(struct flexalloc *fs, uint64_t flags);
+  int (*fini_dp)(struct flexalloc *fs);
+  int (*prep_dp_ctx)(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx);
+};
+
+struct fla_dp
+{
+  enum fla_dp_t dp_type;
+  union
+  {
+    struct fla_dp_fdp     *fla_dp_fdp;
+    struct fla_dp_zns     *fla_dp_zns;
+  };
+
+  struct fla_dp_fncs fncs;
+};
+
 /// flexalloc handle
 struct flexalloc
 {
@@ -110,6 +130,7 @@ struct flexalloc
   struct fla_super *super;
   struct fla_pools pools;
   struct fla_slabs slabs;
+  struct fla_dp fla_dp;
 
   struct fla_fns fns;
 

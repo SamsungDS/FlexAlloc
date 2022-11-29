@@ -51,6 +51,7 @@ enum fla_xne_io_type
 struct fla_xne_io
 {
   enum fla_xne_io_type io_type;
+  struct fla_dp const *fla_dp;
   struct xnvme_dev *dev;
   void *buf;
   union

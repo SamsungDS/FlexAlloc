@@ -9,6 +9,11 @@
 #define __FLEXALLOC_ZND_H_
 #include "src/flexalloc.h"
 
+struct fla_data_placement_zns
+{
+  int dummy_zns_memember;
+};
+
 int
 fla_znd_manage_zones_object_finish(struct flexalloc *fs, struct fla_pool const *pool_handle,
                                    struct fla_object *obj);
