@@ -9,6 +9,7 @@
 #include <stdbool.h>
 #include <libxnvme.h>
 #include <libxnvme_lba.h>
+#include <libxnvme_nvm.h>
 
 struct fla_strp_params
 {
@@ -59,6 +60,8 @@ struct fla_xne_io
     struct xnvme_lba_range * lba_range;
     struct fla_strp_params * strp_params;
   };
+  struct fla_pool const * pool_handle;
+  struct fla_object const * obj_handle;
 
   int (*prep_ctx)(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx);
 };
@@ -168,4 +171,7 @@ fla_xne_dev_sanity_check(struct xnvme_dev const * dev, struct xnvme_dev const * 
 
 struct xnvme_lba_range
 fla_xne_lba_range_from_slba_naddrs(struct xnvme_dev *dev, uint64_t slba, uint64_t naddrs);
+
+int
+fla_xne_get_usable_pids(struct xnvme_dev *dev, uint32_t npids, uint32_t **pids);
 #endif /*__XNVME_ENV_H */

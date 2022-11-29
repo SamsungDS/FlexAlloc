@@ -1168,6 +1168,8 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
     sp.strp_nobjs = strp_ops->strp_nobjs;
     sp.strp_chunk_nbytes = strp_ops->strp_nbytes;
     xne_io.io_type = FLA_IO_DATA_READ;
+    xne_io.obj_handle = obj;
+    xne_io.pool_handle = pool_handle;
     sp.faobj_nlbs = pool_entry->obj_nlb;
     sp.xfer_snbytes = r_offset;
     sp.xfer_nbytes = r_len;
@@ -1213,6 +1215,8 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   xne_io.dev = fs->dev.dev;
   xne_io.buf = (void*)buf;
   xne_io.prep_ctx = fs->fla_dp.fncs.prep_dp_ctx;
+  xne_io.obj_handle = obj;
+  xne_io.pool_handle = pool_handle;
   xne_io.fla_dp = &fs->fla_dp;
   if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
   {
@@ -1306,6 +1310,8 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
   xne_io.dev = fs->dev.dev;
   xne_io.buf = bounce_buf;
   xne_io.prep_ctx = fs->fla_dp.fncs.prep_dp_ctx;
+  xne_io.obj_handle = obj;
+  xne_io.pool_handle = pool_handle;
   xne_io.fla_dp = &fs->fla_dp;
 
   lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, aligned_sb, bounce_buf_size);
