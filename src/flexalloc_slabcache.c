@@ -157,6 +157,7 @@ fla_slab_cache_elem_load(struct fla_slab_flist_cache *cache, uint32_t slab_id,
     .dev = md_dev,
     .buf = flist_buf,
     .lba_range = &range,
+    .fla_dp = &cache->_fs->fla_dp
   };
 
   err = fla_xne_sync_seq_r_xneio(&xne_io);
@@ -207,7 +208,7 @@ fla_slab_cache_elem_flush(struct fla_slab_flist_cache *cache, uint32_t slab_id)
   if ((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
     goto exit;
 
-  struct fla_xne_io xne_io = {.dev = md_dev, .buf = e->freelist, .lba_range = &range};
+  struct fla_xne_io xne_io = {.dev = md_dev, .buf = e->freelist, .lba_range = &range, .fla_dp = &(cache->_fs->fla_dp)};
 
   err = fla_xne_sync_seq_w_xneio(&xne_io);
   if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))

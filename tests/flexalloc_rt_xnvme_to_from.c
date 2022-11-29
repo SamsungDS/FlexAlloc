@@ -98,6 +98,7 @@ test_from_stg(const int buf_size, const int blk_num, const int blk_size,
         .dev = xnvme_dev,
         .buf = buf,
         .lba_range = &range,
+        .fla_dp = NULL
       };
 
       ret = fla_xne_sync_seq_r_xneio(&xne_io);
@@ -138,7 +139,7 @@ test_to_stg(const int buf_size, const int blk_num, const int blk_size,
       if ((ret = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
         goto exit;
 
-      struct fla_xne_io xne_io = {.dev = xnvme_dev, .buf = buf, .lba_range = &range};
+      struct fla_xne_io xne_io = {.dev = xnvme_dev, .buf = buf, .lba_range = &range, .fla_dp = NULL};
       ret = fla_xne_sync_seq_w_xneio(&xne_io);
       if(FLA_ERR(ret, "fla_xne_sync_seq_w_xneio()"))
         goto exit;

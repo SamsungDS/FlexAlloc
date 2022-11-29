@@ -9,6 +9,7 @@
 #include <string.h>
 #include "flexalloc.h"
 #include "flexalloc_util.h"
+#include "flexalloc_dp.h"
 #include "flexalloc_hash.h"
 #include "flexalloc_freelist.h"
 #include "flexalloc_slabcache.h"
@@ -20,6 +21,7 @@
 #include "flexalloc_shared.h"
 #include "flexalloc_znd.h"
 #include "flexalloc_pool.h"
+#include "flexalloc_dp.h"
 
 static bool
 fla_geo_zoned(const struct fla_geo *geo)
@@ -463,14 +465,14 @@ fla_init(struct fla_geo *geo, struct xnvme_dev *dev, struct xnvme_dev *md_dev, v
   fs->slabs.fslab_num = (uint32_t*)((unsigned char*)fs->slabs.headers +
                                     (geo->slab_sgmt.slab_sgmt_nlb * geo->lb_nbytes) - (sizeof(uint32_t)*3));
 
+  err = fla_init_dp(fs);
+  if (err)
+    return err;
+
   return 0;
 }
 
-int
-fla_noop_prep_ctx(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx)
-{
-  return 0;
-}
+
 
 int
 fla_mkfs(struct fla_mkfs_p *p)
@@ -547,7 +549,8 @@ fla_mkfs(struct fla_mkfs_p *p)
   xne_io.io_type = FLA_IO_MD_WRITE;
   xne_io.dev = md_dev;
   xne_io.buf = fla_md_buf;
-  xne_io.prep_ctx = fla_noop_prep_ctx;
+  xne_io.prep_ctx = fs->fla_dp.fncs.prep_dp_ctx;
+  xne_io.fla_dp = &fs->fla_dp;
 
   lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, FLA_SUPER_SLBA, fla_md_buf_len);
   if(( err = FLA_ERR(lba_range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
@@ -590,7 +593,7 @@ fla_super_read(struct xnvme_dev *dev, size_t lb_nbytes, struct fla_super **super
   range = fla_xne_lba_range_from_offset_nbytes(dev, 0, lb_nbytes);
   if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
     goto exit;
-  struct fla_xne_io xne_io = {.dev = dev, .buf = *super, .lba_range = &range};
+  struct fla_xne_io xne_io = {.dev = dev, .buf = *super, .lba_range = &range, .fla_dp = NULL};
 
   err = fla_xne_sync_seq_r_xneio(&xne_io);
   if (FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
@@ -655,7 +658,7 @@ fla_flush(struct flexalloc *fs)
   if ((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
     goto exit;
 
-  struct fla_xne_io xne_io = {.dev = md_dev, .buf = fs->fs_buffer, .lba_range = &range};
+  struct fla_xne_io xne_io = {.dev = md_dev, .buf = fs->fs_buffer, .lba_range = &range, .fla_dp = &fs->fla_dp};
   err = fla_xne_sync_seq_w_xneio(&xne_io);
   if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
     goto exit;
@@ -1172,6 +1175,7 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
     goto exit;
 
   struct fla_xne_io xne_io;
+  xne_io.fla_dp = &fs->fla_dp;
   if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
   {
     struct xnvme_lba_range range;
@@ -1188,6 +1192,7 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
   {
     struct fla_pool_strp *strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
     struct fla_strp_params sp;
+    xne_io.prep_ctx = fs->fla_dp.fncs.prep_dp_ctx;
     sp.strp_nobjs = strp_ops->strp_nobjs;
     sp.strp_chunk_nbytes = strp_ops->strp_nbytes;
     xne_io.io_type = FLA_IO_DATA_READ;
@@ -1201,7 +1206,6 @@ fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle
     xne_io.dev = fs->dev.dev;
     xne_io.buf = buf;
     xne_io.strp_params = &sp;
-    xne_io.prep_ctx = fla_noop_prep_ctx;
     err = fla_xne_async_strp_seq_xneio(&xne_io);
   }
 
@@ -1236,7 +1240,8 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
   xne_io.io_type = FLA_IO_DATA_WRITE;
   xne_io.dev = fs->dev.dev;
   xne_io.buf = (void*)buf;
-  xne_io.prep_ctx = fla_noop_prep_ctx;
+  xne_io.prep_ctx = fs->fla_dp.fncs.prep_dp_ctx;
+  xne_io.fla_dp = &fs->fla_dp;
   if (!(pool_entry->flags && FLA_POOL_ENTRY_STRP))
   {
     struct xnvme_lba_range lba_range;
@@ -1300,7 +1305,7 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
     range = fla_xne_lba_range_from_offset_nbytes(fs->dev.dev, aligned_sb, fs->dev.lb_nbytes);
     if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
       goto exit;
-    struct fla_xne_io xne_io = {.dev = fs->dev.dev, .buf = bounce_buf, .lba_range = &range};
+    struct fla_xne_io xne_io = {.dev = fs->dev.dev, .buf = bounce_buf, .lba_range = &range, .fla_dp = &fs->fla_dp};
     err = fla_xne_sync_seq_r_xneio(&xne_io);
     if(FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
       goto free_bounce_buf;
@@ -1313,7 +1318,7 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
     if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
       goto exit;
     buf = bounce_buf + bounce_buf_size - fs->dev.lb_nbytes;
-    struct fla_xne_io xne_io = {.dev = fs->dev.dev, .buf = buf, .lba_range = &range};
+    struct fla_xne_io xne_io = {.dev = fs->dev.dev, .buf = buf, .lba_range = &range, .fla_dp = &fs->fla_dp};
 
     err = fla_xne_sync_seq_r_xneio(&xne_io);
     if(FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
@@ -1328,10 +1333,13 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
   xne_io.io_type = FLA_IO_DATA_WRITE;
   xne_io.dev = fs->dev.dev;
   xne_io.buf = bounce_buf;
-  xne_io.prep_ctx = fla_noop_prep_ctx;
+  xne_io.prep_ctx = fs->fla_dp.fncs.prep_dp_ctx;
+  xne_io.fla_dp = &fs->fla_dp;
+
   lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, aligned_sb, bounce_buf_size);
   if(( err = FLA_ERR(lba_range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
     goto free_bounce_buf;
+
   xne_io.lba_range = &lba_range;
 
   err = fla_xne_sync_seq_w_xneio(&xne_io);
@@ -1449,7 +1457,7 @@ fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
   range = fla_xne_lba_range_from_offset_nbytes(md_dev, 0, fla_md_buf_len);
   if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
     goto exit;
-  struct fla_xne_io xne_io = {.dev = md_dev, .buf = fla_md_buf, .lba_range = &range};
+  struct fla_xne_io xne_io = {.dev = md_dev, .buf = fla_md_buf, .lba_range = &range, .fla_dp = &(*fs)->fla_dp};
 
   err = fla_xne_sync_seq_r_xneio(&xne_io);
   if (FLA_ERR(err, "fla_xne_sync_seq_r_nbyte_nbytess()"))

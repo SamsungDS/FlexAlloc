@@ -23,6 +23,7 @@ xnvme_env_files = ['src/flexalloc_xnvme_env.c', 'src/flexalloc_xnvme_env.h']
 flexalloc_znd_files = ['src/flexalloc_znd.c', 'src/flexalloc_znd.h']
 flexalloc_common =  ['src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_hash.c', 'src/flexalloc_bits.c',
   'src/flexalloc_freelist.c', 'src/flexalloc_ll.c', 'src/flexalloc_pool.c', 'src/flexalloc_slabcache.c',
+  'src/flexalloc_dp.c',
   xnvme_env_files, flexalloc_util_files, flexalloc_znd_files]
 
 flexalloc_daemon_files = ['src/flexalloc_daemon_base.c']
