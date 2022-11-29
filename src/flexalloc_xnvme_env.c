@@ -6,7 +6,9 @@
 #include <libxnvme_dev.h>
 #include <libxnvme_pp.h>
 #include <libxnvme_lba.h>
+#include <libxnvme_spec.h>
 #include <libxnvme_znd.h>
+#include <libxnvme_adm.h>
 #include <libxnvmec.h>
 
 #include <errno.h>
@@ -566,6 +568,46 @@ void
 fla_xne_dev_close(struct xnvme_dev *dev)
 {
   xnvme_dev_close(dev);
+}
+
+int
+fla_xne_ctrl_idfy(struct xnvme_dev *dev, struct xnvme_spec_idfy *idfy_ctrlr)
+{
+  int err = 0;
+  struct xnvme_cmd_ctx ctx = {0};
+
+  memset(idfy_ctrlr, 0, sizeof(*idfy_ctrlr));
+  ctx = xnvme_cmd_ctx_from_dev(dev);
+  err = xnvme_adm_idfy_ctrlr(&ctx, idfy_ctrlr);
+  if (err || xnvme_cmd_ctx_cpl_status(&ctx))
+  {
+    err = err ? err : -EIO;
+    xnvmec_perr("xnvme_adm_idfy_ctrlr(), err: %d", err);
+  }
+
+  return err;
+}
+
+int
+fla_xne_feat_idfy(struct xnvme_dev *dev, uint32_t const endgid, uint32_t *dw0)
+{
+  int err;
+  struct xnvme_cmd_ctx ctx = {0};
+  uint32_t nsid = xnvme_dev_get_nsid(dev);
+
+  ctx = xnvme_cmd_ctx_from_dev(dev);
+  err = xnvme_adm_gfeat(&ctx, nsid, XNVME_SPEC_FEAT_FDP_MODE,
+                        XNVME_SPEC_FEAT_SEL_CURRENT, endgid, NULL, 0);
+  if (err || xnvme_cmd_ctx_cpl_status(&ctx))
+  {
+    xnvmec_perr("xnvme_adm_gfeat()", err);
+    err = err ? err : -EIO;
+    return err;
+  }
+
+  *dw0 = ctx.cpl.cdw0;
+
+  return 0;
 }
 
 int
