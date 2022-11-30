@@ -3,7 +3,6 @@ cc = meson.get_compiler('c')
 pymod = import('python')
 #py = pymod.find_installation('python3', modules: ['pip', 'venv'], required: true)
 
-
 add_project_arguments('-DFLEXALLOC_VERBOSITY=' + get_option('FLEXALLOC_VERBOSITY').to_string(), language : 'c')
 if get_option('buildtype').startswith('debug')
   add_project_arguments('-DDEBUG', language : 'c')
@@ -66,6 +65,8 @@ else
 endif
 
 subdir('examples/bw_tester')
+subdir('flan')
+
 ### Tests ###
 flexalloc_testing = ['tests/flexalloc_tests_common.c', 'tests/flexalloc_tests_common.h']
 libflexalloc_t_files = ['src/libflexalloc_t.c', 'src/libflexalloc_t.h']
