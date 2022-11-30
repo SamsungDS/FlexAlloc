@@ -7,7 +7,7 @@
  */
 #ifndef __FLEXALLOC_ZND_H_
 #define __FLEXALLOC_ZND_H_
-#include "src/flexalloc.h"
+#include "flexalloc.h"
 
 struct fla_data_placement_zns
 {
