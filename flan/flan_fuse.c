@@ -12,7 +12,6 @@
 
 #include "flan.h"
 
-
 static struct flan_fuse_info {
 	const char *dev_uri;
 	const char *mddev_uri;
@@ -40,7 +39,17 @@ static void *flan_fuse_init(struct fuse_conn_info *conn,
 	(void) conn;
 	cfg->kernel_cache = 1;
 
-	ret = flan_init(pf_info.dev_uri, pf_info.mddev_uri, pf_info.poolname,
+	struct fla_pool_create_arg pool_arg =
+	{
+		.flags = 0,
+		.name = (char*)pf_info.poolname,
+		.name_len = strlen(pf_info.poolname),
+		.obj_nlb = 0, // will get set by flan_init
+		.strp_nobjs = 0,
+		.strp_nbytes = 0
+	};
+
+	ret = flan_init(pf_info.dev_uri, pf_info.mddev_uri, &pool_arg,
 			  pf_info.obj_sz, &flanh);
 	if (ret)
 		printf("Something went wrong during init\n");

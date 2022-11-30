@@ -57,8 +57,8 @@ struct flan_ohandle
 };
 
 
-int flan_init(const char *dev_uri, const char *mddev_uri, const char *pool_name, uint64_t obj_sz,
-                struct flan_handle **flanh);
+int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create_arg *pool_arg,
+              uint64_t obj_sz, struct flan_handle **flanh);
 void flan_reset_pool_dir();
 struct flan_oinfo* flan_get_oinfo(struct flan_handle *flanh, bool create);
 int flan_object_open(const char *filename, struct flan_handle *flanh, uint64_t *oh, int flags);
@@ -73,7 +73,6 @@ int flan_object_rename(const char *oldname, const char *newname, struct flan_han
 int flan_sync(struct flan_handle *flanh);
 bool flan_is_zns(struct flan_handle *flanh);
 struct flan_oinfo *flan_find_oinfo(struct flan_handle *flanh, const char *name, uint32_t *cur);
-int flan_pool_set_strp(struct flan_handle *flanh, uint32_t num_strp, uint32_t strp_sz);
 #ifdef __cplusplus
 }
 #endif

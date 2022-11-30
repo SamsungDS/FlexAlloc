@@ -26,11 +26,6 @@ void flan_cleanup(void)
   flan_close(root);
 }
 
-int flan_pool_set_strp(struct flan_handle *flanh, uint32_t num_strp, uint32_t strp_sz)
-{
-  return fla_pool_set_strp(flanh->fs, flanh->ph, num_strp, strp_sz);
-}
-
 void flan_get_cur_to_start(struct flan_handle *flanh, bool search_for_last)
 {
   struct flan_oinfo *oinfo, *oinfo_prev;
@@ -90,8 +85,8 @@ void flan_get_cur_to_start(struct flan_handle *flanh, bool search_for_last)
   return;
 }
 
-int flan_init(const char *dev_uri, const char *mddev_uri, const char *pool_name, uint64_t objsz,
-                struct flan_handle **flanh)
+int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create_arg *pool_arg,
+              uint64_t objsz, struct flan_handle **flanh)
 {
   struct fla_object robj;
   int ret = 0;
@@ -124,13 +119,16 @@ int flan_init(const char *dev_uri, const char *mddev_uri, const char *pool_name,
     (*flanh)->append_sz = objsz;
 
   obj_nlb = objsz / fla_fs_lb_nbytes((*flanh)->fs);
-  ret = fla_pool_open((*flanh)->fs, pool_name, &((*flanh)->ph));
+  ret = fla_pool_open((*flanh)->fs, pool_arg->name, &((*flanh)->ph));
   if (ret == -1)
-    ret = fla_pool_create((*flanh)->fs, pool_name, strlen(pool_name), obj_nlb, &((*flanh)->ph));
+  {
+    pool_arg->obj_nlb = obj_nlb;
+    ret = fla_pool_create((*flanh)->fs, pool_arg, &((*flanh)->ph));
+  }
 
   if (ret)
   {
-    printf("Error opening fla pool:%s\n", pool_name);
+    printf("Error opening fla pool:%s\n", pool_arg->name);
     goto out_free;
   }
 

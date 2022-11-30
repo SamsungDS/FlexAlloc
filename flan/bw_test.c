@@ -8,6 +8,7 @@
 #include <libxnvme.h>
 
 #include "flan.h"
+#include "flexalloc_pool.h"
 
 #define POOL_NAME "TEST"
 #define USAGE "./test OBJ_SZ IO_SZ NUM_OBJS NUM_STRPS TO_ACCESS"
@@ -105,17 +106,23 @@ int main(int argc, char **argv)
     return 0;
   }
 
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = FLA_POOL_ENTRY_STRP,
+    .name = POOL_NAME,
+    .name_len = strlen(POOL_NAME),
+    .obj_nlb = 0, // will get set by flan_init
+    .strp_nobjs = num_strps,
+    .strp_nbytes = OPT_IO_SIZE / num_strps
+  };
+
   // Open flexalloc device, create pool, create named object and close
   printf("Opening flan, and creating \"test\" objects\n");
   if (md_dev_uri)
-    ret = flan_init(dev_uri, md_dev_uri, POOL_NAME, obj_sz, &flanh);
+    ret = flan_init(dev_uri, md_dev_uri, &pool_arg, obj_sz, &flanh);
   else
-    ret = flan_init(dev_uri, NULL, POOL_NAME, obj_sz, &flanh);
+    ret = flan_init(dev_uri, NULL, &pool_arg, obj_sz, &flanh);
 
-  if (ret)
-    goto out;
-
-  ret = flan_pool_set_strp(flanh, num_strps, OPT_IO_SIZE / num_strps);
   if (ret)
     goto out;
 
@@ -133,7 +140,7 @@ int main(int argc, char **argv)
     }
 
     if (count && !(count % 1024))
-		printf("Created:%lu objects\n", count);
+      printf("Created:%lu objects\n", count);
 
     uint64_t to_write = to_access;
     xnvme_timer_start(&time);
@@ -199,10 +206,13 @@ int main(int argc, char **argv)
   printf("Closing flan and flexalloc\n");
   flan_close(flanh);
   printf("Reopening flan\n");
+  pool_arg.strp_nbytes = 0;
+  pool_arg.strp_nobjs = 0;
+  pool_arg.flags = 0;
   if (md_dev_uri)
-    ret = flan_init(dev_uri, md_dev_uri, POOL_NAME, obj_sz, &flanh);
+    ret = flan_init(dev_uri, md_dev_uri, &pool_arg, obj_sz, &flanh);
   else
-    ret = flan_init(dev_uri, NULL, POOL_NAME, obj_sz, &flanh);
+    ret = flan_init(dev_uri, NULL, &pool_arg, obj_sz, &flanh);
 
   if (ret)
     goto out;
