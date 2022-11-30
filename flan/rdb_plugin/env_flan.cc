@@ -2,6 +2,7 @@
 // Copyright (c) 2022-present, Joel Granados <j.granados@samsung.com>
 // Copyright (c) 2022-present, Jesper Devantier <j.devantier@samsung.com>
 
+#include "flexalloc_pool.h"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include "env_flan.h"
 
@@ -71,13 +72,20 @@ LibFlanEnv::LibFlanEnv(Env *env, const std::string &flan_opts)
   if (opts.size() == 4)
     md_dev_uri = opts[3];
 
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = FLA_POOL_ENTRY_STRP,
+    .name = ROCKSDB_POOLNAME,
+    .name_len = strlen(ROCKSDB_POOLNAME),
+    .obj_nlb = 0, // will get set by flan_init
+    .strp_nobjs = 64,
+    .strp_nbytes = 2097152/64
+  };
+
   //std::cout << "Starting a flan environmnet" << std::endl;
-  if (flan_init(dev_uri.c_str(), md_dev_uri.c_str(), ROCKSDB_POOLNAME, target_file_size_base / 64,
+  if (flan_init(dev_uri.c_str(), md_dev_uri.c_str(), &pool_arg, target_file_size_base / 64,
         &flanh))
       throw std::runtime_error(std::string("Error initializing flan:"));
-
-  if (flan_pool_set_strp(flanh, 64, 2097152/64))
-    throw std::runtime_error(std::string("Error setting flan striping parameters"));
 
 }
 

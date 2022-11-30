@@ -106,12 +106,23 @@ int main(int argc, char **argv)
     return 0;
   }
 
+  struct fla_pool_create_arg pool_arg =
+  {
+    .flags = 0,
+    .name = POOL_NAME,
+    .name_len = strlen(POOL_NAME),
+    .obj_nlb = 0, // will get set by flan_init
+    .strp_nobjs = 0,
+    .strp_nbytes = 0
+  };
+
+
   // Open flexalloc device, create pool, create named object and close
   printf("Opening flan, and creating \"test\" objects\n");
   if (md_dev_uri)
-    ret = flan_init(dev_uri, md_dev_uri, POOL_NAME, obj_sz, &flanh);
+    ret = flan_init(dev_uri, md_dev_uri, &pool_arg, obj_sz, &flanh);
   else
-    ret = flan_init(dev_uri, NULL, POOL_NAME, obj_sz, &flanh);
+    ret = flan_init(dev_uri, NULL, &pool_arg, obj_sz, &flanh);
 
   if (ret)
     goto out;
@@ -165,9 +176,9 @@ int main(int argc, char **argv)
   // Re open flan
   printf("Re opening flan\n");
   if (md_dev_uri)
-    ret = flan_init(dev_uri, md_dev_uri, POOL_NAME, obj_sz, &flanh);
+    ret = flan_init(dev_uri, md_dev_uri, &pool_arg, obj_sz, &flanh);
   else
-    ret = flan_init(dev_uri, NULL, POOL_NAME, obj_sz, &flanh);
+    ret = flan_init(dev_uri, NULL, &pool_arg, obj_sz, &flanh);
 
   if (ret)
     goto out;
