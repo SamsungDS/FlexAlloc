@@ -17,28 +17,38 @@ xnvme_deps = dependency('xnvme', version : '>=0.0.28' )
 
 ### Files ###
 libflexalloc_header_dirs = include_directories('./src')
-flexalloc_util_files = ['src/flexalloc_util.c']
-flexalloc_introspect = ['src/flexalloc_introspection.c']
-xnvme_env_files = ['src/flexalloc_xnvme_env.c', 'src/flexalloc_xnvme_env.h']
-flexalloc_znd_files = ['src/flexalloc_znd.c', 'src/flexalloc_znd.h']
-flexalloc_common =  ['src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_hash.c', 'src/flexalloc_bits.c',
+fla_util_files = files('src/flexalloc_util.c')
+fla_introspect_files = files('src/flexalloc_introspection.c')
+xnvme_env_files = files('src/flexalloc_xnvme_env.c', 'src/flexalloc_xnvme_env.h')
+fla_znd_files = files('src/flexalloc_znd.c', 'src/flexalloc_znd.h')
+fla_common_files = files('src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_hash.c', 'src/flexalloc_bits.c',
   'src/flexalloc_freelist.c', 'src/flexalloc_ll.c', 'src/flexalloc_pool.c', 'src/flexalloc_slabcache.c',
-  'src/flexalloc_dp.c',
-  xnvme_env_files, flexalloc_util_files, flexalloc_znd_files]
+  'src/flexalloc_dp.c')
+fla_common_set =  [fla_common_files, xnvme_env_files, fla_util_files, fla_znd_files]
 
 flexalloc_daemon_files = ['src/flexalloc_daemon_base.c']
-libflexalloc_files = ['src/libflexalloc.c', flexalloc_common]
+libflexalloc_files = files('src/libflexalloc.c')
+libflexalloc_set = [libflexalloc_files, fla_common_set]
 
 ### Executables ###
-executable('mkfs.flexalloc', ['src/flexalloc_mkfs.c', 'src/flexalloc_cli_common.c', flexalloc_common],
+executable('mkfs.flexalloc',
+  ['src/flexalloc_mkfs.c', 'src/flexalloc_cli_common.c', fla_common_set],
   dependencies: xnvme_deps, install : true)
-executable('flexalloc_inspect', ['src/flexalloc_inspect.c', 'src/flexalloc_cli_common.c',
-  flexalloc_introspect, flexalloc_common], dependencies: xnvme_deps)
-daemon_exe = executable('flexalloc_daemon', ['src/flexalloc_daemon.c', flexalloc_common, 'src/flexalloc_cli_common.c', 'src/flexalloc_daemon_base.c', libflexalloc_files], dependencies: xnvme_deps)
-executable('flexalloc_client', ['src/flexalloc_test_client.c', flexalloc_common, 'src/flexalloc_daemon_base.c', libflexalloc_files], dependencies: [xnvme_deps])
+executable('flexalloc_inspect',
+  ['src/flexalloc_inspect.c', 'src/flexalloc_cli_common.c',
+    fla_introspect_files, fla_common_set],
+  dependencies: xnvme_deps)
+daemon_exe = executable('flexalloc_daemon',
+  ['src/flexalloc_daemon.c', fla_common_set, 'src/flexalloc_cli_common.c',
+    'src/flexalloc_daemon_base.c', libflexalloc_set],
+  dependencies: xnvme_deps)
+executable('flexalloc_client',
+  ['src/flexalloc_test_client.c', fla_common_set,
+    'src/flexalloc_daemon_base.c', libflexalloc_set],
+  dependencies: [xnvme_deps])
 
 ### Libraries ###
-library = both_libraries('flexalloc', [libflexalloc_files, flexalloc_daemon_files],
+library = both_libraries('flexalloc', [libflexalloc_set, flexalloc_daemon_files],
                          dependencies: xnvme_deps, install : true)
 
 foreach header_file: [
@@ -132,7 +142,7 @@ foreach suite : suites
       + opts.get('test_opts', {})
     t_link_args = opts.get('link_args', [])
     t_exec = 'test_' + opts.get('executable', t_name)
-    t_exec_files = opts.get('exec_files', [flexalloc_common, flexalloc_testing, libflexalloc_files])
+    t_exec_files = opts.get('exec_files', [fla_common_set, flexalloc_testing, libflexalloc_set])
     t_data_files = opts.get('data_files', [])
 
     if t_data_files.length() > 0
