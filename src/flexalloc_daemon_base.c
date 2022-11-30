@@ -513,7 +513,7 @@ fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
 
   memcpy(&dev_uri_len, read_ptr, sizeof(size_t));
   read_ptr += sizeof(size_t);
-  client->flexalloc->dev.dev_uri = strndup(read_ptr, dev_uri_len);
+  client->flexalloc->dev.dev_uri = fla_strndup(read_ptr, dev_uri_len);
   if (!client->flexalloc->dev.dev_uri)
   {
     err = -ENOMEM;
@@ -527,7 +527,7 @@ fla_daemon_fs_init_rq(struct fla_daemon_client *client, int sock_fd)
   else
   {
     read_ptr += sizeof(size_t);
-    client->flexalloc->dev.md_dev_uri = strndup(read_ptr, md_dev_uri_len);
+    client->flexalloc->dev.md_dev_uri = fla_strndup(read_ptr, md_dev_uri_len);
     if (!client->flexalloc->dev.md_dev_uri)
     {
       err = -ENOMEM;
@@ -713,7 +713,7 @@ fla_daemon_pool_open_rq(struct flexalloc *fs, char const *name, struct fla_pool 
   int err;
   struct fla_daemon_client *client = fla_get_client(fs);
   struct fla_pool_entry *pool_entry = NULL;
-  size_t name_len = strnlen((char *)name, FLA_NAME_SIZE_POOL);
+  size_t name_len = fla_strnlen((char *)name, FLA_NAME_SIZE_POOL);
   if (FLA_ERR(name_len == FLA_NAME_SIZE_POOL,
               "invalid, pool name exceeds max length or is not null-terminated"))
     return 1;

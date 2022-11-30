@@ -1477,7 +1477,7 @@ fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
 
   free(super);
 
-  (*fs)->dev.dev_uri = strdup(opts->dev_uri);
+  (*fs)->dev.dev_uri = fla_strdup(opts->dev_uri);
   if ((*fs)->dev.dev_uri == NULL)
   {
     err = -ENOMEM;
@@ -1486,7 +1486,7 @@ fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
 
   if(md_dev != dev)
   {
-    (*fs)->dev.md_dev_uri = strdup(opts->md_dev_uri);
+    (*fs)->dev.md_dev_uri = fla_strdup(opts->md_dev_uri);
     if ((*fs)->dev.md_dev_uri == NULL)
     {
       err = -ENOMEM;
