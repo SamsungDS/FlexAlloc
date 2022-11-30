@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 size_t
-strnlen(char *s, size_t maxlen)
+fla_strnlen(char *s, size_t maxlen)
 {
   // otherwise provided by POSIX
   for (size_t off = 0; off < maxlen; off++, s++)
@@ -13,7 +13,7 @@ strnlen(char *s, size_t maxlen)
 }
 
 char *
-strndup(char const *s, size_t const len)
+fla_strndup(char const *s, size_t const len)
 {
   char *new_s = malloc(len + 1);
   if (new_s == NULL)
@@ -28,9 +28,9 @@ strndup(char const *s, size_t const len)
 }
 
 char *
-strdup(char const *s)
+fla_strdup(char const *s)
 {
   size_t len = strlen(s);
-  return strndup(s, len);
+  return fla_strndup(s, len);
 }
 

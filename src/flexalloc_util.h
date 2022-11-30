@@ -148,7 +148,7 @@ fla_err_errno_fl(const int condition, const char * message, const char * f,
  * is not null-terminated within the first maxlen bytes.
  */
 size_t
-strnlen(char *s, size_t maxlen);
+fla_strnlen(char *s, size_t maxlen);
 
 /**
  * Create a duplicate of the provided string.
@@ -157,9 +157,9 @@ strnlen(char *s, size_t maxlen);
  * Memory is allocated by `malloc` and should be freed after use.
  */
 char *
-strdup(char const *s);
+fla_strdup(char const *s);
 
 char *
-strndup(char const *s, size_t const len);
+fla_strndup(char const *s, size_t const len);
 
 #endif /* __FLEXALLOC_UTIL_H */

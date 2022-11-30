@@ -126,7 +126,7 @@ check_pool_entries(struct flexalloc *fs, uint32_t *offset)
     if (pool_entry->name[0] == '\0')
       err |= POOL_ENTRY_NAME_UNSET;
 
-    if (strnlen(pool_entry->name, FLA_NAME_SIZE_POOL) == FLA_NAME_SIZE_POOL)
+    if (fla_strnlen(pool_entry->name, FLA_NAME_SIZE_POOL) == FLA_NAME_SIZE_POOL)
       err |= POOL_ENTRY_NAME_NO_NULLTERM;
 
     // check that htbl h2 value matches with hashing the pool entry name
