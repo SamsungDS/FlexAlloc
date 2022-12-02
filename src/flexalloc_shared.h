@@ -109,6 +109,12 @@ fla_fs_get_user();
 
 #define FLA_POOL_ENTRY_STRP 1
 
+enum fla_cs_t
+{
+  FLA_CS_ZNS,
+  FLA_CS_CNS
+};
+
 #ifdef __cplusplus
 }
 #endif

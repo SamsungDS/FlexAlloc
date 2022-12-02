@@ -11,6 +11,7 @@
 #include <pthread.h>
 
 #include "flan.h"
+#include "flexalloc_cs.h"
 
 struct flan_dirhandle flan_dir;
 unsigned int num_objects;
@@ -112,7 +113,8 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
     goto out_free;
   }
 
-  (*flanh)->is_zns = fla_fs_zns((*flanh)->fs);
+  (*flanh)->is_zns = fla_cs_is_type((*flanh)->fs, FLA_CS_ZNS);
+
   if (objsz > FLAN_APPEND_SIZE)
     (*flanh)->append_sz = FLAN_APPEND_SIZE;
   else

@@ -3,6 +3,7 @@
 #include <libxnvme_geo.h>
 #include <libxnvme_dev.h>
 #include <stdint.h>
+#include "flexalloc_shared.h"
 struct flexalloc;
 struct fla_geo;
 struct fla_pool;
@@ -19,12 +20,6 @@ struct fla_cs_fncs
                      struct fla_object *obj);
   int (*object_destroy)(struct flexalloc *fs, struct fla_pool const *pool_handle,
                         struct fla_object *obj);
-};
-
-enum fla_cs_t
-{
-  FLA_CS_ZNS,
-  FLA_CS_CNS
 };
 
 struct fla_cs
