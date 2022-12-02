@@ -19,15 +19,8 @@
 #include "flexalloc_ll.h"
 #include "flexalloc_slabcache.h"
 #include "flexalloc_shared.h"
-#include "flexalloc_znd.h"
 #include "flexalloc_pool.h"
 #include "flexalloc_dp.h"
-
-static bool
-fla_geo_zoned(const struct fla_geo *geo)
-{
-  return geo->type == XNVME_GEO_ZONED;
-}
 
 static int
 fla_dev_sanity_check(struct xnvme_dev const * dev, struct xnvme_dev const *md_dev)
@@ -162,9 +155,6 @@ fla_geo_from_super(struct xnvme_dev *dev, struct fla_super *super,
   //...
   geo->lb_nbytes = fla_xne_dev_lba_nbytes(dev);
   geo->nlb = fla_xne_dev_tbytes(dev) / geo->lb_nbytes;
-  geo->nzones = fla_xne_dev_znd_zones(dev);
-  geo->nzsect = fla_xne_dev_znd_sect(dev);
-  geo->type = fla_xne_dev_type(dev);
 
   geo->slab_nlb = super->slab_nlb;
   geo->npools = super->npools;
@@ -198,9 +188,6 @@ fla_geo_init(const struct xnvme_dev *dev, uint32_t npools, uint32_t slab_nlb,
 
   geo->lb_nbytes = lb_nbytes;
   geo->nlb = fla_xne_dev_tbytes(dev) / geo->lb_nbytes;
-  geo->nzones = fla_xne_dev_znd_zones(dev);
-  geo->nzsect = fla_xne_dev_znd_sect(dev);
-  geo->type = fla_xne_dev_type(dev);
 
   geo->npools = npools;
   geo->slab_nlb = slab_nlb;
@@ -222,6 +209,7 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
    * NOTE: this procedure is intended during creation of the system. When opening an existing
    *       system, read the super block and call the fla_geo_init procedure.
    */
+  int err;
   uint32_t nslabs_approx;
   uint32_t lb_nbytes = fla_xne_dev_lba_nbytes(dev);
   struct fla_geo md_geo;
@@ -229,11 +217,10 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
   fla_geo_init(dev, npools, slab_nlb, lb_nbytes, geo);
   fla_geo_init(dev, npools, slab_nlb, lb_nbytes, &md_geo);
 
-  if (fla_geo_zoned(geo) && geo->slab_nlb % geo->nzsect)
-  {
-    FLA_ERR_PRINTF("Znd dev slb sz:%u not multiple of zone sz:%lu\n", slab_nlb, geo->nzsect);
-    return -1;
-  }
+  err = fla_cs_geo_check(dev, geo);
+  if (FLA_ERR(err, "fla_cs_geo_check()"))
+    return err;
+
   // estimate how many slabs we can get before knowing the overhead of the pool metadata
   if (!md_dev)
   {
@@ -337,11 +324,9 @@ fla_geo_slab_lb_off(struct flexalloc const *fs, uint32_t slab_id)
   if (fs->dev.md_dev == NULL)
     slabs_base = fla_geo_slabs_lb_off(&fs->geo);
 
-  slab_base = slabs_base + (slab_id * fs->geo.slab_nlb);
-  if (fla_geo_zoned(&fs->geo) && slab_base % fs->geo.nzsect)
-  {
-    slab_base += (slab_base % fs->geo.nzsect);
-  }
+  //FIXME: We are missing the error handling here.
+  int err = fs->fla_cs.fncs.slab_offset(fs, slab_id, slabs_base, &slab_base);
+  FLA_ERR(err, "slab_offset()");
 
   return slab_base;
 }
@@ -455,10 +440,12 @@ fla_init(struct fla_geo *geo, struct xnvme_dev *dev, struct xnvme_dev *md_dev, v
   if (err)
     return err;
 
+  err = fla_init_cs(fs);
+  if (FLA_ERR(err, "fla_init_cs()"))
+    return err;
+
   return 0;
 }
-
-
 
 int
 fla_mkfs(struct fla_mkfs_p *p)
@@ -660,6 +647,8 @@ fla_close_noflush(struct flexalloc *fs)
     return;
 
   fs->state &= ~FLA_STATE_OPEN;
+  fs->fla_cs.fncs.fini_cs(fs, 0);
+  fs->fla_dp.fncs.fini_dp(fs);
   fla_slab_cache_free(&fs->slab_cache);
   xnvme_dev_close(fs->dev.dev);
   free(fs->super);
@@ -960,12 +949,9 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
   uint32_t * from_head, * to_head;
   struct fla_pool_entry_fnc const * pool_entry_fnc;
 
-  if (fla_geo_zoned(&fs->geo))
-  {
-    err = fla_znd_manage_zones_object_reset(fs, pool_handle, obj);
-    if (FLA_ERR(err, "fla_xne_dev_znd_reset()"))
-      goto exit;
-  }
+  err = fs->fla_cs.fncs.object_destroy(fs, pool_handle, obj);
+  if (FLA_ERR(err, "object_destroy()"))
+    goto exit;
 
   slab = fla_slab_header_ptr(obj->slab_id, fs);
   if((err = FLA_ERR(!slab, "fla_slab_header_ptr()")))
@@ -1345,18 +1331,6 @@ fla_fs_lb_nbytes(struct flexalloc const * const fs)
   return fs->dev.lb_nbytes;
 }
 
-uint64_t
-fla_fs_nzsect(struct flexalloc const *fs)
-{
-  return fs->geo.nzsect;
-}
-
-bool
-fla_fs_zns(struct flexalloc const *fs)
-{
-  return fla_geo_zoned(&fs->geo);
-}
-
 struct fla_fns base_fns =
 {
   .close = &fla_base_close,
@@ -1375,16 +1349,7 @@ struct fla_fns base_fns =
 int
 fla_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle, struct fla_object *obj)
 {
-  int err = 0;
-
-  if (fla_fs_zns(fs))
-  {
-    err = fla_znd_manage_zones_object_finish(fs, pool_handle, obj);
-    if (FLA_ERR(err, "fla_znd_manage_zones_object_finish()"))
-      return err;
-  }
-
-  return err;
+  return fs->fla_cs.fncs.object_seal(fs, pool_handle, obj);
 }
 
 int

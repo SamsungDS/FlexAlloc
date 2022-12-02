@@ -20,11 +20,10 @@ libflexalloc_header_dirs = include_directories('./src')
 fla_util_files = files('src/flexalloc_util.c')
 fla_introspect_files = files('src/flexalloc_introspection.c')
 xnvme_env_files = files('src/flexalloc_xnvme_env.c', 'src/flexalloc_xnvme_env.h')
-fla_znd_files = files('src/flexalloc_znd.c', 'src/flexalloc_znd.h')
 fla_common_files = files('src/flexalloc.c', 'src/flexalloc_mm.c', 'src/flexalloc_hash.c', 'src/flexalloc_bits.c',
   'src/flexalloc_freelist.c', 'src/flexalloc_ll.c', 'src/flexalloc_pool.c', 'src/flexalloc_slabcache.c',
-  'src/flexalloc_dp.c')
-fla_common_set =  [fla_common_files, xnvme_env_files, fla_util_files, fla_znd_files]
+  'src/flexalloc_dp.c', 'src/flexalloc_cs.c', 'src/flexalloc_cs_zns.c', 'src/flexalloc_cs_cns.c')
+fla_common_set =  [fla_common_files, xnvme_env_files, fla_util_files]
 
 flexalloc_daemon_files = ['src/flexalloc_daemon_base.c']
 libflexalloc_files = files('src/libflexalloc.c')

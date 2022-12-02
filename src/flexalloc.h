@@ -16,6 +16,7 @@
 #include "flexalloc_hash.h"
 #include "flexalloc_pool.h"
 #include "flexalloc_dp.h"
+#include "flexalloc_cs.h"
 
 /// flexalloc device handle
 struct fla_dev
@@ -62,12 +63,6 @@ struct fla_geo
   struct fla_geo_pool_sgmt pool_sgmt;
   /// blocks needed for slab segment
   struct fla_geo_slab_sgmt slab_sgmt;
-  /// Number of zones
-  uint32_t nzones;
-  /// Number of sectors in zone
-  uint64_t nzsect;
-  /// Controls flexalloc zns logic
-  enum xnvme_geo_type type;
 };
 
 struct fla_pools
@@ -131,6 +126,7 @@ struct flexalloc
   struct fla_pools pools;
   struct fla_slabs slabs;
   struct fla_dp fla_dp;
+  struct fla_cs fla_cs;
 
   struct fla_fns fns;
 
