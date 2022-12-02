@@ -566,7 +566,7 @@ free_md:
   fla_xne_free_buf(md_dev, fla_md_buf);
 
 free_fs:
-  free(fs);
+  fla_fs_free(fs);
 
 exit:
   if (md_dev && md_dev != dev)
@@ -682,7 +682,7 @@ fla_close_noflush(struct flexalloc *fs)
   free(fs->dev.dev_uri);
   if(fs->dev.md_dev_uri != NULL)
     free(fs->dev.md_dev_uri);
-  free(fs);
+  fla_fs_free(fs);
 }
 
 int
