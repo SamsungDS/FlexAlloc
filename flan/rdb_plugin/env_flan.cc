@@ -2,7 +2,6 @@
 // Copyright (c) 2022-present, Joel Granados <j.granados@samsung.com>
 // Copyright (c) 2022-present, Jesper Devantier <j.devantier@samsung.com>
 
-#include "flexalloc_pool.h"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include "env_flan.h"
 
@@ -54,39 +53,78 @@ NewFlanEnv(const std::string &flan_opts) {
 LibFlanEnv::LibFlanEnv(Env *env, const std::string &flan_opts)
   : EnvWrapper(env), options(new LibFlanEnv_Options())
 {
-  uint64_t target_file_size_base;
+  uint64_t target_file_size_base, obj_nbytes;
+  uint32_t strp_nobjs = 0, strp_nbytes = 0;
   std::vector<std::string> opts;
-  
+  std::vector<std::string> opts_names =
+  {"flan", "main device", "metadata device", "target file size base",
+    "object_nbytes", "strp_nobjs", "strp_nbytes"};
+
   options->flan_mut = new std::mutex();
-  // dev:target_file_size_base:md_dev (opt)
+  /* Order of the options:
+   * [0] flan
+   * [1] main device
+   * [2] metadata device. might be ""
+   * [3] targe_file_size_base
+   * [4] object nbytes
+   * [5] strp_nobjs
+   * [6] strp_nbytes
+   *
+   * if 4 or 5 are "" then we create an unstriped run
+   */
   split(flan_opts, ':', opts);
+  for(size_t i = 0 ; i < opts.size() ; ++i)
+    std::cout << "option [" << opts_names[i] << "] : " << opts[i] << std::endl;
 
 
-  if (opts.size() < 3 || opts.size() > 4 )
-    throw std::runtime_error(std::string("flan params must be 2 or 3 colon separated values"));
+  // make sure we have all the arguments
+  if (opts.size() != 7)
+    throw std::runtime_error(std::string("Error : missing a parameter in flan plugin string"));
+
+  // make sure we are in flan
+  if (opts[0].compare("flan") != 0)
+    throw std::runtime_error(std::string("Error : initializing a plugin that is not flan"));
 
   dev_uri = opts[1];
-  std::istringstream conv(opts[2]);
-  conv >> target_file_size_base;
+  if (opts[2].size() > 0)
+    md_dev_uri = opts[2];
 
-  if (opts.size() == 4)
-    md_dev_uri = opts[3];
+  // Get file size base
+  std::istringstream target_file_size_base_stream(opts[3]);
+  target_file_size_base_stream >> target_file_size_base;
 
+  // Get object size in bytes
+  std::istringstream obj_nbytes_stream(opts[4]);
+  obj_nbytes_stream >> obj_nbytes;
+
+  std::string p_name = ROCKSDB_POOLNAME;
   struct fla_pool_create_arg pool_arg =
   {
-    .flags = FLA_POOL_ENTRY_STRP,
-    .name = ROCKSDB_POOLNAME,
-    .name_len = strlen(ROCKSDB_POOLNAME),
+    .flags = 0,
+    .name = (char*)p_name.c_str(),
+    .name_len = (int)p_name.length(),
     .obj_nlb = 0, // will get set by flan_init
-    .strp_nobjs = 64,
-    .strp_nbytes = 2097152/64
+    .strp_nobjs = 0,
+    .strp_nbytes = 0
   };
 
-  //std::cout << "Starting a flan environmnet" << std::endl;
-  if (flan_init(dev_uri.c_str(), md_dev_uri.c_str(), &pool_arg, target_file_size_base / 64,
-        &flanh))
-      throw std::runtime_error(std::string("Error initializing flan:"));
+  if (opts[5].size() > 0 && opts[6].size() > 0) {
+    // Get strp_nobjs
+    std::istringstream strp_nobjs_stream(opts[5]);
+    strp_nobjs_stream >> strp_nobjs;
+    pool_arg.strp_nobjs = strp_nobjs;
 
+    // Get strp_nbytes
+    std::istringstream strp_nbytes_stream(opts[6]);
+    strp_nbytes_stream >> strp_nbytes;
+    pool_arg.strp_nbytes = strp_nbytes;
+
+    pool_arg.flags |= FLA_POOL_ENTRY_STRP;
+  }
+
+  //std::cout << "Starting a flan environmnet" << std::endl;
+  if (flan_init(dev_uri.c_str(), md_dev_uri.c_str(), &pool_arg, obj_nbytes, &flanh))
+      throw std::runtime_error(std::string("Error initializing flan:"));
 }
 
 LibFlanEnv::~LibFlanEnv()
