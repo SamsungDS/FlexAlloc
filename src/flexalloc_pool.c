@@ -2,7 +2,6 @@
 #include "flexalloc_pool.h"
 #include "flexalloc_ll.h"
 #include "flexalloc_util.h"
-#include "flexalloc_znd.h"
 #include "flexalloc_shared.h"
 
 void
@@ -281,11 +280,9 @@ fla_base_pool_create(struct flexalloc *fs, struct fla_pool_create_arg const *arg
   if((err = FLA_ERR(slab_nobj < 1, "Object size is incompatible with slab size.")))
     goto exit;
 
-  if (fs->geo.type == XNVME_GEO_ZONED)
-  {
-    if ((err = FLA_ERR(arg->obj_nlb != fs->geo.nzsect, "object sz != fomatted zone size")))
-      goto exit;
-  }
+  err = fs->fla_cs.fncs.check_pool(fs, arg->obj_nlb);
+  if (FLA_ERR(err, "check_pool()"))
+    goto exit;
 
   (*handle) = malloc(sizeof(struct fla_pool));
   if (FLA_ERR(!(*handle), "malloc()"))
