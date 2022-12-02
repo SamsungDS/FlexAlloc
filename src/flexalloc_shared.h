@@ -112,6 +112,12 @@ enum fla_pool_entry_flags
   FLA_POOL_ENTRY_STRP
 };
 
+enum fla_cs_t
+{
+  FLA_CS_ZNS,
+  FLA_CS_CNS
+};
+
 #ifdef __cplusplus
 }
 #endif
