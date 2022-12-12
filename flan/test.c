@@ -10,6 +10,7 @@
 
 #define POOL_NAME "TEST"
 #define USAGE "./test OBJ_SZ"
+#define FLAN_TEST_MAX_OBJECTS_TO_CREATE 5
 
 int main(int argc, char **argv)
 {
@@ -89,7 +90,7 @@ int main(int argc, char **argv)
     ret = flan_object_read(oh, obj_name, 0, mid - 1, flanh);
     ret = flan_object_write(oh, obj_name + mid - 1, mid - 1, mid + 1, flanh);
     flan_object_close(oh, flanh);
-  } while (!ret);
+  } while (!ret && count < FLAN_TEST_MAX_OBJECTS_TO_CREATE);
 
   printf("Created %d objects\n", count);
   printf("Listing all objects in the pool\n");
