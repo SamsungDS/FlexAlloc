@@ -1,6 +1,7 @@
 #include "flexalloc_dp.h"
 #include "flexalloc.h"
 #include "flexalloc_dp_noop.h"
+#include "flexalloc_util.h"
 
 int
 fla_init_dp(struct flexalloc *fs)
@@ -19,9 +20,12 @@ fla_init_dp(struct flexalloc *fs)
   case FLA_DP_ZNS:
   case FLA_DP_DEFAULT:
     err = fla_dp_noop_init(fs, 0);
+    FLA_ERR(err, "fla_dp_noop_init()");
+
     break;
   default:
     err = 1;
+    FLA_ERR(err, "Invalid data placement type.");
   }
 
   return err;
