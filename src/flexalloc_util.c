@@ -34,3 +34,24 @@ fla_strdup(char const *s)
   return fla_strndup(s, len);
 }
 
+uint32_t
+fla_nelems_max(uint64_t units_total, uint32_t elem_sz_nunit,
+    uint32_t (*calc_md_size_nunits)(uint32_t nelems, va_list), ...)
+{
+  uint32_t nelems = units_total / elem_sz_nunit;
+  uint32_t md_nunits;
+  va_list ap;
+
+  while(nelems)
+  {
+    va_start(ap, calc_md_size_nunits);
+    md_nunits = calc_md_size_nunits(nelems, ap);
+    va_end(ap);
+    if(units_total - (nelems * elem_sz_nunit) >= md_nunits)
+      break;
+    nelems--;
+  }
+  return nelems;
+}
+
+
