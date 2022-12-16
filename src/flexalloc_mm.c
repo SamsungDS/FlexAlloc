@@ -104,6 +104,13 @@ fla_slab_sgmt_calc(uint32_t nslabs, uint32_t lb_nbytes)
   return FLA_CEIL_DIV(slab_headers_nbytes + needed_end_nbytes, lb_nbytes);
 }
 
+uint32_t
+fla_slab_sgmt_calc_v(uint32_t nslabs, va_list ap)
+{
+  uint32_t lb_nbytes = va_arg(ap, uint32_t);
+  return fla_slab_sgmt_calc(nslabs, lb_nbytes);
+}
+
 void
 fla_geo_slab_sgmt_calc(uint32_t nslabs, uint32_t lb_nbytes,
                        struct fla_geo_slab_sgmt *geo)
@@ -129,27 +136,6 @@ fla_nslabs_max_mddev(uint64_t blocks, uint32_t slab_nlb, uint32_t lb_nbytes,
     return nslabs;
   else
     return 0;
-}
-
-uint32_t
-fla_nslabs_max(uint64_t blocks, uint32_t slab_nlb, uint32_t lb_nbytes)
-{
-  /*
-   * Given 'blocks', distribute them such that we get the most number of slabs
-   * while retaining enough space to house the accompanying metadata.
-   */
-  uint32_t nslabs = blocks / slab_nlb;
-  uint32_t md_nlb;
-  while (nslabs)
-  {
-    md_nlb = fla_slab_sgmt_calc(nslabs, lb_nbytes);
-    if (blocks - nslabs * slab_nlb >= md_nlb)
-    {
-      break;
-    }
-    nslabs--;
-  }
-  return nslabs;
 }
 
 /// total number of blocks in pool segment
@@ -251,7 +237,7 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
   // estimate how many slabs we can get before knowing the overhead of the pool metadata
   if (!md_dev)
   {
-    nslabs_approx = fla_nslabs_max(geo->nlb - geo->md_nlb, slab_nlb, lb_nbytes);
+    nslabs_approx = fla_nelems_max(geo->nlb - geo->md_nlb, slab_nlb, fla_slab_sgmt_calc_v, lb_nbytes);
   }
   else
   {
@@ -279,10 +265,10 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
   // calculate maximum number of slabs we can support given the logical blocks remaining
   if (!md_dev)
   {
-    geo->nslabs = fla_nslabs_max(
+    geo->nslabs = fla_nelems_max(
                     geo->nlb - geo->md_nlb - fla_geo_pool_sgmt_nblocks(&geo->pool_sgmt),
                     slab_nlb,
-                    lb_nbytes);
+                    fla_slab_sgmt_calc_v, lb_nbytes);
   }
   else
   {

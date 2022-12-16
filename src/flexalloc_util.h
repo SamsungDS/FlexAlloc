@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 #define FLA_ERR_MIN_NOPRINT 2001
 #define FLA_ERR_PRX fprintf(stderr, "flexalloc ERR ");
@@ -162,4 +163,7 @@ fla_strdup(char const *s);
 char *
 fla_strndup(char const *s, size_t const len);
 
+uint32_t
+fla_nelems_max(uint64_t units_total, uint32_t elem_sz_nunit,
+    uint32_t (*calc_md_size_nunits)(uint32_t nelems, va_list), ...);
 #endif /* __FLEXALLOC_UTIL_H */
