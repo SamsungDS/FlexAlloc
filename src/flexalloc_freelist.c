@@ -67,11 +67,12 @@ fla_flist_init(freelist_t flist, uint32_t len)
 int
 fla_flist_new(uint32_t len, freelist_t *flist)
 {
+  if (len == 0)
+    return FLA_ERR(-EINVAL, "fla_flist_init(), Cannot have zero len");
+
   *flist = malloc(fla_flist_size(len));
   if (FLA_ERR(!(*flist), "malloc()"))
-  {
     return -ENOMEM;
-  }
 
   fla_flist_init(*flist, len);
 
