@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <libflexalloc.h>
 #include <stdbool.h>
+#include "flan_md.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -25,14 +26,6 @@ struct flan_oinfo
   char name[FLAN_OBJ_NAME_LEN_MAX];
 };
 
-struct flan_dirhandle
-{
-  char *buf;
-  unsigned int cur;
-  struct fla_object fla_oh;
-  unsigned int dev_last;
-};
-
 struct flan_handle
 {
   struct flexalloc *fs;
@@ -40,13 +33,12 @@ struct flan_handle
   uint32_t append_sz;
   bool is_zns;
   bool is_dirty;
+  struct flan_md *md;
 };
 
 struct flan_ohandle
 {
-	struct flan_oinfo oinfo;
-	struct fla_object flan_oh;
-	uint32_t oinfo_off;
+	struct flan_oinfo *oinfo;
 	char *append_buf;
 	char *read_buf;
 	uint64_t append_off;
@@ -59,8 +51,6 @@ struct flan_ohandle
 
 int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create_arg *pool_arg,
               uint64_t obj_sz, struct flan_handle **flanh);
-void flan_reset_pool_dir();
-struct flan_oinfo* flan_get_oinfo(struct flan_handle *flanh, bool create);
 int flan_object_open(const char *filename, struct flan_handle *flanh, uint64_t *oh, int flags);
 int flan_object_delete(const char *filename, struct flan_handle *flanh);
 ssize_t flan_object_read(uint64_t oh, void *buf, size_t offset, size_t len, struct flan_handle *flanh);
@@ -72,7 +62,7 @@ uint32_t flan_dev_bs(struct flan_handle *flanh);
 int flan_object_rename(const char *oldname, const char *newname, struct flan_handle *flanh);
 int flan_sync(struct flan_handle *flanh);
 bool flan_is_zns(struct flan_handle *flanh);
-struct flan_oinfo *flan_find_oinfo(struct flan_handle *flanh, const char *name, uint32_t *cur);
+struct flan_oinfo *flan_find_oinfo(struct flan_handle *flanh, const char *name, uint32_t * cur);
 #ifdef __cplusplus
 }
 #endif
