@@ -227,7 +227,7 @@ LibFlanEnv::GetFileSize(const std::string& fname, uint64_t* size)
   //std::lock_guard<std::mutex> guard(*(options->flan_mut));
   uint32_t res_cur;
   struct flan_oinfo *oinfo = flan_find_oinfo(flanh, fname.c_str(), &res_cur);
-  
+
   if(!oinfo)
     return Status::NotFound();
 
