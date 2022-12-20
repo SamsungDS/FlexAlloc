@@ -167,12 +167,13 @@ int
 fla_flist_search_wfunc(freelist_t flist, uint64_t flags, uint32_t *found,
                        int(*f)(const uint32_t, va_list), ...)
 {
-  uint32_t elem_cpy, wndx = 0, ret;
+  int ret;
+  uint32_t elem_cpy, wndx = 0;
   uint32_t u32_elems = FLA_FREELIST_U32_ELEMS(*flist);
   uint32_t len = *flist;
   va_list ap;
 
-  if ((flags & FLA_FLIST_SEARCH_EXEC_FIRST) == 0)
+  if ((flags & FLA_FLIST_SEARCH_FROM_START) == 0)
     return -EINVAL;
 
   *found = 0;
@@ -207,13 +208,18 @@ fla_flist_search_wfunc(freelist_t flist, uint64_t flags, uint32_t *found,
 
       switch (ret)
       {
-      case 1:
-        *found += ret;
-      //fall through
-      case 0:
+      case FLA_FLIST_SEARCH_RET_FOUND_STOP:
+        *found += 1;
+      case FLA_FLIST_SEARCH_RET_STOP:
+        return 0;
+      case FLA_FLIST_SEARCH_RET_FOUND_CONTINUE:
+        *found += 1;
+      case FLA_FLIST_SEARCH_RET_CONTINUE:
         elem_cpy |= wndx;
         continue;
+      case FLA_FLIST_SEARCH_RET_ERR:
       default:
+        FLA_ERR(ret, "fla_flist_search_wfunc(): f() return unknown value");
         return ret;
       }
     }

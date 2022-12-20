@@ -70,10 +70,10 @@ fla_fdp_get_id(const uint32_t ndx, va_list ag)
   if(*fla_id == (fdp->pids + ndx)->fla_id)
   {
     *pid = (fdp->pids + ndx)->pid;
-    return 1;
+    return FLA_FLIST_SEARCH_RET_FOUND_STOP;
   }
 
-  return 0;
+  return FLA_FLIST_SEARCH_RET_CONTINUE;
 }
 
 static int
@@ -111,7 +111,7 @@ fla_fdp_cached_prep_ctx(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx)
     }
   }
 
-  ret = fla_flist_search_wfunc(fdp->free_pids, FLA_FLIST_SEARCH_EXEC_FIRST,
+  ret = fla_flist_search_wfunc(fdp->free_pids, FLA_FLIST_SEARCH_FROM_START,
                                &found, fla_fdp_get_id, &pid, &fla_id, fdp);
   if (FLA_ERR(ret, "fla_flist_search_wfunc()"))
     return ret;
