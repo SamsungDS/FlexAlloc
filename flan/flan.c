@@ -11,9 +11,10 @@
 #include <pthread.h>
 
 #include "flan.h"
+#include "flan_md.h"
 #include "flexalloc_cs.h"
+#include "flexalloc_util.h"
 
-struct flan_dirhandle flan_dir;
 unsigned int num_objects;
 unsigned int flan_obj_sz;
 unsigned int flan_oi_ob;
@@ -27,69 +28,27 @@ void flan_cleanup(void)
   flan_close(root);
 }
 
-void flan_get_cur_to_start(struct flan_handle *flanh, bool search_for_last)
+static uint32_t
+flan_elem_nbytes()
 {
-  struct flan_oinfo *oinfo, *oinfo_prev;
+  return sizeof(struct flan_oinfo);
+}
 
-  /* we don't bother if it is not ZNS*/
-  if(!flanh->is_zns)
-  {
-    flan_dir.cur = 0;
-    return;
-  }
+static bool
+flan_has_key(char const *key, void const *ptr)
+{
+  struct flan_oinfo const *oinfo = ptr;
+  if (!oinfo)
+    return false;
 
-  oinfo = ((struct flan_oinfo *)flan_dir.buf + flan_oi_ob);
-  if (oinfo->size == UINT64_MAX)
-  {
-    printf ("We have a root object that if FULL!!!!! ERROR");
-    return;
-  }
-
-  if(search_for_last)
-  {
-    flan_dir.dev_last = 0;
-  }
-
-  /* We asume that we have already setup flan_dir.buf correctly */
-  for(unsigned int i = flan_oi_ob - 1 ; i > 0 ; --i)
-  {
-    oinfo_prev = ((struct flan_oinfo *)flan_dir.buf + i);
-    oinfo = ((struct flan_oinfo *)flan_dir.buf + i - 1);
-
-    if (search_for_last && flan_dir.dev_last == 0
-        && oinfo_prev->size == 0 && oinfo->size != 0
-        && oinfo_prev->name[0] == '\0'  && oinfo->name[0] != '\0')
-    {
-      //we found the end of the device
-      flan_dir.dev_last = i - 1;
-      //ceil it to the next block size
-      uint64_t mod_div =
-        ((flan_dir.dev_last * sizeof(struct flan_oinfo)) % flan_dev_bs(flanh));
-      if(mod_div > 0)
-      {
-        uint64_t dist_to_next_bs_align = flan_dev_bs(flanh) - mod_div;
-        flan_dir.dev_last += (dist_to_next_bs_align / sizeof(struct flan_oinfo));
-      }
-
-    }
-
-    /*We stop when we find the first end*/
-    if(oinfo->size == UINT64_MAX && !strcmp("ZNSEND", oinfo->name))
-    {
-       flan_dir.cur = i;
-       return;
-    }
-  }
-
-  printf("We have encountered an error finding the cur start\n");
-  flan_dir.cur = 0;
-  return;
+  if (!strncmp(key, oinfo->name, FLAN_OBJ_NAME_LEN_MAX))
+    return 1;
+  return 0;
 }
 
 int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create_arg *pool_arg,
               uint64_t objsz, struct flan_handle **flanh)
 {
-  struct fla_object robj;
   int ret = 0;
   uint32_t obj_nlb;
   struct fla_open_opts open_opts = {0};
@@ -136,162 +95,24 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
 
   flan_obj_sz = obj_nlb * fla_fs_lb_nbytes((*flanh)->fs);
   flan_oi_ob = flan_obj_sz / sizeof(struct flan_oinfo);
-  flan_dir.buf = fla_buf_alloc((*flanh)->fs, flan_obj_sz);
-  if (!flan_dir.buf)
-  {
-    printf("fla_buf_alloc\n");
+
+  ret = flan_md_init((*flanh)->fs, (*flanh)->ph, flan_elem_nbytes, flan_has_key, &(*flanh)->md);
+  open_opts.opts->sync = "io_uring";
+  if (FLA_ERR(ret, "flan_md_init()"))
     goto out_free;
-  }
 
-  memset((void *)flan_dir.buf, 0, flan_obj_sz);
-  flan_dir.cur = FLAN_DHANDLE_NONE;
-  num_objects = 0;
-
-  ret = fla_pool_get_root_object((*flanh)->fs, (*flanh)->ph, &robj);
-  flan_dir.fla_oh = robj;
-  if (ret) // Root object not set
-  {
-    // Grab a object from the pool, zero it out, and set it to root
-    ret = fla_object_create((*flanh)->fs, (*flanh)->ph, &robj);
-    if (ret)
-    {
-      printf("Error allocating root object\n");
-      goto out_free_buf;
-    }
-
-    if (!(*flanh)->is_zns)
-    {
-      ret = fla_object_write((*flanh)->fs, (*flanh)->ph, &robj, flan_dir.buf, 0, flan_obj_sz);
-      if (ret)
-      {
-        printf("Error initial write md object \n");
-        goto out_free_buf;
-      }
-    } else
-    {
-      ((struct flan_oinfo *)flan_dir.buf)->size = UINT64_MAX;
-      memcpy(((struct flan_oinfo *)flan_dir.buf)->name, "ZNSEND", 6);
-    }
-
-    // Set the acquired object to the root object
-    ret =  fla_pool_set_root_object((*flanh)->fs, (*flanh)->ph, &robj, false);
-    flan_dir.fla_oh = robj;
-    (*flanh)->is_dirty = false; // Metadata is currently clean
-  }
-  else
-  {
-    ret = fla_object_read((*flanh)->fs, (*flanh)->ph, &robj, flan_dir.buf, 0, flan_obj_sz);
-  }
-
-  //flan_dir.cur = 0;
-  flan_get_cur_to_start(*flanh, true);
   root = *flanh;
   atexit(flan_cleanup);
   return ret;
 
-out_free_buf:
-  free(flan_dir.buf);
 out_free:
   free(*flanh);
 
   return ret;
 }
 
-void flan_reset_pool_dir()
-{
-  flan_dir.cur = FLAN_DHANDLE_NONE;
-}
-
-int flan_init_dirhandle(struct flan_handle *flanh)
-{
-  struct fla_object robj;
-  int ret = 0;
-
-  if (flan_dir.cur == FLAN_DHANDLE_NONE)
-  {
-    //flan_dir.cur = 0;
-    flan_get_cur_to_start(flanh, false);
-    if (!flanh->is_zns)
-    {
-      ret = fla_pool_get_root_object(flanh->fs, flanh->ph, &robj);
-      if (ret)
-      {
-        printf("Error getting root object\n");
-        goto out;
-      }
-
-      ret = fla_object_read(flanh->fs, flanh->ph, &robj, flan_dir.buf, 0, flan_obj_sz);
-      if (ret)
-      {
-        printf("Error reading root object\n");
-        goto out;
-      }
-
-      flan_dir.fla_oh = robj;
-    }
-  }
-
-out:
-  return ret;
-
-}
-
-struct flan_oinfo* flan_get_oinfo(struct flan_handle *flanh, bool create)
-{
-  int ret = 0;
-  struct flan_oinfo *oinfo;
-
-  ret = flan_init_dirhandle(flanh);
-  if (ret)
-  {
-    printf("Error initializing dirhandle\n");
-    return NULL;
-  }
-
-  // We ran out of md objects
-  if(flan_dir.cur && !(flan_dir.cur % flan_oi_ob))
-    return NULL;
-
-  if (!((flan_dir.cur + 1) % flan_oi_ob))
-  {
-    oinfo = ((struct flan_oinfo *)flan_dir.buf + (flan_oi_ob - 1));
-    // Check if next entry is a pointer to another object
-    if (oinfo->size == UINT64_MAX)
-    {
-      flan_dir.fla_oh = oinfo->fla_oh;
-      fla_object_read(flanh->fs, flanh->ph, &oinfo->fla_oh, flan_dir.buf, 0, flan_obj_sz);
-      // Skip over the oinfo object which points to the next object used for MD
-      flan_dir.cur++;
-    }
-    else if(create)// Lets try to allocate a new object
-    {
-      struct fla_object new_md_obj;
-      // Grab a object from the pool, zero it out, and set it to root
-      ret = fla_object_create(flanh->fs, flanh->ph, &new_md_obj);
-      if (!ret)
-      {
-        oinfo->size = UINT64_MAX;
-        oinfo->fla_oh = new_md_obj;
-        fla_object_write(flanh->fs, flanh->ph, &flan_dir.fla_oh, flan_dir.buf, 0, flan_obj_sz);
-        memset((void *)flan_dir.buf, 0, flan_obj_sz);
-        flan_dir.fla_oh = new_md_obj;
-        // Skip over the oinfo object which points to the next MD object
-        flan_dir.cur++;
-      }
-      else
-      {
-        printf("Error allocating MD object bailing\n");
-        exit(0);
-      }
-    }
-  }
-
-  oinfo = ((struct flan_oinfo *)flan_dir.buf + (flan_dir.cur % flan_oi_ob));
-  flan_dir.cur++;
-  return oinfo;
-}
-
-int flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinfo *oinfo)
+static int
+flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinfo **oinfo)
 {
   int ret;
   unsigned int namelen = strlen(name);
@@ -304,75 +125,32 @@ int flan_object_create(const char *name, struct flan_handle *flanh, struct flan_
   }
 
   ret = fla_object_create(flanh->fs, flanh->ph, &fla_obj);
-  if (ret)
-  {
-    printf("Error allocating fla object\n");
+  if (FLA_ERR(ret, "fla_object_create()"))
     return ret;
-  }
 
-  memcpy(oinfo->name, name, namelen + 1);
-  oinfo->size = 0;
-  oinfo->fla_oh = fla_obj;
+  ret = flan_md_map_obj(flanh->md, name, (void**)oinfo);
+  if (FLA_ERR(ret, "flan_md_map_obj()"))
+    return ret;
 
-  if (!flanh->is_zns)
-  {
-    // TOOD make sure this is safe with object handle table now having private copies
-    ret = fla_object_write(flanh->fs, flanh->ph, &flan_dir.fla_oh, flan_dir.buf, 0, flan_obj_sz);
-    if (ret)
-    {
-      printf("Error writing md for object :%d\n", num_objects);
-      exit(0);
-    }
-  }
-  else
-    flanh->is_dirty = true;
+  memcpy((*oinfo)->name, name, namelen + 1);
+  (*oinfo)->size = 0;
+  (*oinfo)->fla_oh = fla_obj;
 
+  flanh->is_dirty = true;
   num_objects++;
 
   return ret;
-
 }
 
-static int revcmp(char const * l, char const * r)
+struct flan_oinfo
+*flan_find_oinfo(struct flan_handle *flanh, const char *name, uint32_t * cur)
 {
-  size_t l_len = strlen(l), r_len = strlen(r);
-  size_t min_len = XNVME_MIN(l_len, r_len);
-  char const * last_l = l + l_len;
-  char const * last_r = r + r_len;
-  int i;
-
-  if(min_len == 0)
-    return l_len != r_len;
-  else
-  {
-    for (i = 0;i < min_len && *(last_l--) == *(last_r--); ++i);
-    return !(i == min_len);
-  }
-}
-
-struct flan_oinfo *flan_find_oinfo(struct flan_handle *flanh, const char *name, uint32_t * cur)
-{
+  int err;
   struct flan_oinfo *oinfo;
 
-  pthread_mutex_lock(&flan_mutex);
-  flan_reset_pool_dir();
-  while (((oinfo = flan_get_oinfo(flanh, false)) != NULL) && revcmp(oinfo->name, name));
-  *cur = flan_dir.cur;
-  pthread_mutex_unlock(&flan_mutex);
-
-  return oinfo;
-}
-
-struct flan_oinfo *flan_find_first_free_oinfo(struct flan_handle *flanh, uint32_t *cur)
-{
-  struct flan_oinfo *oinfo;
-
-  pthread_mutex_lock(&flan_mutex);
-  flan_reset_pool_dir();
-  while (((oinfo = flan_get_oinfo(flanh, true)) != NULL) &&
-         strlen(oinfo->name) > 0);
-  *cur = flan_dir.cur;
-  pthread_mutex_unlock(&flan_mutex);
+  err = flan_md_find(flanh->md, name, (void**)&oinfo);
+  if (FLA_ERR(err, "flan_md_find()"))
+    return NULL;
 
   return oinfo;
 }
@@ -380,31 +158,28 @@ struct flan_oinfo *flan_find_first_free_oinfo(struct flan_handle *flanh, uint32_
 uint64_t flan_otable_search(const char *name, uint64_t *ff)
 {
   bool oh_set = false;
-  uint64_t oh_num = FLAN_MAX_OPEN_OBJECTS;
+  uint64_t oh_num;
 
   // Seach through the open objects table
   for (oh_num = 0; oh_num < FLAN_MAX_OPEN_OBJECTS; oh_num++)
   {
     // Blank entry
-    if (!strlen(flan_otable[oh_num].oinfo.name))
+    if (flan_otable[oh_num].oinfo == NULL)
     {
       if (!oh_set)
       {
         if (ff)
           *ff = oh_num;
-        
+
         oh_set = true;
       }
 
       continue;
-
     }
 
     // Entry with a matching name return the entry
-    if (!strncmp(name, flan_otable[oh_num].oinfo.name, FLAN_OBJ_NAME_LEN_MAX))
-    {
+    if (!strncmp(name, flan_otable[oh_num].oinfo->name, FLAN_OBJ_NAME_LEN_MAX))
       return oh_num;
-    }
   }
 
   if (!oh_set)
@@ -420,10 +195,10 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   uint64_t oh_num;
   uint64_t ff_oh;
   struct fla_object *noh;
-  uint32_t bs = flanh->append_sz, res_cur;
+  uint32_t bs = flanh->append_sz;
 
   oh_num = flan_otable_search(basename((char *)name), &ff_oh);
- 
+
   // The object is already open increase ref count and return object handle
   if (oh_num < FLAN_MAX_OPEN_OBJECTS)
   {
@@ -439,32 +214,20 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   }
 
   // Search through all the on disk MD
-  oinfo = flan_find_oinfo(flanh, basename((char *)name), &res_cur);
+  ret = flan_md_find(flanh->md, name, (void**)&oinfo);
+  if (FLA_ERR(ret, "flan_md_find()"))
+    return ret;
+
   if (!oinfo && (flags & FLAN_OPEN_FLAG_CREATE))
-    oinfo = flan_find_first_free_oinfo(flanh, &res_cur);
-
-  if (!oinfo)
-    return -EINVAL;
-
-  if ((strlen(oinfo->name) == 0) && (flags & FLAN_OPEN_FLAG_CREATE))
   {
-    ret = flan_object_create(basename((char *)name), flanh, oinfo);
+    ret = flan_object_create(basename((char *)name), flanh, &oinfo);
     if (ret)
-    {
       return ret;
-    }
   }
 
-  memcpy(&flan_otable[ff_oh].oinfo, oinfo, sizeof(struct flan_oinfo));
-  flan_otable[ff_oh].flan_oh = flan_dir.fla_oh;
-  flan_otable[ff_oh].oinfo_off = (res_cur - 1) % flan_oi_ob; // Convert to byte offset for update
-                                                                  //
-  //fprintf(stderr, "found %s in MD and size is %"PRIu64" with off %"PRIu32", flan_dir.cur : %d"
-  //    " res_cur %"PRIu32"\n",
-  //    oinfo->name, oinfo->size, flan_otable[ff_oh].oinfo_off, flan_dir.cur, res_cur);
-
+  flan_otable[ff_oh].oinfo = oinfo;
   if (flags & FLAN_OPEN_FLAG_WRITE)
-    flan_otable[ff_oh].append_off = flan_otable[ff_oh].oinfo.size; // Verify zero on new entry
+    flan_otable[ff_oh].append_off = flan_otable[ff_oh].oinfo->size; // Verify zero on new entry
   else if (flags & FLAN_OPEN_FLAG_READ)
     flan_otable[ff_oh].read_buf_off = UINT64_MAX;
 
@@ -473,7 +236,7 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
 
   if (flags & FLAN_OPEN_FLAG_READ)
     flan_otable[ff_oh].read_buf = flan_otable[ff_oh].append_buf;
-  
+
   flan_otable[ff_oh].o_flags = flags;
 
   memset(flan_otable[ff_oh].append_buf, 0, bs);
@@ -502,25 +265,29 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
 
 int flan_object_delete(const char *name, struct flan_handle *flanh)
 {
+  int err;
   uint64_t oh = flan_otable_search(basename((char *)name), NULL);
-  uint32_t res_cur;
-  struct flan_oinfo *oinfo = flan_find_oinfo(flanh, basename((char *)name), &res_cur);
+  struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
+
+  if (!oinfo)
+    return -EINVAL;
 
   // Invalidate any open handles
   if (oh != FLAN_MAX_OPEN_OBJECTS)
   {
     free(flan_otable[oh].append_buf);
-    int err = fla_object_destroy(flanh->fs, flanh->ph, &oinfo->fla_oh);
-    if(err)
+    err = fla_object_destroy(flanh->fs, flanh->ph, &oinfo->fla_oh);
+    if (FLA_ERR(err, "fla_object_destroy()"))
     {
       printf("Error while destroying object in fla %d\n", err);
-      return -EINVAL;
+      return err;
     }
     memset(&flan_otable[oh], 0, sizeof(struct flan_ohandle) - sizeof(uint32_t));
   }
 
-  if (!oinfo)
-    return -EINVAL;
+  err = flan_md_umap_obj(flanh->md, name);
+  if (FLA_ERR(err, "flan_md_umap_obj()"))
+    return err;
 
   memset(oinfo->name, 0, FLAN_OBJ_NAME_LEN_MAX);
   oinfo->size = 0;
@@ -528,16 +295,7 @@ int flan_object_delete(const char *name, struct flan_handle *flanh)
   oinfo->fla_oh.entry_ndx = UINT32_MAX;
   num_objects--;
 
-  if (!flanh->is_zns)
-  {
-    if (fla_object_write(flanh->fs, flanh->ph, &flan_dir.fla_oh, flan_dir.buf, 0, flan_obj_sz))
-    {
-      printf("Error writing md during delete for object:%s\n", name);
-      exit(0);
-    }
-  }
-  else
-    flanh->is_dirty = true;
+  flanh->is_dirty = true;
 
   return 0;
 }
@@ -548,47 +306,22 @@ void flan_otable_close(struct flan_handle *flanh)
 
   for (oh_num = 0; oh_num < FLAN_MAX_OPEN_OBJECTS; oh_num++)
   {
-    if (strlen(flan_otable[oh_num].oinfo.name))
+    if(flan_otable[oh_num].oinfo != NULL)
       flan_object_close(oh_num, flanh);
   }
 }
 
 void flan_close(struct flan_handle *flanh)
 {
+  int err;
   if (!flanh)
     return;
 
   flan_otable_close(flanh);
 
-  if (!flanh->is_dirty) // Also clean case, TODO make this independent of ZNS
-    goto free;
+  err = flan_md_fini(flanh->md);
+  FLA_ERR(err, "flan_md_fini() : Unhandled error on closing md");
 
-  if(!flanh->is_zns)
-  {
-    if (fla_object_write(flanh->fs, flanh->ph, &flan_dir.fla_oh, flan_dir.buf, 0, flan_obj_sz))
-    {
-      printf("Error writing md during close\n");
-      exit(0);
-    }
-  } else
-  {
-    unsigned int real_dev_last = flan_dir.dev_last * sizeof(struct flan_oinfo);
-    // after this call flan_dir.dev_last will have the buffer last not the device last
-    flan_get_cur_to_start(flanh, true);
-    uint64_t buf_offset = (flan_dir.cur-1) * sizeof(struct flan_oinfo);
-    uint64_t buf_size = (flan_dir.dev_last * sizeof(struct flan_oinfo)) - buf_offset;
-
-    if(fla_object_write(flanh->fs, flanh->ph, &flan_dir.fla_oh, flan_dir.buf + buf_offset, real_dev_last, buf_size))
-    {
-      printf("Error writing md during close ZNS\n");
-      exit(0);
-    }
-  }
-
-free:
-  if (flan_dir.buf)
-    fla_buf_free(flanh->fs, flan_dir.buf);
-  
   fla_pool_close(flanh->fs, flanh->ph);
   fla_close(flanh->fs);
   free(flanh);
@@ -738,7 +471,7 @@ ssize_t flan_object_read_rw(uint64_t oh, void *buf, size_t offset, size_t len,
 ssize_t flan_object_read(uint64_t oh, void *buf, size_t offset, size_t len,
                            struct flan_handle *flanh)
 {
-  struct flan_oinfo *oinfo = &flan_otable[oh].oinfo;
+  struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
 
   // Cant read past end of file
   if (offset + len > oinfo->size)
@@ -754,36 +487,6 @@ ssize_t flan_object_read(uint64_t oh, void *buf, size_t offset, size_t len,
 
   return flan_object_read_r(oh, buf, offset, len, flanh, oinfo);
 }
-int flan_update_md(struct flan_ohandle *oh, struct flan_handle *flanh)
-{
-  int ret = 0;
-  struct fla_object *nfsobj = &oh->flan_oh;
-  char *tbuf = fla_buf_alloc(flanh->fs, flan_obj_sz); // On disk MD buf
-  struct flan_oinfo *oinfo;
-
-  ret = fla_object_read(flanh->fs, flanh->ph, nfsobj, tbuf, 0, flan_obj_sz);
-  if (ret)
-  {
-    printf("Object read in update md fails\n");
-    free(tbuf);
-    return -EIO;
-  }
-
-  oinfo = ((struct flan_oinfo *)tbuf) + oh->oinfo_off;
-  memcpy(oinfo, &oh->oinfo, sizeof(struct flan_oinfo));
-  ret = fla_object_write(flanh->fs, flanh->ph, nfsobj, tbuf, 0, flan_obj_sz);
-  if (ret)
-  {
-    printf("Object write in update md fails\n");
-    free(tbuf);
-    return -EIO;
-  }
-
-  free(tbuf);
-  return ret;
-}
-
-
 
 int flan_conv_object_write(struct fla_object *nfs_oh, void *buf, size_t offset,
     size_t len, struct flan_handle *flanh)
@@ -870,7 +573,7 @@ int flan_zns_object_write(struct fla_object *nfs_oh, void *buf, size_t offset,
 int flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
                         struct flan_handle *flanh)
 {
-  struct flan_oinfo *oinfo = &flan_otable[oh].oinfo;
+  struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
   struct fla_object *nfsobj = &oinfo->fla_oh;
   int ret = 0;
 
@@ -886,16 +589,7 @@ int flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
   }
 
   if (offset + len > oinfo->size)
-  {
     oinfo->size = offset + len;
-
-    if (!flanh->is_zns)
-    {
-      ret = flan_update_md(&flan_otable[oh], flanh);
-      if (ret)
-        exit(0);
-    }
-  }
 
   return ret;
 }
@@ -910,38 +604,25 @@ uint32_t flan_dev_bs(struct flan_handle *flanh)
   return fla_fs_lb_nbytes(flanh->fs);
 }
 
-// TODO update to reflect object table
+/* You can only rename open objects */
 int flan_object_rename(const char *oldname, const char *newname, struct flan_handle *flanh)
 {
-  uint32_t res_cur;
-  struct flan_oinfo *oinfo = flan_find_oinfo(flanh, basename((char *)oldname), &res_cur);
+  struct flan_oinfo *oinfo;
+
   unsigned int namelen = strlen(basename((char *)newname));
-  uint64_t oh;
+  if (namelen > FLAN_OBJ_NAME_LEN_MAX)
+    return FLA_ERR(-1, "flan_object_rename()");
 
-  oh = flan_otable_search(basename((char *)oldname), NULL);
-  flan_object_delete(basename((char *)newname), flanh); // TODO clear out even if we have the file currently open
+  uint64_t oh = flan_otable_search(basename((char *)oldname), NULL);
+  if (FLA_ERR(oh == FLAN_MAX_OPEN_OBJECTS, "flan_otable_search()"))
+    return -EIO;
 
+  oinfo = flan_otable[oh].oinfo;
   if (!oinfo)
-  {
     return -EINVAL;
-  }
 
-  if (oh != FLAN_MAX_OPEN_OBJECTS) {
-    memset(flan_otable[oh].oinfo.name, 0, FLAN_OBJ_NAME_LEN_MAX);  
-    memcpy(flan_otable[oh].oinfo.name, basename((char *)newname), namelen + 1);
-  }
-  
   memset(oinfo->name, 0, FLAN_OBJ_NAME_LEN_MAX);
   memcpy(oinfo->name, basename((char *)newname), namelen + 1);
-
-  if (!flanh->is_zns)
-  {
-    if (fla_object_write(flanh->fs, flanh->ph, &flan_dir.fla_oh, flan_dir.buf, 0, flan_obj_sz))
-    {
-      printf("Error writing md during rename for object:%s\n", oinfo->name);
-      exit(0);
-    }
-  }
 
   return 0;
 }
@@ -949,52 +630,34 @@ int flan_object_rename(const char *oldname, const char *newname, struct flan_han
 // TODO assumes this won't fail, revisit me
 int flan_object_close(uint64_t oh, struct flan_handle *flanh)
 {
-  struct fla_object *noh = &flan_otable[oh].oinfo.fla_oh;
+  struct fla_object *noh = &flan_otable[oh].oinfo->fla_oh;
   size_t append_off = flan_otable[oh].append_off;
   uint32_t bs = flanh->append_sz;
   int ret = 0;
 
-  // File is no longer open
-  if (!strlen(flan_otable[oh].oinfo.name))
+  /* File is no longer open */
+  if (flan_otable[oh].oinfo == NULL)
     return 0;
 
   flan_otable[oh].use_count--;
   // Use count drops to zero lets free
-  if (!flan_otable[oh].use_count)
+  if (flan_otable[oh].use_count < 1)
   {
     if (append_off % bs && !flan_otable[oh].frozen)
     {
       // Append the last block
       ret = fla_object_write(flanh->fs, flanh->ph, noh, flan_otable[oh].append_buf,
                              (append_off / bs) * bs, bs);
-      if (ret)
-      {
-        printf("Error writing last block, corruption abound\n");
+      if (FLA_ERR(ret, "Error writing last block, corruption abound\n"))
         return ret;
-      }
     }
 
     // Seal the object
     if (append_off)
       fla_object_seal(flanh->fs, flanh->ph, noh);
 
-    // TODO fix this issue
-    if (flan_otable[oh].flan_oh.slab_id != flan_dir.fla_oh.slab_id &&
-        flan_otable[oh].flan_oh.entry_ndx != flan_dir.fla_oh.entry_ndx)
-    {
-      printf("MD will be inconsistent\n");
-    }
-    else
-    {
-    //  fprintf(stderr, "updating oh : %"PRIu64" to flan_dir. Size : %"PRIu64" to offset : %"PRIu32"\n",
-    //      oh, flan_otable[oh].oinfo.size, flan_otable[oh].oinfo_off);
-      memcpy(((struct flan_oinfo *)flan_dir.buf) + flan_otable[oh].oinfo_off, &flan_otable[oh].oinfo,
-          sizeof(struct flan_oinfo));
-    }
-
     free(flan_otable[oh].append_buf);
     memset(&flan_otable[oh], 0, sizeof(struct flan_ohandle));
-
   }
 
   return 0;
