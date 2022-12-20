@@ -206,7 +206,7 @@ __htbl_lookup(struct fla_htbl *htbl, uint64_t h2, uint64_t ndx)
 }
 
 struct fla_htbl_entry *
-htbl_lookup(struct fla_htbl *htbl, const char *key)
+htbl_lookup(struct fla_htbl *htbl, char const *key)
 {
   return __htbl_lookup(htbl, FLA_HTBL_H2(key), FLA_HTBL_COMPRESS(FLA_HTBL_H1(key),
                        htbl->tbl_size));
@@ -214,7 +214,7 @@ htbl_lookup(struct fla_htbl *htbl, const char *key)
 
 // remove - based on the robinhood placement strategy
 void
-htbl_remove(struct fla_htbl *htbl, char *key)
+htbl_remove(struct fla_htbl *htbl, char const *key)
 {
   struct fla_htbl_entry *next;
   struct fla_htbl_entry *end = htbl->tbl + htbl->tbl_size;
