@@ -169,6 +169,13 @@ fla_flist_entries_free(freelist_t flist, uint32_t ndx, unsigned int num);
 int
 fla_flist_search_wfunc(freelist_t flist, uint64_t flags, uint32_t *found,
                        int(*f)(const uint32_t, va_list), ...);
-#define FLA_FLIST_SEARCH_EXEC_FIRST 1 << 0
+#define FLA_FLIST_SEARCH_FROM_START 1 << 0
+enum {
+  FLA_FLIST_SEARCH_RET_FOUND_STOP,
+  FLA_FLIST_SEARCH_RET_FOUND_CONTINUE,
+  FLA_FLIST_SEARCH_RET_STOP,
+  FLA_FLIST_SEARCH_RET_CONTINUE,
+  FLA_FLIST_SEARCH_RET_ERR,
+};
 
 #endif // __FLEXALLOC_FREELIST_H_
