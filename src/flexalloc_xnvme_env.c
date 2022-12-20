@@ -475,7 +475,7 @@ fla_xne_sync_seq_r_xneio(struct fla_xne_io *xne_io)
   int err;
 
   err = fla_xne_sync_seq_r(xne_io->lba_range, xne_io->dev, xne_io->buf);
-  FLA_ERR(err, "fla_xne_sync_seq_w()");
+  FLA_ERR(err, "fla_xne_sync_seq_r()");
 
   return err;
 }
