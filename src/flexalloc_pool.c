@@ -135,8 +135,12 @@ fla_pool_initialize_entrie_func_(struct fla_pools *pools, const uint32_t ndx)
 int
 fla_pool_initialize_entrie_func(const uint32_t ndx, va_list ag)
 {
+  int err;
   struct fla_pools *pools = va_arg(ag, struct fla_pools*);
-  return fla_pool_initialize_entrie_func_(pools, ndx);
+  err = fla_pool_initialize_entrie_func_(pools, ndx);
+  if (FLA_ERR(err, "fla_pool_initialize_entrie_func()"))
+    return FLA_FLIST_SEARCH_RET_ERR;
+  return FLA_FLIST_SEARCH_RET_FOUND_CONTINUE;
 }
 
 int
@@ -163,7 +167,7 @@ fla_pool_init(struct flexalloc *fs, struct fla_geo *geo, uint8_t *pool_sgmt_base
   if (FLA_ERR(fs->pools.entrie_funcs == NULL, "malloc()"))
     return -ENOMEM;
 
-  ret = fla_flist_search_wfunc(fs->pools.freelist, FLA_FLIST_SEARCH_EXEC_FIRST,
+  ret = fla_flist_search_wfunc(fs->pools.freelist, FLA_FLIST_SEARCH_FROM_START,
                                &found, fla_pool_initialize_entrie_func, &fs->pools);
 
   return ret;
