@@ -173,6 +173,23 @@ fla_flist_entries_free(freelist_t flist, uint32_t ndx, unsigned int num)
 }
 
 int
+fla_flist_entry_unfree(freelist_t flist, uint32_t ndx)
+{
+  uint32_t *elem = flist + 1;
+  if (ndx > *flist)
+    return -1;
+
+  while (ndx >= sizeof(uint32_t) * CHAR_BIT)
+  {
+    elem++;
+    ndx -= sizeof(uint32_t) * CHAR_BIT;
+  }
+  *elem &= ~(1 << ndx);
+  return 0;
+
+}
+
+int
 fla_flist_search_wfunc(freelist_t flist, uint64_t flags, uint32_t *found,
                        int(*f)(const uint32_t, va_list), ...)
 {
