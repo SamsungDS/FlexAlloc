@@ -94,6 +94,7 @@ static int flan_fuse_readdir(const char *path, void *buf,
 			       struct fuse_file_info *fi,
 			       enum fuse_readdir_flags flags)
 {
+  /*
 	struct flan_oinfo *oinfo;
 	(void) offset;
 	(void) fi;
@@ -109,8 +110,12 @@ static int flan_fuse_readdir(const char *path, void *buf,
 			if (filler(buf, basename(oinfo->name), NULL, 0, 0))
 				printf ("Filler had an issue\n");
 		}
-	}
+	}*/
 
+  /*
+   * We need to implement a walking function for the flan_md
+   * that will go through all the active files and call filler
+   */
 	return 0;
 }
 
