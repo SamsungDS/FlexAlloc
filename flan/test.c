@@ -10,7 +10,7 @@
 
 #define POOL_NAME "TEST"
 #define USAGE "./test OBJ_SZ"
-#define FLAN_TEST_MAX_OBJECTS_TO_CREATE 50
+#define FLAN_TEST_MAX_OBJECTS_TO_CREATE 5
 
 int main(int argc, char **argv)
 {
