@@ -149,5 +149,8 @@ struct fla_htbl_entry *htbl_lookup(struct fla_htbl *htbl, const char *key);
  * @param htbl the hash table
  * @param key key of the entry to remove
  */
-void htbl_remove(struct fla_htbl *htbl, char const *key);
+void htbl_remove_key(struct fla_htbl *htbl, char const *key);
+
+void htbl_remove_entry(struct fla_htbl *htbl, struct fla_htbl_entry *entry);
+
 #endif // __FLEXALLOC_HASH_H_
