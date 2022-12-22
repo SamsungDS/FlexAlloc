@@ -128,8 +128,8 @@ flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinf
   if (FLA_ERR(ret, "fla_object_create()"))
     return ret;
 
-  ret = flan_md_map_obj(flanh->md, name, (void**)oinfo);
-  if (FLA_ERR(ret, "flan_md_map_obj()"))
+  ret = flan_md_map_new_elem(flanh->md, name, (void**)oinfo);
+  if (FLA_ERR(ret, "flan_md_map_new_elem()"))
     return ret;
 
   memcpy((*oinfo)->name, name, namelen + 1);
@@ -196,8 +196,9 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   uint64_t ff_oh;
   struct fla_object *noh;
   uint32_t bs = flanh->append_sz;
+  char * base_name = basename((char *)name);
 
-  oh_num = flan_otable_search(basename((char *)name), &ff_oh);
+  oh_num = flan_otable_search(base_name, &ff_oh);
 
   // The object is already open increase ref count and return object handle
   if (oh_num < FLAN_MAX_OPEN_OBJECTS)
@@ -214,16 +215,19 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   }
 
   // Search through all the on disk MD
-  ret = flan_md_find(flanh->md, name, (void**)&oinfo);
+  ret = flan_md_find(flanh->md, base_name, (void**)&oinfo);
   if (FLA_ERR(ret, "flan_md_find()"))
     return ret;
 
   if (!oinfo && (flags & FLAN_OPEN_FLAG_CREATE))
   {
-    ret = flan_object_create(basename((char *)name), flanh, &oinfo);
+    ret = flan_object_create(base_name, flanh, &oinfo);
     if (ret)
       return ret;
   }
+
+  if (oinfo == NULL)
+    return -EINVAL;
 
   flan_otable[ff_oh].oinfo = oinfo;
   if (flags & FLAN_OPEN_FLAG_WRITE)
@@ -266,7 +270,8 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
 int flan_object_delete(const char *name, struct flan_handle *flanh)
 {
   int err;
-  uint64_t oh = flan_otable_search(basename((char *)name), NULL);
+  char *base_name = basename((char *)name);
+  uint64_t oh = flan_otable_search(base_name, NULL);
   struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
 
   if (!oinfo)
@@ -285,8 +290,8 @@ int flan_object_delete(const char *name, struct flan_handle *flanh)
     memset(&flan_otable[oh], 0, sizeof(struct flan_ohandle) - sizeof(uint32_t));
   }
 
-  err = flan_md_umap_obj(flanh->md, name);
-  if (FLA_ERR(err, "flan_md_umap_obj()"))
+  err = flan_md_umap_elem(flanh->md, base_name);
+  if (FLA_ERR(err, "flan_md_umap_elem()"))
     return err;
 
   memset(oinfo->name, 0, FLAN_OBJ_NAME_LEN_MAX);
@@ -607,22 +612,28 @@ uint32_t flan_dev_bs(struct flan_handle *flanh)
 /* You can only rename open objects */
 int flan_object_rename(const char *oldname, const char *newname, struct flan_handle *flanh)
 {
+  int err;
   struct flan_oinfo *oinfo;
+  char * base_newname = basename((char*)newname);
+  char * base_oldname = basename((char*)oldname);
 
-  unsigned int namelen = strlen(basename((char *)newname));
+  unsigned int namelen = strlen(base_newname);
   if (namelen > FLAN_OBJ_NAME_LEN_MAX)
     return FLA_ERR(-1, "flan_object_rename()");
 
-  uint64_t oh = flan_otable_search(basename((char *)oldname), NULL);
+  uint64_t oh = flan_otable_search(base_oldname, NULL);
   if (FLA_ERR(oh == FLAN_MAX_OPEN_OBJECTS, "flan_otable_search()"))
     return -EIO;
 
-  oinfo = flan_otable[oh].oinfo;
-  if (!oinfo)
-    return -EINVAL;
+  err = flan_md_rmap_elem(flanh->md, base_oldname, base_newname, (void**)&oinfo);
+  if (FLA_ERR(err, "flan_md_rmap_elem()"))
+    return -EIO;
+
+  if (FLA_ERR(oinfo != flan_otable[oh].oinfo, "flan_object_rename() : oinfo mismatch"))
+    return -EIO;
 
   memset(oinfo->name, 0, FLAN_OBJ_NAME_LEN_MAX);
-  memcpy(oinfo->name, basename((char *)newname), namelen + 1);
+  memcpy(oinfo->name, base_newname, namelen + 1);
 
   return 0;
 }

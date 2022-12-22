@@ -1,9 +1,7 @@
 #ifndef __LIBFLAN_MD_H
 #define __LIBFLAN_MD_H
 
-#include "flexalloc_hash.h"
 #include "flexalloc_shared.h"
-#include "flexalloc_freelist.h"
 #define FLAN_MD_MAX_OPEN_ROOT_OBJECTS 2
 #define FLAN_MD_ROOT_END_SIGNATURE 0xABCDFDCB
 struct flan_md_root_obj_buf_end
@@ -40,10 +38,10 @@ struct flan_md_root_obj_buf
   struct fla_object fla_obj;
 
   /* In mem and storage */
-  freelist_t freelist;
+  uint32_t * freelist;
 
   /* dirty elements */
-  freelist_t dirties;
+  uint32_t * dirties;
   struct fla_htbl *elem_htbl;
   enum {
     ACTIVE,
@@ -75,8 +73,10 @@ int flan_md_init(struct flexalloc *fs, struct fla_pool *ph, uint32_t(*elem_nbyte
     struct flan_md **md);
 int flan_md_fini(struct flan_md *md);
 int flan_md_find(struct flan_md *md, const char *key, void ** elem);
-int flan_md_map_obj(struct flan_md *md, const char *key,  void **elem);
-int flan_md_umap_obj(struct flan_md *md, const char *key);
+int flan_md_map_new_elem(struct flan_md *md, const char *key,  void **elem);
+int flan_md_umap_elem(struct flan_md *md, const char *key);
 int flan_md_mod_dirty(struct flan_md *md, const char *key, void *elem, bool val);
+int flan_md_rmap_elem(struct flan_md *md, const char *curr_key, const char *new_key,
+    void** rmapped_elem);
 
 #endif //__LIBFLAN_MD_H
