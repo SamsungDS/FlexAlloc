@@ -144,10 +144,20 @@ int htbl_insert(struct fla_htbl *htbl, char const *key, uint32_t val);
 struct fla_htbl_entry *htbl_lookup(struct fla_htbl *htbl, const char *key);
 
 /**
- * Remove entry from hash table.
+ * Remove entry represented by key from hash table.
  *
  * @param htbl the hash table
  * @param key key of the entry to remove
  */
-void htbl_remove(struct fla_htbl *htbl, char const *key);
+void htbl_remove_key(struct fla_htbl *htbl, char const *key);
+
+/**
+ * Remove entry represented from hash table.
+ *
+ * @param htbl the hash table
+ * @param entry entry to remove
+ */
+
+void htbl_remove_entry(struct fla_htbl *htbl, struct fla_htbl_entry *entry);
+
 #endif // __FLEXALLOC_HASH_H_

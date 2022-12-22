@@ -342,11 +342,11 @@ test_remove()
   test_err |= FLA_ASSERT(e->val == 2, "value should be 2");
 
   // test
-  htbl_remove(htbl, "one");
+  htbl_remove_key(htbl, "one");
   test_err |= FLA_ASSERT(_htbl_len(htbl) == 1, "expect one entry left\n");
   test_err |= FLA_ASSERT(htbl->len == 1, "len variable not updated after remove");
 
-  htbl_remove(htbl, "two");
+  htbl_remove_key(htbl, "two");
   test_err |= FLA_ASSERT(_htbl_len(htbl) == 0, "expect 0 entries\n");
   test_err |= FLA_ASSERT(htbl->len == 0, "len variable not updated after remove");
 
@@ -377,9 +377,9 @@ test_remove_non_existing()
   err |= FLA_ASSERT(htbl->len == 0, "expect 0 entries in table");
 
   // test
-  htbl_remove(htbl, "one");
+  htbl_remove_key(htbl, "one");
 
-  htbl_remove(htbl, "two");
+  htbl_remove_key(htbl, "two");
 
   htbl_free(htbl);
   return test_err;
@@ -411,11 +411,11 @@ test_remove_idempotent()
   test_err |= FLA_ASSERT(e->val == 2, "value should be 2");
 
   // test
-  htbl_remove(htbl, "two");
+  htbl_remove_key(htbl, "two");
   test_err |= FLA_ASSERT(_htbl_len(htbl) == 1, "expect one entry left\n");
   test_err |= FLA_ASSERT(htbl->len == 1, "len variable not updated after remove");
 
-  htbl_remove(htbl, "two");
+  htbl_remove_key(htbl, "two");
   test_err |= FLA_ASSERT(_htbl_len(htbl) == 1, "expect one entry left (still)\n");
 
   htbl_free(htbl);

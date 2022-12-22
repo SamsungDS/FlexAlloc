@@ -371,7 +371,7 @@ fla_base_pool_destroy(struct flexalloc *fs, struct fla_pool * handle)
     goto exit;
 
   // remove hash table entry, note the freelist entry is the canonical entry.
-  htbl_remove(&fs->pools.htbl, pool_entry->name);
+  htbl_remove_key(&fs->pools.htbl, pool_entry->name);
 
   free(handle);
 

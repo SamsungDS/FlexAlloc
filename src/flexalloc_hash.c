@@ -212,15 +212,11 @@ htbl_lookup(struct fla_htbl *htbl, char const *key)
                        htbl->tbl_size));
 }
 
-// remove - based on the robinhood placement strategy
 void
-htbl_remove(struct fla_htbl *htbl, char const *key)
+htbl_remove_entry(struct fla_htbl *htbl, struct fla_htbl_entry *entry)
 {
   struct fla_htbl_entry *next;
   struct fla_htbl_entry *end = htbl->tbl + htbl->tbl_size;
-  uint64_t h2 = FLA_HTBL_H2(key);
-  uint64_t ndx = FLA_HTBL_COMPRESS(FLA_HTBL_H1(key), htbl->tbl_size);
-  struct fla_htbl_entry *entry = __htbl_lookup(htbl, h2, ndx);
 
   if (!entry)
     return;
@@ -243,4 +239,14 @@ htbl_remove(struct fla_htbl *htbl, char const *key)
   entry->h2 = FLA_HTBL_ENTRY_UNSET;
   entry->psl = 0;
   htbl->len--;
+}
+
+// remove - based on the robinhood placement strategy
+void
+htbl_remove_key(struct fla_htbl *htbl, char const *key)
+{
+  uint64_t h2 = FLA_HTBL_H2(key);
+  uint64_t ndx = FLA_HTBL_COMPRESS(FLA_HTBL_H1(key), htbl->tbl_size);
+  struct fla_htbl_entry *entry = __htbl_lookup(htbl, h2, ndx);
+  return htbl_remove_entry(htbl, entry);
 }
