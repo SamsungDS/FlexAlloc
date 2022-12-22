@@ -434,7 +434,7 @@ flan_md_get_usable_root_ndx(struct flan_md *md, struct flan_md_root_obj_buf **ro
   return 0;
 }
 
-int flan_md_map_obj(struct flan_md *md, const char *key,  void **elem)
+int flan_md_map_new_elem(struct flan_md *md, const char *key,  void **elem)
 {
   int err;
   struct flan_md_root_obj_buf *root_obj;
@@ -456,12 +456,31 @@ int flan_md_map_obj(struct flan_md *md, const char *key,  void **elem)
   return 0;
 }
 
-int flan_md_umap_obj(struct flan_md *md, const char *key)
+static int
+flan_md_umap_(struct flan_md_root_obj_buf * root_obj,
+    struct fla_htbl_entry *htbl_entry, uint32_t const ndx)
 {
   int err;
+  err = fla_flist_entries_free(root_obj->freelist, ndx, 1);
+  if (FLA_ERR(err, "fla_flist_entries_free()"))
+    return err;
+
+  err = fla_flist_entries_free(root_obj->dirties, ndx, 1);
+  if (FLA_ERR(err, "fla_flist_entry_free()"))
+    return err;
+
+  htbl_remove_entry(root_obj->elem_htbl, htbl_entry);
+  return 0;
+}
+
+int flan_md_umap_elem(struct flan_md *md, const char *key)
+{
+  int err;
+  struct flan_md_root_obj_buf * root_obj;
+
   for (uint32_t i = 0 ; i < FLAN_MD_MAX_OPEN_ROOT_OBJECTS ; ++i)
   {
-    struct flan_md_root_obj_buf *root_obj = &md->r_objs[i];
+    root_obj = &md->r_objs[i];
     if (root_obj->state == INACTIVE)
       continue;
 
@@ -470,11 +489,11 @@ int flan_md_umap_obj(struct flan_md *md, const char *key)
     if (!htbl_entry)
       continue;
 
-    err = fla_flist_entries_free(root_obj->freelist, htbl_entry->val, 1);
-    if (FLA_ERR(err, "fla_flist_entries_free()"))
+    err = flan_md_umap_(root_obj, htbl_entry, htbl_entry->val);
+    if (FLA_ERR(err, "fla_md_umap_elem()"))
       return err;
 
-    htbl_remove(htbl, key);
+    htbl_remove_entry(htbl, htbl_entry);
     return 0;
   }
 
@@ -536,54 +555,157 @@ flan_md_add_elem_from_freelist_to_hash(const uint32_t ndx, va_list ag)
   return FLA_FLIST_SEARCH_RET_CONTINUE;
 }
 
-int flan_md_find(struct flan_md *md, const char *key, void **elem)
+static int
+flan_md_find_elem_hash(struct flan_md *md, const char *key,
+    struct flan_md_root_obj_buf **root_obj,
+    struct fla_htbl_entry **htbl_entry,
+    uint32_t *ndx, void **elem)
 {
-  struct flan_md_root_obj_buf *root_obj;
-  uint32_t found_ndx;
   for (uint32_t i = 0 ; i < FLAN_MD_MAX_OPEN_ROOT_OBJECTS ; ++i)
   {
-    root_obj = &md->r_objs[i];
-    if (root_obj->state == INACTIVE)
+    (*root_obj) = &md->r_objs[i];
+    if ((*root_obj)->state == INACTIVE)
       continue;
 
-    struct fla_htbl *htbl = root_obj->elem_htbl;
-    struct fla_htbl_entry *htbl_entry = htbl_lookup(htbl, key);
-    if (!htbl_entry)
+    struct fla_htbl *htbl = (*root_obj)->elem_htbl;
+    *htbl_entry = htbl_lookup(htbl, key);
+    if (!(*htbl_entry))
       continue;
 
-    found_ndx = htbl_entry->val;
-    goto set_elem;
+    *ndx = (*htbl_entry)->val;
+    goto exit;
   }
+
+  *elem = NULL;
+  *root_obj = NULL;
+  *htbl_entry = NULL;
+  *ndx = UINT32_MAX;
+  return 0;
+
+exit:
+  *elem = (*root_obj)->buf + (md->elem_nbytes() * (*ndx));
+  return 0;
+}
+
+static int
+flan_md_find_elem_freelist(struct flan_md *md, const char *key,
+    struct flan_md_root_obj_buf **root_obj,
+    struct fla_htbl_entry **htbl_entry,
+    uint32_t *ndx, void **elem)
+{
+  int err;
+  uint32_t found = 0;
+
+  for (uint32_t i = 0 ; i < FLAN_MD_MAX_OPEN_ROOT_OBJECTS ; ++i)
+  {
+    (*root_obj) = &md->r_objs[i];
+    if ((*root_obj)->state == INACTIVE)
+      continue;
+
+    found = 0;
+    err = fla_flist_search_wfunc((*root_obj)->freelist, FLA_FLIST_SEARCH_FROM_START,
+        &found, flan_md_add_elem_from_freelist_to_hash, (*root_obj), md, key, ndx);
+    if (FLA_ERR(err, "fla_flist_search_wfunc()"))
+      return err;
+    if (!found)
+      continue;
+
+    goto exit;
+  }
+
+  *elem = NULL;
+  *root_obj = NULL;
+  *htbl_entry = NULL;
+  *ndx = UINT32_MAX;
+  return 0;
+
+exit:
+  *elem = (*root_obj)->buf + (md->elem_nbytes() * (*ndx));
+  *htbl_entry = htbl_lookup((*root_obj)->elem_htbl, key);
+
+  if (FLA_ERR(!(*htbl_entry), "htbl_lookup()"))
+    return -EIO;
+
+  return 0;
+}
+
+static int
+flan_md_find_(struct flan_md *md, const char *key,
+    struct flan_md_root_obj_buf **root_obj,
+    struct fla_htbl_entry **htbl_entry,
+    uint32_t *ndx, void **elem)
+{
+  int err;
+  err = flan_md_find_elem_hash(md, key, root_obj, htbl_entry, ndx, elem);
+  if (FLA_ERR(err, "flan_md_find_elem_hash()"))
+    return err;
+
+  if (*elem)
+    return 0;
 
   /*
    * Its not on any of the active hash tables. We are forced to do
    * a "thorough" search on the free lists and add it to the hash
    * if we find it.
    */
-  uint32_t found;
+  err = flan_md_find_elem_freelist(md, key, root_obj, htbl_entry, ndx, elem);
+  if (FLA_ERR(err, "flan_md_find_elem_freelist()"))
+    return err;
+
+  return 0;
+}
+
+int flan_md_rmap_elem(struct flan_md *md, const char *curr_key, const char *new_key,
+    void** rmapped_elem)
+{
   int err;
-  for (uint32_t i = 0 ; i < FLAN_MD_MAX_OPEN_ROOT_OBJECTS ; ++i)
-  {
-    root_obj = &md->r_objs[i];
-    if (root_obj->state == INACTIVE)
-      continue;
+  uint32_t curr_ndx, new_ndx;
+  struct fla_htbl_entry *curr_htbl_entry, *new_htbl_entry;
+  struct flan_md_root_obj_buf *curr_root_obj, *new_root_obj;
+  void *curr_elem = NULL, *new_elem = NULL;
 
-    found = 0;
-    err = fla_flist_search_wfunc(root_obj->freelist, FLA_FLIST_SEARCH_FROM_START,
-        &found, flan_md_add_elem_from_freelist_to_hash, root_obj, md, key, &found_ndx);
-    if (FLA_ERR(err, "fla_flist_search_wfunc()"))
+  err = flan_md_find_(md, new_key, &new_root_obj, &new_htbl_entry, &new_ndx, &new_elem);
+  if (FLA_ERR(err, "flan_md_find_()"))
+    return err;
+
+  if(new_elem) {
+    err = flan_md_umap_(new_root_obj, new_htbl_entry, new_ndx);
+    if (FLA_ERR(err, "flan_md_umap_()"))
       return err;
-    if (found == 0)
-      continue;
 
-    goto set_elem;
+    memset(new_elem, 0, md->elem_nbytes());
   }
 
-  *elem = NULL;
-  return 0;
+  err = flan_md_find_(md, curr_key, &curr_root_obj, &curr_htbl_entry, &curr_ndx, &curr_elem);
+  if (FLA_ERR(err, "flan_md_find_()"))
+    return err;
 
-set_elem:
-  *elem = root_obj->buf + (md->elem_nbytes() * found_ndx);
+  /* Hash of new_key needs to point to new offset */
+  htbl_remove_entry(curr_root_obj->elem_htbl, curr_htbl_entry);
+  err = htbl_insert(curr_root_obj->elem_htbl, new_key, curr_ndx);
+  if (FLA_ERR(err, "htbl_insert()"))
+    return err;
+
+  *rmapped_elem = curr_elem;
+
+  return 0;
+}
+
+int flan_md_find(struct flan_md *md, const char *key, void **elem)
+{
+  int err;
+  uint32_t found_ndx;
+  struct fla_htbl_entry *htbl_entry;
+  struct flan_md_root_obj_buf *root_obj;
+
+  err = flan_md_find_(md, key, &root_obj, &htbl_entry, &found_ndx, elem);
+  if (FLA_ERR(err, "flan_md_find_()"))
+    return err;
+
+  if (*elem)
+    return 0;
+
+  *elem = NULL;
   return 0;
 }
 
