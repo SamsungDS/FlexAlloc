@@ -39,4 +39,4 @@ executable('flan_test', 'test.c',
 #  override_options: ['c_std=gnu11'],
 #  )
 
-install_headers('flan.h')
+install_headers('flan.h', 'flan_md.h')
