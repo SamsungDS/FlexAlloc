@@ -631,7 +631,11 @@ fla_flush(struct flexalloc *fs)
   if ((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
     goto exit;
 
-  struct fla_xne_io xne_io = {.dev = md_dev, .buf = fs->fs_buffer, .lba_range = &range, .fla_dp = &fs->fla_dp};
+  struct fla_xne_io xne_io =
+    { .dev = md_dev,
+      .buf = fs->fs_buffer,
+      .lba_range = &range,
+      .fla_dp = &fs->fla_dp};
   err = fla_xne_sync_seq_w_xneio(&xne_io);
   if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
     goto exit;
