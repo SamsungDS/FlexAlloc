@@ -349,8 +349,9 @@ void flan_close(struct flan_handle *flanh)
   root = NULL;
 }
 
-int flan_object_unaligned_read(uint64_t oh, struct fla_object *noh, void *buf,
-                                 size_t offset, size_t len, struct flan_handle *flanh)
+static int
+flan_object_unaligned_read(uint64_t oh, struct fla_object *noh, void *buf,
+                           size_t offset, size_t len, struct flan_handle *flanh)
 {
   void *al_buf;
   size_t al_offset, al_len, tail_len = 0, tail_start = 0;
@@ -360,7 +361,7 @@ int flan_object_unaligned_read(uint64_t oh, struct fla_object *noh, void *buf,
   al_offset = offset - (offset % bs);
   al_len = len + (bs - (len % bs));
   if (al_offset + al_len < offset + len)
-	  al_len += bs;
+    al_len += bs;
 
   al_buf = flan_buf_alloc(al_len, flanh);
   if (!al_buf)
@@ -407,8 +408,9 @@ out_free:
   return ret;
 }
 
-ssize_t flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
-                             struct flan_handle *flanh, struct flan_oinfo *oinfo)
+static ssize_t
+flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
+                   struct flan_handle *flanh, struct flan_oinfo *oinfo)
 {
   uint64_t *rb_off = &flan_otable[oh].read_buf_off;
   char *rb = flan_otable[oh].read_buf;
@@ -456,8 +458,9 @@ ssize_t flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
 
 }
 
-ssize_t flan_object_read_rw(uint64_t oh, void *buf, size_t offset, size_t len,
-                              struct flan_handle *flanh, struct flan_oinfo *oinfo)
+static ssize_t
+flan_object_read_rw(uint64_t oh, void *buf, size_t offset, size_t len,
+                    struct flan_handle *flanh, struct flan_oinfo *oinfo)
 {
   struct fla_object *nfsobj = &oinfo->fla_oh;
   uint32_t bs = flanh->append_sz;
@@ -580,7 +583,7 @@ int flan_zns_object_write(struct fla_object *nfs_oh, void *buf, size_t offset,
   if (al_len) {
     al_buf = flan_buf_alloc(al_len, flanh);
     memcpy(al_buf, bufpos, al_len);
-	  ret = fla_object_write(flanh->fs, flanh->ph, nfs_oh, al_buf, al_start, al_len);
+    ret = fla_object_write(flanh->fs, flanh->ph, nfs_oh, al_buf, al_start, al_len);
     free(al_buf);
   }
 
