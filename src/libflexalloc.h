@@ -282,6 +282,9 @@ fla_pool_get_root_object(struct flexalloc const * const fs,
 uint32_t
 fla_pool_obj_nlb(struct flexalloc const *const fs, struct fla_pool const *pool_handle);
 
+uint64_t
+fla_object_size_nbytes(struct flexalloc const * fs, struct fla_pool const * pool_handle);
+
 #ifdef __cplusplus
 }
 #endif
