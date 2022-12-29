@@ -30,6 +30,13 @@ executable('flan_test', 'test.c',
   include_directories : libflexalloc_header_dirs
   )
 
+executable('flan_test_write_over_obj_size', 'test_write_over_obj_size.c',
+  fla_common_files, flan_files, libflexalloc_files, xnvme_env_files,
+  fla_util_files,
+  dependencies: xnvme_deps,
+  include_directories : libflexalloc_header_dirs
+  )
+
 #fuse_deps = dependency('fuse3')
 #executable('flan_fuse', flan_fuse_files,
 #  fla_common_files,  flan_files, libflexalloc_files, xnvme_env_files,

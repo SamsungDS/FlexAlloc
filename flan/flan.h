@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <libflexalloc.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include "flan_md.h"
 
 #ifdef __cplusplus
@@ -19,10 +20,26 @@ extern "C" {
 #define FLAN_MAX_OPEN_OBJECTS 16384
 #define FLAN_APPEND_SIZE 2097152
 
+struct flan_oinfo_set
+{
+  struct fla_object fla_oh;
+  uint64_t offset;
+};
+
+enum flan_oinfo_type
+{
+  FLAN_OINFO_TYPE_SINGLE_OBJ_DEFAULT,
+  FLAN_OINFO_TYPE_MULTPL_OBJ_NAIVE
+};
+
 struct flan_oinfo
 {
   uint64_t size;
-  struct fla_object fla_oh;
+  union {
+    struct fla_object fla_oh;
+    struct flan_oinfo_set fla_set;
+  };
+  enum flan_oinfo_type type;
   char name[FLAN_OBJ_NAME_LEN_MAX];
 };
 
@@ -36,16 +53,23 @@ struct flan_handle
   struct flan_md *md;
 };
 
+struct flan_ohandle_funcs
+{
+  int (*flan_write)(uint64_t oh, void *buf, size_t offset, size_t len, struct flan_handle *flanh);
+  ssize_t (*flan_read)(uint64_t oh, void *buf, size_t offset, size_t len, struct flan_handle *flanh);
+};
+
 struct flan_ohandle
 {
-	struct flan_oinfo *oinfo;
-	char *append_buf;
-	char *read_buf;
-	uint64_t append_off;
-	uint64_t read_buf_off;
-	uint32_t use_count;
-	uint32_t o_flags;
-	bool frozen;
+  struct flan_oinfo *oinfo;
+  char *append_buf;
+  char *read_buf;
+  uint64_t append_off;
+  uint64_t read_buf_off;
+  uint32_t use_count;
+  uint32_t o_flags;
+  bool frozen;
+  struct flan_ohandle_funcs funcs;
 };
 
 

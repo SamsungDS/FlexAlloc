@@ -23,6 +23,13 @@ static pthread_mutex_t flan_mutex;
 
 struct flan_ohandle flan_otable[FLAN_MAX_OPEN_OBJECTS];
 
+static ssize_t
+flan_object_read_(uint64_t oh, void *buf, size_t offset, size_t len,
+                           struct flan_handle *flanh);
+static int
+flan_object_write_(uint64_t oh, void *buf, size_t offset, size_t len,
+                        struct flan_handle *flanh);
+
 void flan_cleanup(void)
 {
   flan_close(root);
@@ -135,6 +142,7 @@ flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinf
   memcpy((*oinfo)->name, name, namelen + 1);
   (*oinfo)->size = 0;
   (*oinfo)->fla_oh = fla_obj;
+  (*oinfo)->type = FLAN_OINFO_TYPE_SINGLE_OBJ_DEFAULT;
 
   flanh->is_dirty = true;
   num_objects++;
@@ -262,6 +270,14 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   // Freeze a zns file that has been previously appended
   if (flan_otable[ff_oh].append_off % flanh->append_sz && flanh->is_zns)
     flan_otable[ff_oh].frozen = true;
+
+  if (oinfo->type == FLAN_OINFO_TYPE_SINGLE_OBJ_DEFAULT)
+  {
+    flan_otable[ff_oh].funcs.flan_read = flan_object_read_;
+    flan_otable[ff_oh].funcs.flan_write = flan_object_write_;
+  }
+  else
+    return FLA_ERR(-EIO, "Do not recognize oinfo type %d\n", oinfo->type);
 
   *oh = ff_oh;
   return ret;
@@ -473,7 +489,8 @@ ssize_t flan_object_read_rw(uint64_t oh, void *buf, size_t offset, size_t len,
   return len;
 }
 
-ssize_t flan_object_read(uint64_t oh, void *buf, size_t offset, size_t len,
+static ssize_t
+flan_object_read_(uint64_t oh, void *buf, size_t offset, size_t len,
                            struct flan_handle *flanh)
 {
   struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
@@ -491,6 +508,12 @@ ssize_t flan_object_read(uint64_t oh, void *buf, size_t offset, size_t len,
     return flan_object_read_rw(oh, buf, offset, len, flanh, oinfo);
 
   return flan_object_read_r(oh, buf, offset, len, flanh, oinfo);
+
+}
+ssize_t flan_object_read(uint64_t oh, void *buf, size_t offset, size_t len,
+                           struct flan_handle *flanh)
+{
+  return flan_otable[oh].funcs.flan_read(oh, buf, offset, len, flanh);
 }
 
 int flan_conv_object_write(struct fla_object *nfs_oh, void *buf, size_t offset,
@@ -526,7 +549,7 @@ int flan_zns_object_write(struct fla_object *nfs_oh, void *buf, size_t offset,
   if ((offset + len) % bs)
     al_end = ((offset + len) / bs) * bs;
   else
-      al_end = offset + len;
+    al_end = offset + len;
 
   al_len = al_end - al_start;
   tail_len = len - ((al_start - offset) + al_len);
@@ -575,7 +598,8 @@ int flan_zns_object_write(struct fla_object *nfs_oh, void *buf, size_t offset,
   return ret;
 }
 
-int flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
+static int
+flan_object_write_(uint64_t oh, void *buf, size_t offset, size_t len,
                         struct flan_handle *flanh)
 {
   struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
@@ -597,6 +621,12 @@ int flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
     oinfo->size = offset + len;
 
   return ret;
+}
+
+int flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
+                        struct flan_handle *flanh)
+{
+  return flan_otable[oh].funcs.flan_write(oh, buf, offset, len, flanh);
 }
 
 void *flan_buf_alloc(size_t nbytes, struct flan_handle *flanh)
