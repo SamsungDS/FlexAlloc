@@ -632,10 +632,12 @@ fla_flush(struct flexalloc *fs)
     goto exit;
 
   struct fla_xne_io xne_io =
-    { .dev = md_dev,
-      .buf = fs->fs_buffer,
-      .lba_range = &range,
-      .fla_dp = &fs->fla_dp};
+  {
+    .dev = md_dev,
+    .buf = fs->fs_buffer,
+    .lba_range = &range,
+    .fla_dp = &fs->fla_dp
+  };
   err = fla_xne_sync_seq_w_xneio(&xne_io);
   if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
     goto exit;
@@ -1130,24 +1132,38 @@ fla_object_eoffset(struct flexalloc const * fs, struct fla_object const * obj,
   return fla_object_elba(fs, obj, pool_handle) * fs->dev.lb_nbytes;
 }
 
+static int
+fla_object_check_range(struct flexalloc const *fs, struct fla_object const *obj,
+                       struct fla_pool const *pool_handle, uint64_t const op_end_offset)
+{
+  int err;
+  uint64_t obj_eoffset, slab_eoffset;
+
+  obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
+  slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
+  if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Operation outside slab")))
+    goto exit;
+
+  if((err = FLA_ERR(obj_eoffset < op_end_offset, "Operation outside of an object")))
+    goto exit;
+
+exit:
+  return err;
+}
+
 int
 fla_object_read(const struct flexalloc * fs, struct fla_pool const * pool_handle,
                 struct fla_object const * obj, void * buf, size_t r_offset, size_t r_len)
 {
   int err;
-  uint64_t obj_eoffset, obj_soffset, r_soffset, r_eoffset, slab_eoffset;
+  uint64_t obj_soffset, r_soffset;
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
 
-  obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
   obj_soffset = fla_object_soffset(fs, obj, pool_handle);
   r_soffset = obj_soffset + r_offset;
-  r_eoffset = r_soffset + r_len;
 
-  slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
-  if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Read outside a slab")))
-    goto exit;
-
-  if((err = FLA_ERR(obj_eoffset < r_eoffset, "Read outside of an object")))
+  err = fla_object_check_range(fs, obj, pool_handle, r_soffset + r_len);
+  if (FLA_ERR(err, "fla_object_check_range()"))
     goto exit;
 
   struct fla_xne_io xne_io;
@@ -1199,20 +1215,15 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
                  struct fla_object const * obj, void const * buf, size_t w_offset, size_t w_len)
 {
   int err = 0;
-  uint64_t obj_eoffset, obj_soffset, w_soffset, w_eoffset, slab_eoffset;
+  uint64_t obj_soffset, w_soffset;
   struct fla_pool_entry *pool_entry = &fs->pools.entries[pool_handle->ndx];
   struct fla_xne_io xne_io;
 
-  obj_eoffset = fla_object_eoffset(fs, obj, pool_handle);
   obj_soffset = fla_object_soffset(fs, obj, pool_handle);
   w_soffset = obj_soffset + w_offset;
-  w_eoffset = w_soffset + w_len;
 
-  slab_eoffset = (fla_geo_slab_lb_off(fs, obj->slab_id) + fs->geo.slab_nlb) * fs->geo.lb_nbytes;
-  if((err = FLA_ERR(slab_eoffset < obj_eoffset, "Write outside slab")))
-    goto exit;
-
-  if((err = FLA_ERR(obj_eoffset < w_eoffset, "Write outside of an object")))
+  err = fla_object_check_range(fs, obj, pool_handle, w_soffset + w_len);
+  if (FLA_ERR(err, "fla_object_check_range()"))
     goto exit;
 
   xne_io.io_type = FLA_IO_DATA_WRITE;
@@ -1271,6 +1282,10 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
   aligned_eb = FLA_CEIL_DIV(orig_eb, fs->dev.lb_nbytes) * fs->dev.lb_nbytes;
   bounce_buf_size = aligned_eb - aligned_sb;
 
+  err = fla_object_check_range(fs, obj, pool_handle, aligned_sb + bounce_buf_size);
+  if (FLA_ERR(err, "fla_object_check_range()"))
+    goto exit;
+
   bounce_buf = fla_xne_alloc_buf(fs->dev.dev, bounce_buf_size);
   if(FLA_ERR(!bounce_buf, "fla_buf_alloc()"))
   {
@@ -1285,7 +1300,13 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
     range = fla_xne_lba_range_from_offset_nbytes(fs->dev.dev, aligned_sb, fs->dev.lb_nbytes);
     if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
       goto exit;
-    struct fla_xne_io xne_io = {.dev = fs->dev.dev, .buf = bounce_buf, .lba_range = &range, .fla_dp = &fs->fla_dp};
+    struct fla_xne_io xne_io =
+    {
+      .dev = fs->dev.dev,
+      .buf = bounce_buf,
+      .lba_range = &range,
+      .fla_dp = &fs->fla_dp
+    };
     err = fla_xne_sync_seq_r_xneio(&xne_io);
     if(FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
       goto free_bounce_buf;
@@ -1298,7 +1319,13 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
     if((err = FLA_ERR(range.attr.is_valid != 1, "fla_xne_lba_range_from_slba_naddrs()")))
       goto exit;
     buf = bounce_buf + bounce_buf_size - fs->dev.lb_nbytes;
-    struct fla_xne_io xne_io = {.dev = fs->dev.dev, .buf = buf, .lba_range = &range, .fla_dp = &fs->fla_dp};
+    struct fla_xne_io xne_io =
+    {
+      .dev = fs->dev.dev,
+      .buf = buf,
+      .lba_range = &range,
+      .fla_dp = &fs->fla_dp
+    };
 
     err = fla_xne_sync_seq_r_xneio(&xne_io);
     if(FLA_ERR(err, "fla_xne_sync_seq_r_xneio()"))
@@ -1309,14 +1336,16 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
   memcpy(buf, w_buf, len);
 
   struct xnvme_lba_range lba_range;
-  struct fla_xne_io xne_io;
-  xne_io.io_type = FLA_IO_DATA_WRITE;
-  xne_io.dev = fs->dev.dev;
-  xne_io.buf = bounce_buf;
-  xne_io.prep_ctx = fs->fla_dp.fncs.prep_dp_ctx;
-  xne_io.obj_handle = obj;
-  xne_io.pool_handle = pool_handle;
-  xne_io.fla_dp = &fs->fla_dp;
+  struct fla_xne_io xne_io =
+  {
+    .io_type = FLA_IO_DATA_WRITE,
+    .dev = fs->dev.dev,
+    .buf = bounce_buf,
+    .prep_ctx = fs->fla_dp.fncs.prep_dp_ctx,
+    .obj_handle = obj,
+    .pool_handle = pool_handle,
+    .fla_dp = &fs->fla_dp
+  };
 
   lba_range = fla_xne_lba_range_from_offset_nbytes(xne_io.dev, aligned_sb, bounce_buf_size);
   if(( err = FLA_ERR(lba_range.attr.is_valid != 1, "fla_xne_lba_range_from_offset_nbytes()")))
