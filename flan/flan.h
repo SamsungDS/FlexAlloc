@@ -19,27 +19,12 @@ extern "C" {
 #define FLAN_OPEN_FLAG_WRITE 0x4
 #define FLAN_MAX_OPEN_OBJECTS 16384
 #define FLAN_APPEND_SIZE 2097152
-
-struct flan_oinfo_set
-{
-  struct fla_object fla_oh;
-  uint64_t offset;
-};
-
-enum flan_oinfo_type
-{
-  FLAN_OINFO_TYPE_SINGLE_OBJ_DEFAULT,
-  FLAN_OINFO_TYPE_MULTPL_OBJ_NAIVE
-};
+#define FLAN_MAX_FLA_OBJ_IN_OINFO 2
 
 struct flan_oinfo
 {
   uint64_t size;
-  union {
-    struct fla_object fla_oh;
-    struct flan_oinfo_set fla_set;
-  };
-  enum flan_oinfo_type type;
+  struct fla_object fla_oh[FLAN_MAX_FLA_OBJ_IN_OINFO];
   char name[FLAN_OBJ_NAME_LEN_MAX];
 };
 
