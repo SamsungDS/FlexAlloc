@@ -1265,7 +1265,7 @@ fla_object_write(struct flexalloc * fs, struct fla_pool const * pool_handle,
     err = fla_xne_async_strp_seq_xneio(&xne_io);
   }
 
-  if(FLA_ERR(err, "fla_xne_sync_seq_w_xneio()"))
+  if(FLA_ERR(err, "fla_object_write()"))
     goto exit;
 
 exit:
