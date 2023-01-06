@@ -1,5 +1,4 @@
-
-// Copyright (C) 2021 Adam Manzanares <a.manzanares@samsung.com>
+// Copyright (C) 2021 Joel Granados <j.granados@samsung.com>
 
 #include <libflexalloc.h>
 #include <stdio.h>
