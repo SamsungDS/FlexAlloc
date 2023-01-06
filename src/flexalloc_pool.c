@@ -193,10 +193,10 @@ fla_print_pool_entries(struct flexalloc *fs)
       continue; //as this pool has not been initialized
 
     fprintf(stderr, "Pool Entry %"PRIu32"(%p)\n", npool, pool_entry);
+    fprintf(stderr, "|  flags: \n");
+    fprintf(stderr, "|  `-> Stripped: %d\n", (int)(pool_entry->flags & FLA_POOL_ENTRY_STRP));
     fprintf(stderr, "|  obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
     fprintf(stderr, "|  root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
-    //fprintf(stderr, "|  strp_nobjs : %"PRIu32"\n", pool_entry->strp_nobjs);
-    //fprintf(stderr, "|  strp_nbytes : %"PRIu32"\n", pool_entry->strp_nbytes);
     fprintf(stderr, "|  PoolName : %s\n", pool_entry->name);
     fprintf(stderr, "|  Max Number of Objects In Slab %"PRIu32"\n", pool_entry->slab_nobj);
     fprintf(stderr, "|  Slabs:\n");
@@ -300,6 +300,7 @@ fla_base_pool_create(struct flexalloc *fs, struct fla_pool_create_arg const *arg
     goto free_handle;
   pool_entry = &fs->pools.entries[entry_ndx];
 
+  pool_entry->flags = arg->flags;
   err = fla_pool_initialize_entrie_func_(&fs->pools, entry_ndx);
   if (FLA_ERR(err, "fla_pool_initialize_entrie_func_()"))
     goto free_freelist_entry;
