@@ -277,6 +277,7 @@ flan_md_root_object_open(struct flan_md const *md, struct flan_md_root_obj_buf *
   root_obj->buf = fla_buf_alloc(md->fs, root_obj->buf_nbytes);
   if (FLA_ERR(!root_obj->buf, "fla_buf_alloc()"))
     return -EIO;
+  memset(root_obj->buf, 0, root_obj->buf_nbytes);
 
   err = flan_md_read_root_obj(md, root_obj);
   if (FLA_ERR(err, "flan_md_read_root_obj()"))
