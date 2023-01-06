@@ -931,8 +931,8 @@ exit:
 uint64_t
 fla_object_size_nbytes(struct flexalloc const * fs, struct fla_pool const * pool_handle)
 {
-  const struct fla_pool_entry * pool_entry = &fs->pools.entries[pool_handle->ndx];
-  return pool_entry->obj_nlb * fs->geo.lb_nbytes;
+  struct fla_pool_entry_fnc const * pool_entry_fnc = fs->pools.entrie_funcs + pool_handle->ndx;
+  return pool_entry_fnc->fla_pool_obj_size_nbytes(fs, pool_handle);
 }
 
 uint64_t
