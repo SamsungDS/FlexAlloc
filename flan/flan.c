@@ -47,7 +47,7 @@ flan_has_key(char const *key, void const *ptr)
 {
   struct flan_oinfo const *oinfo = ptr;
   if (!oinfo)
-    return false;
+    return 0;
 
   if (!strncmp(key, oinfo->name, FLAN_OBJ_NAME_LEN_MAX))
     return 1;
@@ -219,6 +219,9 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
   for (int obj_offset = r_offset / obj_nbytes;r_len_toread > 0 ;
       r_len_toread -= loop_r_len)
   {
+    if ((err = FLA_ERR(obj_offset > 1, "fla_multi_object_action()")))
+      goto exit;
+
     fla_obj_tmp = &oinfo->fla_oh[obj_offset];
     loop_r_offset = r_offset % obj_nbytes;
     r_len_end_obj = obj_nbytes - loop_r_offset;
@@ -230,6 +233,7 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
       break;
     case FLAN_MULTI_OBJ_ACTION_WRITE_UNALIGNED:
       err = fla_object_unaligned_write((struct flexalloc*)fs, ph, fla_obj_tmp, buf, loop_r_offset, loop_r_len);
+      break;
     case FLAN_MULTI_OBJ_ACTION_READ:
       err = fla_object_read(fs, ph, fla_obj_tmp, buf, loop_r_offset, loop_r_len);
       break;
@@ -240,9 +244,7 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
     if (FLA_ERR(err, "fla_object_action()"))
       goto exit;
     obj_offset++;
-    if ((err = FLA_ERR(obj_offset > 2, "fla_multi_object_read()")))
-      goto exit;
-    if ((err = FLA_ERR(loop_r_len > r_len_toread, "Error in multi object read")))
+    if ((err = FLA_ERR(loop_r_len > r_len_toread, "Error in multi object action")))
       goto exit;
   }
 
@@ -321,8 +323,6 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
       return ret;
   }
 
-
-
   // Freeze a zns file that has been previously appended
   if (flan_otable[ff_oh].append_off % flanh->append_sz && flanh->is_zns)
     flan_otable[ff_oh].frozen = true;
@@ -352,6 +352,7 @@ flan_multi_object_destroy(struct flexalloc * fs, struct fla_pool * ph,
 
   return err;
 }
+
 int flan_object_delete(const char *name, struct flan_handle *flanh)
 {
   int err;
@@ -607,10 +608,8 @@ int flan_conv_object_write(struct flan_oinfo *oinfo, void *buf, size_t offset,
     ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, buf, offset,
         len, FLAN_MULTI_OBJ_ACTION_WRITE_UNALIGNED);
   else
-  {
     ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, buf, offset,
         len, FLAN_MULTI_OBJ_ACTION_WRITE);
-  }
 
   return ret;
 }
@@ -685,12 +684,39 @@ int flan_zns_object_write(struct flan_oinfo *oinfo, void *buf, size_t offset,
   return ret;
 }
 
+static uint32_t
+flan_object_oinfo_num_active_objs(struct flan_oinfo *oinfo)
+{
+  uint32_t count = 0;
+
+  for (int i = 0 ; i < FLAN_MAX_FLA_OBJ_IN_OINFO ; ++i)
+  {
+    if (oinfo->fla_oh[i].entry_ndx == UINT32_MAX ||
+        oinfo->fla_oh[i].slab_id == UINT32_MAX)
+      break;
+    count++;
+  }
+
+  return count;
+}
+
 static int
 flan_object_write_(uint64_t oh, void *buf, size_t offset, size_t len,
                         struct flan_handle *flanh)
 {
   struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
+  uint32_t num_active = flan_object_oinfo_num_active_objs(oinfo);
   int ret = 0;
+
+  if (offset + len
+      > fla_object_size_nbytes(flanh->fs, flanh->ph) * num_active)
+  {
+    if ((ret = FLA_ERR(num_active == FLAN_MAX_FLA_OBJ_IN_OINFO, "flan_object_write_(): exceeded FLAN_MAX_FLA_OBJ_IN_OINFO")))
+      return ret;
+    ret = fla_object_create(flanh->fs, flanh->ph, &oinfo->fla_oh[num_active]);
+    if (FLA_ERR(ret, "fla_object_create()"))
+      return ret;
+  }
 
   if (flanh->is_zns)
     ret = flan_zns_object_write(oinfo, buf, offset, len, oh, flanh);
@@ -748,6 +774,10 @@ int flan_object_rename(const char *oldname, const char *newname, struct flan_han
   if (FLA_ERR(oinfo != flan_otable[oh].oinfo, "flan_object_rename() : oinfo mismatch"))
     return -EIO;
 
+  if (oinfo->fla_oh[0].entry_ndx == UINT32_MAX && oinfo->fla_oh[0].slab_id == UINT32_MAX
+      && oinfo->fla_oh[1].entry_ndx == UINT32_MAX && oinfo->fla_oh[1].slab_id == UINT32_MAX)
+    return FLA_ERR(-EIO, "flan object without a fla object");
+
   memset(oinfo->name, 0, FLAN_OBJ_NAME_LEN_MAX);
   memcpy(oinfo->name, base_newname, namelen + 1);
 
@@ -765,8 +795,8 @@ flan_multi_object_seal(struct flexalloc *fs, struct fla_pool *ph,
     if (oinfo->fla_oh[i].entry_ndx != UINT32_MAX && oinfo->fla_oh[i].slab_id != UINT32_MAX)
     {
       err = fla_object_seal(fs, ph, &oinfo->fla_oh[i]);
-      oinfo->fla_oh[i].slab_id = UINT32_MAX;
-      oinfo->fla_oh[i].entry_ndx = UINT32_MAX;
+      //oinfo->fla_oh[i].slab_id = UINT32_MAX;
+      //oinfo->fla_oh[i].entry_ndx = UINT32_MAX;
     }
   }
 
