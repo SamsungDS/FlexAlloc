@@ -223,7 +223,8 @@ flan_md_write_root_obj(struct flan_md *md, struct flan_md_root_obj_buf *root_obj
 
   err = fla_object_write(md->fs, md->ph, &root_obj->fla_obj, root_obj->buf,
       src_write_nbytes, dest_write_nbytes - src_write_nbytes);
-  if (FLA_ERR(err, "fla_object_write()"))
+  if (FLA_ERR(err, "fla_object_write() src_nbytes : %"PRIu64", len %"PRIu64"",
+        src_write_nbytes, dest_write_nbytes))
     return err;
 
   return err;
