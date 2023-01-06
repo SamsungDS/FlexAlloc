@@ -214,8 +214,12 @@ fla_print_pool_entries(struct flexalloc *fs)
     fprintf(stderr, "Pool Entry %"PRIu32"(%p)\n", npool, pool_entry);
     fprintf(stderr, "|  flags: \n");
     fprintf(stderr, "|  `-> Stripped: %d\n", (int)(pool_entry->flags & FLA_POOL_ENTRY_STRP));
-    fprintf(stderr, "|  obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
-    fprintf(stderr, "|  root_obj_hndl : %"PRIu64"\n", pool_entry->root_obj_hndl);
+    fprintf(stderr, "|  non-stripped obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
+    fprintf(stderr, "|  root_obj_hndl : ");
+    fprintf(stderr, "|  `-> slab_id : %"PRIu32"\n",
+        ((struct fla_object*)(&pool_entry->root_obj_hndl))->slab_id);
+    fprintf(stderr, "|  `-> entry_ndx %"PRIu32"\n",
+        ((struct fla_object*)(&pool_entry->root_obj_hndl))->entry_ndx);
     fprintf(stderr, "|  PoolName : %s\n", pool_entry->name);
     fprintf(stderr, "|  Max Number of Objects In Slab %"PRIu32"\n", pool_entry->slab_nobj);
     fprintf(stderr, "|  Slabs:\n");
