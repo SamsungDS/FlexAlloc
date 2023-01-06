@@ -90,6 +90,7 @@ struct fla_pool_entry_fnc
                               struct fla_pool_create_arg const *arg,
                               uint32_t const slab_nobj);
   uint32_t (*fla_pool_num_fla_objs)(struct fla_pool_entry const * pool_entry);
+  uint64_t (*fla_pool_obj_size_nbytes)(struct flexalloc const *fs, struct fla_pool const *ph);
 };
 
 void

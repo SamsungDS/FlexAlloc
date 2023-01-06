@@ -113,6 +113,22 @@ fla_pool_num_fla_objs_default(struct fla_pool_entry const * pool_entry)
   return 1;
 }
 
+static uint64_t
+fla_pool_obj_size_nbytes_default(struct flexalloc const *fs, struct fla_pool const *ph)
+{
+  const struct fla_pool_entry * pool_entry = &fs->pools.entries[ph->ndx];
+  return pool_entry->obj_nlb * fs->geo.lb_nbytes;
+}
+
+static uint64_t
+fla_pool_obj_size_nbytes_strp(struct flexalloc const *fs, struct fla_pool const *ph)
+{
+  const struct fla_pool_entry * pool_entry = &fs->pools.entries[ph->ndx];
+  struct fla_pool_strp *strp_ops = (struct fla_pool_strp*)&pool_entry->usable;
+  return pool_entry->obj_nlb * fs->geo.lb_nbytes * (uint64_t)strp_ops->strp_nobjs;
+}
+
+
 static int
 fla_pool_initialize_entrie_func_(struct fla_pools *pools, const uint32_t ndx)
 {
@@ -121,12 +137,15 @@ fla_pool_initialize_entrie_func_(struct fla_pools *pools, const uint32_t ndx)
     (pools->entrie_funcs + ndx)->get_slab_elba = get_slab_elba_strp;
     (pools->entrie_funcs + ndx)->fla_pool_entry_reset = fla_pool_entry_reset_strp;
     (pools->entrie_funcs + ndx)->fla_pool_num_fla_objs = fla_pool_num_fla_objs_strp;
+    (pools->entrie_funcs + ndx)->fla_pool_obj_size_nbytes = fla_pool_obj_size_nbytes_strp;
+
   }
   else
   {
     (pools->entrie_funcs + ndx)->get_slab_elba = get_slab_elba_default;
     (pools->entrie_funcs + ndx)->fla_pool_entry_reset = fla_pool_entry_reset_default;
     (pools->entrie_funcs + ndx)->fla_pool_num_fla_objs = fla_pool_num_fla_objs_default;
+    (pools->entrie_funcs + ndx)->fla_pool_obj_size_nbytes = fla_pool_obj_size_nbytes_default;
   }
 
   return 0;
