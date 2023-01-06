@@ -143,6 +143,8 @@ flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinf
   memcpy((*oinfo)->name, name, namelen + 1);
   (*oinfo)->size = 0;
   (*oinfo)->fla_oh[0] = fla_obj;
+  (*oinfo)->fla_oh[1].entry_ndx = UINT32_MAX;
+  (*oinfo)->fla_oh[1].slab_id = UINT32_MAX;
 
   flanh->is_dirty = true;
   num_objects++;
