@@ -130,6 +130,7 @@ fla_slab_cache_elem_load(struct fla_slab_flist_cache *cache, uint32_t slab_id,
     return FLA_SLAB_CACHE_INVALID_STATE;
 
   flist_buf = fla_xne_alloc_buf( cache->_fs->dev.dev, cache_flist_size(cache, flist_len));
+  memset(flist_buf, 0, cache_flist_size(cache, flist_len));
   if (FLA_ERR(!flist_buf,
               "fla_xne_alloc_buf() - failed to allocate slab flist IO-buffer"))
   {
