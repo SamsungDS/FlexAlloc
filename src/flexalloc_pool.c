@@ -117,7 +117,7 @@ static uint64_t
 fla_pool_obj_size_nbytes_default(struct flexalloc const *fs, struct fla_pool const *ph)
 {
   const struct fla_pool_entry * pool_entry = &fs->pools.entries[ph->ndx];
-  return pool_entry->obj_nlb * fs->geo.lb_nbytes;
+  return pool_entry->obj_nlb * (uint64_t)fs->geo.lb_nbytes;
 }
 
 static uint64_t
