@@ -211,6 +211,7 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
   uint64_t loop_r_len = 0, loop_r_offset;
   uint64_t r_len_end_obj;
 
+  loop_r_offset = r_offset % obj_nbytes;
   for (int obj_offset = r_offset / obj_nbytes;r_len_toread > 0 ;
       r_len_toread -= loop_r_len)
   {
@@ -218,7 +219,6 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
       goto exit;
 
     fla_obj_tmp = &oinfo->fla_oh[obj_offset];
-    loop_r_offset = r_offset % obj_nbytes;
     r_len_end_obj = obj_nbytes - loop_r_offset;
     loop_r_len = fla_min(r_len_toread, r_len_end_obj);
 
@@ -239,6 +239,7 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
     if (FLA_ERR(err, "fla_object_action()"))
       goto exit;
     obj_offset++;
+    loop_r_offset = 0;
     if ((err = FLA_ERR(loop_r_len > r_len_toread, "Error in multi object action")))
       goto exit;
   }
