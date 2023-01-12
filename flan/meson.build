@@ -44,6 +44,12 @@ executable('flan_test_rename_write', 'test_rename_write.c',
   include_directories : libflexalloc_header_dirs
   )
 
+executable('flan_test_unaligned_read', 'test_unaligned_read.c',
+  fla_common_files, flan_files, libflexalloc_files, xnvme_env_files,
+  fla_util_files, flexalloc_testing,
+  dependencies: xnvme_deps,
+  include_directories : libflexalloc_header_dirs
+  )
 
 #fuse_deps = dependency('fuse3')
 #executable('flan_fuse', flan_fuse_files,
