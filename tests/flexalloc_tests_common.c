@@ -4,7 +4,7 @@
 
 #define _XOPEN_SOURCE 500
 #include <libxnvme_geo.h>
-#include "tests/flexalloc_tests_common.h"
+#include "flexalloc_tests_common.h"
 #include "flexalloc_xnvme_env.h"
 #include "flexalloc_util.h"
 #include "libflexalloc.h"
