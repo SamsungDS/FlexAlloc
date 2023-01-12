@@ -210,6 +210,7 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
 
   uint64_t loop_r_len = 0, loop_r_offset;
   uint64_t r_len_end_obj;
+  void * loop_buf = buf;
 
   loop_r_offset = r_offset % obj_nbytes;
   for (int obj_offset = r_offset / obj_nbytes;r_len_toread > 0 ;
@@ -224,13 +225,13 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
 
     switch (at) {
     case FLAN_MULTI_OBJ_ACTION_WRITE:
-      err = fla_object_write((struct flexalloc*)fs, ph, fla_obj_tmp, buf, loop_r_offset, loop_r_len);
+      err = fla_object_write((struct flexalloc*)fs, ph, fla_obj_tmp, loop_buf, loop_r_offset, loop_r_len);
       break;
     case FLAN_MULTI_OBJ_ACTION_WRITE_UNALIGNED:
-      err = fla_object_unaligned_write((struct flexalloc*)fs, ph, fla_obj_tmp, buf, loop_r_offset, loop_r_len);
+      err = fla_object_unaligned_write((struct flexalloc*)fs, ph, fla_obj_tmp, loop_buf, loop_r_offset, loop_r_len);
       break;
     case FLAN_MULTI_OBJ_ACTION_READ:
-      err = fla_object_read(fs, ph, fla_obj_tmp, buf, loop_r_offset, loop_r_len);
+      err = fla_object_read(fs, ph, fla_obj_tmp, loop_buf, loop_r_offset, loop_r_len);
       break;
     default:
       err = -EIO;
@@ -240,6 +241,7 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
       goto exit;
     obj_offset++;
     loop_r_offset = 0;
+    loop_buf += loop_r_len;
     if ((err = FLA_ERR(loop_r_len > r_len_toread, "Error in multi object action")))
       goto exit;
   }
@@ -494,7 +496,7 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
   // Read completely contained in buffer
   if (offset >= *rb_off && offset + len <= *rb_off + FLAN_APPEND_SIZE)
   {
-    memcpy(bufpos, rb + offset % FLAN_APPEND_SIZE, len);
+    memcpy(bufpos, rb + (offset % FLAN_APPEND_SIZE), len);
     return len;
   }
 
@@ -509,11 +511,11 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
   while (toRead > append_sz)
   {
 
-    err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off + FLAN_APPEND_SIZE,
+    *rb_off += FLAN_APPEND_SIZE;
+    err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off,
         FLAN_APPEND_SIZE, FLAN_MULTI_OBJ_ACTION_READ);
     if (err)
       FLA_ERR(err, "flan_object_read_r() uncaught error");
-    *rb_off += FLAN_APPEND_SIZE;
     memcpy(bufpos, rb, FLAN_APPEND_SIZE);
     toRead -= FLAN_APPEND_SIZE;
     bufpos += FLAN_APPEND_SIZE;
