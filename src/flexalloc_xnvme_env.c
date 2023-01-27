@@ -596,8 +596,10 @@ fla_xne_feat_idfy(struct xnvme_dev *dev, uint32_t const endgid, uint32_t *dw0)
   uint32_t nsid = xnvme_dev_get_nsid(dev);
 
   ctx = xnvme_cmd_ctx_from_dev(dev);
-  err = xnvme_adm_gfeat(&ctx, nsid, XNVME_SPEC_FEAT_FDP_MODE,
-                        XNVME_SPEC_FEAT_SEL_CURRENT, endgid, NULL, 0);
+  xnvme_prep_adm_gfeat(&ctx, nsid, XNVME_SPEC_FEAT_FDP_MODE,
+                       XNVME_SPEC_FEAT_SEL_CURRENT);
+  ctx.cmd.gfeat.cdw11 = endgid & 0xFFFF;
+  err = xnvme_cmd_pass_admin(&ctx, NULL, 0x0, NULL, 0x0);
   if (err || xnvme_cmd_ctx_cpl_status(&ctx))
   {
     xnvmec_perr("xnvme_adm_gfeat()", err);
