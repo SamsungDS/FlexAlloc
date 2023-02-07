@@ -370,7 +370,7 @@ int flan_object_delete(const char *name, struct flan_handle *flanh)
   }
 
   err = flan_md_umap_elem(flanh->md, base_name);
-  if (FLA_ERR(err, "flan_md_umap_elem()"))
+  if (err == -1 || FLA_ERR(err, "flan_md_umap_elem()"))
     return err;
 
   memset(oinfo->name, 0, FLAN_OBJ_NAME_LEN_MAX);
