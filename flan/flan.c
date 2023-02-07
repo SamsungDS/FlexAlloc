@@ -609,7 +609,7 @@ int flan_conv_object_write(struct flan_oinfo *oinfo, void *buf, size_t offset,
 {
   int ret;
 
-  if (len % flan_dev_bs(flanh))
+  if (len % flan_dev_bs(flanh) || offset % flan_dev_bs(flanh))
     ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, buf, offset,
         len, FLAN_MULTI_OBJ_ACTION_WRITE_UNALIGNED);
   else
