@@ -136,7 +136,6 @@ Status
 LibFlanEnv::NewSequentialFile(
     const std::string& fname, std::unique_ptr<SequentialFile>* result, const EnvOptions& o)
 {
-  std::lock_guard<std::mutex> guard(*(options->flan_mut));
   Status s;
   s = FileExists(fname);
   if (!s.ok())
@@ -149,7 +148,6 @@ Status
 LibFlanEnv::NewRandomAccessFile(
     const std::string& fname, std::unique_ptr<RandomAccessFile>* result, const EnvOptions& o)
 {
-  std::lock_guard<std::mutex> guard(*(options->flan_mut));
   result->reset(new LibFlanEnvRandAccessFile(fname, options, flanh));
   return Status::OK();
 }
@@ -158,7 +156,6 @@ Status
 LibFlanEnv::NewWritableFile(
     const std::string& fname, std::unique_ptr<WritableFile>* result, const EnvOptions& o)
 {
-  std::lock_guard<std::mutex> guard(*(options->flan_mut));
   result->reset(new LibFlanEnvWriteableFile(fname, options, flanh));
   return Status::OK();
 }
@@ -166,7 +163,6 @@ LibFlanEnv::NewWritableFile(
 Status
 LibFlanEnv::NewDirectory(const std::string& name, std::unique_ptr<Directory>* result)
 {
-  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
   result->reset(new LibFlanEnvDirectory());
   return Status::OK();
 }
@@ -175,13 +171,13 @@ Status
 LibFlanEnv::FileExists(const std::string& fname)
 {
   uint64_t oh;
-  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
+  std::lock_guard<std::mutex> guard(*(options->flan_mut));
   if(!flan_object_open(fname.c_str(), flanh, &oh, FLAN_OPEN_FLAG_READ)) {
     flan_object_close(oh, flanh);
     return Status::OK();
   }
   else
-    return Status::NotFound(Status::SubCode::kPathNotFound);
+    return Status::NotFound(Status::SubCode::kPathNotFound, fname);
 }
 Status
 LibFlanEnv::GetChildren(const std::string& path, std::vector<std::string>* result)
@@ -192,10 +188,9 @@ LibFlanEnv::GetChildren(const std::string& path, std::vector<std::string>* resul
 Status
 LibFlanEnv::DeleteFile(const std::string& fname)
 {
-  //std::cout << "Calling " << __func__ << ", fname " << fname << std::endl;
-  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
+  std::lock_guard<std::mutex> guard(*(options->flan_mut));
   if(flan_object_delete(fname.c_str(), flanh))
-    return Status::NotFound();
+    return Status::NotFound(Status::SubCode::kNone, fname);
 
   return Status::OK(); // No matter what happens we return that the file is not there
 }
@@ -220,17 +215,22 @@ LibFlanEnv::DeleteDir(const std::string& name)
   return Status::OK();
 }
 
-  Status
+Status
 LibFlanEnv::GetFileSize(const std::string& fname, uint64_t* size)
 {
-  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
+  std::lock_guard<std::mutex> guard(*(options->flan_mut));
   uint32_t res_cur;
   struct flan_oinfo *oinfo = flan_find_oinfo(flanh, fname.c_str(), &res_cur);
   
+  /*
+   * When I don't find the files I sould returned not found, but rocks expects
+   * a size zero. WHY!!!!!!!!
+    //    return Status::NotFound(Status::SubCode::kPathNotFound, fname);
+   */
   if(!oinfo)
-    return Status::NotFound();
-
-  *size = oinfo->size;
+    *size = 0;
+  else
+    *size = oinfo->size;
   return Status::OK();
 }
 
@@ -243,11 +243,9 @@ LibFlanEnv::GetFileModificationTime(const std::string& fname, uint64_t* file_mti
 Status
 LibFlanEnv::RenameFile(const std::string& src, const std::string& target)
 {
-  //std::cout << "Calling " << __func__ << ", src " << src << ", target " << target << std::endl;
-  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
-  
+  std::lock_guard<std::mutex> guard(*(options->flan_mut));
   if (flan_object_rename(src.c_str(), target.c_str(), flanh))
-    return Status::NotFound();
+    return Status::NotFound(Status::SubCode::kNone, src);
 
   return Status::OK();
 }
@@ -297,16 +295,9 @@ LibFlanEnv::NewLogger(const std::string& fname, std::shared_ptr<Logger>* result)
 Status
 LibFlanEnv::close()
 {
-  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
-  //std::cout << "BIG flush .... " << std::endl;
+  std::lock_guard<std::mutex> guard(*(options->flan_mut));
   flan_close(this->flanh); // TODO flan close returns status so should flan_close
 
-  //if(flan_close(this->flan_handle) != 0)
-  //{
-  //  std::cerr << "Could not close flan handle." << std::endl;
-  //  return Status::Aborted();
-  //}
-  //std::cout << "returning without an error" << std::endl;
   return Status::OK();
 }
 
@@ -314,7 +305,6 @@ Status
 LibFlanEnv::fssync()
 {
   std::lock_guard<std::mutex> guard(*(options->flan_mut));
-  //std::cout << "Flush has to wait until close " << std::endl;
   if(flan_sync(flanh) != 0)
   {
     std::cerr << "Aborting flushing ... " << std::endl;
@@ -327,8 +317,8 @@ LibFlanEnvSeqAccessFile::LibFlanEnvSeqAccessFile(
     const std::string & fname_, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options> options, struct flan_handle *flanh_)
   :fname(fname_), flanh(flanh_), fh(NULL)
 {
-  //std::cout << "Seq Access File:" << fname << std::endl;
   lnfs_mut = options->flan_mut;
+  std::lock_guard<std::mutex> guard(*lnfs_mut);
   fh = std::make_shared<LibFlanEnv::LibFlanEnv_F>();
   fh->flanh = flanh;
   if(flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_READ))
@@ -342,7 +332,6 @@ LibFlanEnvSeqAccessFile::~LibFlanEnvSeqAccessFile(){}
 Status
 LibFlanEnvSeqAccessFile::Read(size_t n, Slice* result, char* scratch)
 {
-  //std::cout << "Seq Access read:" << fname << " off:" << fh->roffset_ << " len:"  << n << std::endl;
   ssize_t len;
   std::lock_guard<std::mutex> guard(*lnfs_mut);
 
@@ -359,8 +348,6 @@ LibFlanEnvSeqAccessFile::Read(size_t n, Slice* result, char* scratch)
 Status
 LibFlanEnvSeqAccessFile::PositionedRead(uint64_t offset, size_t n, Slice* result, char* scratch)
 {
-  //std::cout << fh->offset_ << "," << fh->e_o_f_ << std::endl;
-  //std::cout << "Seq Acc Pos read:" << fname << " off:" << offset << " len:"  << n << std::endl;
   ssize_t len;
   std::lock_guard<std::mutex> guard(*lnfs_mut);
   
@@ -382,6 +369,7 @@ LibFlanEnvSeqAccessFile::use_direct_io() const
 Status
 LibFlanEnvSeqAccessFile::Skip(uint64_t n)
 {
+  std::lock_guard<std::mutex> guard(*lnfs_mut);
   if(fh->roffset_ + n > fh->e_o_f_)
     return Status::IOError();
   fh->roffset_ += n;
@@ -394,6 +382,7 @@ LibFlanEnvRandAccessFile::LibFlanEnvRandAccessFile(
 {
   //std::cout << "Rand Access File:" << fname << std::endl;
   lnfs_mut = options->flan_mut;
+  std::lock_guard<std::mutex> guard(*lnfs_mut);
   fh = std::make_shared<LibFlanEnv::LibFlanEnv_F>();
   fh->flanh = flanh;
   if(flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_READ))
@@ -406,8 +395,6 @@ LibFlanEnvRandAccessFile::~LibFlanEnvRandAccessFile(){}
 Status
 LibFlanEnvRandAccessFile::Read(uint64_t offset, size_t n, Slice* result, char* scratch) const
 {
-  //std::cout << "Calling a rand read offset : " << offset << " Size : "<< n << std::endl;
-  //std::cout << "Ran Acc read:" << fname << " off:" << offset << " len"  << n << std::endl;
   ssize_t len;
   std::lock_guard<std::mutex> guard(*lnfs_mut);
 
@@ -451,16 +438,14 @@ LibFlanEnvWriteableFile::LibFlanEnvWriteableFile(
 {
 
   lnfs_mut = options->flan_mut;
+  std::lock_guard<std::mutex> guard(*lnfs_mut);
   fh = std::make_shared<LibFlanEnv::LibFlanEnv_F>();
   fh->flanh = flanh;
-  //auto start = std::chrono::high_resolution_clock::now();
+
   if(flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_CREATE | 
 	  FLAN_OPEN_FLAG_WRITE))
     throw std::runtime_error(std::string("Error allocating object for file:") + fname);
     
-  //auto end = std::chrono::high_resolution_clock::now();
-  //auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-  //std::cout << "Writeable File:" << fname << " oh : " << fh->object_handle <<  std::endl;
   fh->opens++;
 }
 
@@ -472,28 +457,19 @@ Status
 LibFlanEnvWriteableFile::Append(const Slice& slice)
 {
   std::lock_guard<std::mutex> guard(*lnfs_mut);
-  //Env::num_written_bytes += slice.size_;
 
-  //auto start = std::chrono::high_resolution_clock::now();
   if(flan_object_write(fh->object_handle, (void*)slice.data_, fh->woffset_, slice.size_, fh->flanh))
     throw std::runtime_error(std::string("Error appending to file"));
 
-  //auto end = std::chrono::high_resolution_clock::now();
-  //auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-  //std::cout << "File:" << fname << " append size:" << slice.size_ << " wof:" << fh->woffset_ << " oh : " << fh->object_handle << std::endl;
-  //std::cout << "Time(us)):" << duration.count() << std::endl;
   fh->e_o_f_ += slice.size_;
   fh->woffset_ += slice.size_;
-  //std::cout << "buf : " << slice.data_ << " size : " << slice.data_ << std::endl;
   return Status::OK();
 }
 
 Status
 LibFlanEnvWriteableFile::PositionedAppend(const Slice& slice, uint64_t offset)
 {
-  //std::cout << "File:" << fname << " pos append size:" << slice.size_<<  " pos:"<< offset<< std::endl;
   std::lock_guard<std::mutex> guard(*lnfs_mut);
-  //Env::num_written_bytes += slice.size_;
 
   if(flan_object_write(fh->object_handle, (void*)slice.data_, offset, slice.size_, fh->flanh))
     throw std::runtime_error(std::string("Error pos appending to file"));
@@ -529,14 +505,15 @@ LibFlanEnvWriteableFile::Flush()
 Status
 LibFlanEnvWriteableFile::Sync()
 {
+  std::lock_guard<std::mutex> guard(*lnfs_mut);
+  if(flan_sync(fh->flanh) != 0)
+    throw std::runtime_error(std::string("Error syncing writable file"));
   return Status::OK();
 }
 Status
 LibFlanEnvWriteableFile::Close()
 {
-  //std::cout << "Calling " << __func__ << ", fname " << fname << std::endl;
-  //std::lock_guard<std::mutex> guard(*lnfs_mut);
-  //std::cout << " Closing oh : " << fh->object_handle << std::endl;
+  std::lock_guard<std::mutex> guard(*lnfs_mut);
   flan_object_close(fh->object_handle, fh->flanh);
   return Status::OK();
 }
