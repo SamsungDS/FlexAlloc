@@ -90,7 +90,7 @@ private:
 
 public:
   LibFlanEnvSeqAccessFile(
-      const std::string & fname, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options> options, struct flan_handle *flanh);
+      const std::string & fname, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options>& options, struct flan_handle *flanh);
   virtual ~LibFlanEnvSeqAccessFile();
 
 public:
@@ -111,7 +111,7 @@ private:
 
 public:
   LibFlanEnvRandAccessFile(
-      const std::string & fname, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options> options, struct flan_handle *flanh);
+      const std::string & fname, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options>& options, struct flan_handle *flanh);
   virtual ~LibFlanEnvRandAccessFile();
 
 public:
@@ -138,7 +138,7 @@ private:
 
 public:
   LibFlanEnvWriteableFile(
-      const std::string & fname, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options> options, struct flan_handle *flanh);
+      const std::string & fname, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options>& options, struct flan_handle *flanh);
   virtual ~LibFlanEnvWriteableFile();
 
 public:
