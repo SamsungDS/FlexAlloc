@@ -122,14 +122,17 @@ LibFlanEnv::LibFlanEnv(Env *env, const std::string &flan_opts)
   }
 
   //std::cout << "Starting a flan environmnet" << std::endl;
-  if (flan_init(dev_uri.c_str(), md_dev_uri_ptr, &pool_arg, obj_nbytes, &flanh))
-      throw std::runtime_error(std::string("Error initializing flan:"));
+  int ret = flan_init(dev_uri.c_str(), md_dev_uri_ptr, &pool_arg, obj_nbytes, &flanh);
+  if (ret)
+      throw std::runtime_error(std::string("Error initializing flan: error ") + 
+          std::to_string(ret));
 }
 
 LibFlanEnv::~LibFlanEnv()
 {
-  std::cout << "Executing the close function ===================================" << std::endl;
-  //close();
+  //std::cout << "Executing the destructor function ===================================" << std::endl;
+  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
+  //flan_close(this->flanh); // TODO flan close returns status so should flan_close
 }
 
 Status
@@ -295,8 +298,9 @@ LibFlanEnv::NewLogger(const std::string& fname, std::shared_ptr<Logger>* result)
 Status
 LibFlanEnv::close()
 {
-  std::lock_guard<std::mutex> guard(*(options->flan_mut));
-  flan_close(this->flanh); // TODO flan close returns status so should flan_close
+  //std::cout << "Executing the close function ===================================" << std::endl;
+  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
+  //flan_close(this->flanh); // TODO flan close returns status so should flan_close
 
   return Status::OK();
 }
@@ -314,15 +318,17 @@ LibFlanEnv::fssync()
 }
 
 LibFlanEnvSeqAccessFile::LibFlanEnvSeqAccessFile(
-    const std::string & fname_, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options> options, struct flan_handle *flanh_)
+    const std::string & fname_, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options>& options, struct flan_handle *flanh_)
   :fname(fname_), flanh(flanh_), fh(NULL)
 {
   lnfs_mut = options->flan_mut;
   std::lock_guard<std::mutex> guard(*lnfs_mut);
   fh = std::make_shared<LibFlanEnv::LibFlanEnv_F>();
   fh->flanh = flanh;
-  if(flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_READ))
-    throw std::runtime_error(std::string("Error finding file:") + fname);
+  int ret = flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_READ);
+  if(ret)
+    throw std::runtime_error(std::string("Error finding file:") + fname +
+        std::string(" error: ") + std::to_string(ret));
 
   fh->opens++;
 }
@@ -377,7 +383,7 @@ LibFlanEnvSeqAccessFile::Skip(uint64_t n)
 }
 
 LibFlanEnvRandAccessFile::LibFlanEnvRandAccessFile(
-    const std::string & fname_, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options> options, struct flan_handle *flanh_)
+    const std::string & fname_, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options>& options, struct flan_handle *flanh_)
   :fname(fname_), flanh(flanh_), fh(NULL)
 {
   //std::cout << "Rand Access File:" << fname << std::endl;
@@ -385,9 +391,11 @@ LibFlanEnvRandAccessFile::LibFlanEnvRandAccessFile(
   std::lock_guard<std::mutex> guard(*lnfs_mut);
   fh = std::make_shared<LibFlanEnv::LibFlanEnv_F>();
   fh->flanh = flanh;
-  if(flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_READ))
-    throw std::runtime_error(std::string("Error allocating object for file:") + fname);
-    
+  int ret = flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_READ);
+  if(ret)
+    throw std::runtime_error(std::string("Error allocating object for file:") + fname +
+        std::string(" error: ") + std::to_string(ret));
+
   fh->opens++;
 }
 LibFlanEnvRandAccessFile::~LibFlanEnvRandAccessFile(){}
@@ -433,7 +441,7 @@ LibFlanEnvRandAccessFile::InvalidateCache(size_t offset, size_t length)
 };
 
 LibFlanEnvWriteableFile::LibFlanEnvWriteableFile(
-    const std::string & fname_, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options> options, struct flan_handle *flanh_)
+    const std::string & fname_, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options>& options, struct flan_handle *flanh_)
   :fname(fname_), flanh(flanh_), fh(NULL), _prevwr(0)
 {
 
@@ -442,10 +450,11 @@ LibFlanEnvWriteableFile::LibFlanEnvWriteableFile(
   fh = std::make_shared<LibFlanEnv::LibFlanEnv_F>();
   fh->flanh = flanh;
 
-  if(flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_CREATE | 
-	  FLAN_OPEN_FLAG_WRITE))
-    throw std::runtime_error(std::string("Error allocating object for file:") + fname);
-    
+  int ret = flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_CREATE |
+                             FLAN_OPEN_FLAG_WRITE);
+  if(ret)
+    throw std::runtime_error(std::string("Error allocating object for file:") + fname +
+        std::string(" error: ") + std::to_string(ret));
   fh->opens++;
 }
 
@@ -458,8 +467,11 @@ LibFlanEnvWriteableFile::Append(const Slice& slice)
 {
   std::lock_guard<std::mutex> guard(*lnfs_mut);
 
-  if(flan_object_write(fh->object_handle, (void*)slice.data_, fh->woffset_, slice.size_, fh->flanh))
-    throw std::runtime_error(std::string("Error appending to file"));
+  int ret = flan_object_write(fh->object_handle, (void*)slice.data_, fh->woffset_,
+      slice.size_, fh->flanh);
+  if(ret)
+    throw std::runtime_error(std::string("Error appending to file: ") + fname +
+        std::string(" error: ") + std::to_string(ret));
 
   fh->e_o_f_ += slice.size_;
   fh->woffset_ += slice.size_;
@@ -471,8 +483,11 @@ LibFlanEnvWriteableFile::PositionedAppend(const Slice& slice, uint64_t offset)
 {
   std::lock_guard<std::mutex> guard(*lnfs_mut);
 
-  if(flan_object_write(fh->object_handle, (void*)slice.data_, offset, slice.size_, fh->flanh))
-    throw std::runtime_error(std::string("Error pos appending to file"));
+  int ret = flan_object_write(fh->object_handle, (void*)slice.data_, offset,
+      slice.size_, fh->flanh);
+  if(ret)
+    throw std::runtime_error(std::string("Error pos appending to file :") + fname +
+        std::string(" error: ") + std::to_string(ret));
 
   fh->e_o_f_ = offset + slice.size_ > fh->e_o_f_ ? offset + slice.size_ : fh->e_o_f_;
   fh->woffset_ = offset + slice.size_;
@@ -506,8 +521,10 @@ Status
 LibFlanEnvWriteableFile::Sync()
 {
   std::lock_guard<std::mutex> guard(*lnfs_mut);
-  if(flan_sync(fh->flanh) != 0)
-    throw std::runtime_error(std::string("Error syncing writable file"));
+  int ret = flan_sync(fh->flanh);
+  if(ret != 0)
+    throw std::runtime_error(std::string("Error syncing writable file : ") + fname +
+        std::string(" error: ") + std::to_string(ret));
   return Status::OK();
 }
 Status
