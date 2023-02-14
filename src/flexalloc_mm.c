@@ -653,6 +653,7 @@ fla_close_noflush(struct flexalloc *fs)
   fs->state &= ~FLA_STATE_OPEN;
   fs->fla_cs.fncs.fini_cs(fs, 0);
   fs->fla_dp.fncs.fini_dp(fs);
+  fla_pool_fini(fs);
   fla_slab_cache_free(&fs->slab_cache);
   xnvme_dev_close(fs->dev.dev);
   free(fs->super);

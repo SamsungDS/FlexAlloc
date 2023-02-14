@@ -305,6 +305,12 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
 
   flan_otable[ff_oh].use_count++;
   flan_otable[ff_oh].append_buf = fla_buf_alloc(flanh->fs, flanh->append_sz);
+  if (!flan_otable[ff_oh].append_buf)
+  {
+    printf("Object open unable to allocate append buf\n");
+    return -EINVAL;
+  }
+
 
   if (flags & FLAN_OPEN_FLAG_READ)
     flan_otable[ff_oh].read_buf = flan_otable[ff_oh].append_buf;
@@ -312,12 +318,6 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   flan_otable[ff_oh].o_flags = flags;
 
   memset(flan_otable[ff_oh].append_buf, 0, bs);
-
-  if (!flan_otable[ff_oh].append_buf)
-  {
-    printf("Object open unable to allocate append buf\n");
-    return -EINVAL;
-  }
 
   // Read the data into the append buffer
   if (flan_otable[ff_oh].append_off < flan_obj_sz * 64 && flags & FLAN_OPEN_FLAG_WRITE)
