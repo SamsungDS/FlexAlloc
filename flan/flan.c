@@ -237,7 +237,7 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
       err = -EIO;
       break;
     }
-    if (FLA_ERR(err, "fla_object_action()"))
+    if (FLA_ERR(err, "fla_object_action(), error: %d", err))
       goto exit;
     obj_offset++;
     loop_r_offset = 0;
@@ -304,7 +304,6 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
     return -EINVAL;
   }
 
-
   if (flags & FLAN_OPEN_FLAG_READ)
     flan_otable[ff_oh].read_buf = flan_otable[ff_oh].append_buf;
 
@@ -318,7 +317,10 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
     ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, flan_otable[ff_oh].append_buf,
                     (flan_otable[ff_oh].append_off / bs) * bs, bs, FLAN_MULTI_OBJ_ACTION_READ);
     if (FLA_ERR(ret, "flan_multi_object_action()"))
+    {
+      fla_buf_free(flanh->fs, flan_otable[ff_oh].append_buf);
       return ret;
+    }
   }
 
   // Freeze a zns file that has been previously appended
@@ -642,11 +644,8 @@ int flan_zns_object_write(struct flan_oinfo *oinfo, void *buf, size_t offset,
     memcpy(flan_otable[oh].append_buf + (offset % bs), buf, al_start - offset);
     ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, flan_otable[oh].append_buf,
         buf_offset, bs, FLAN_MULTI_OBJ_ACTION_WRITE);
-    if (ret)
-    {
-      printf("Error writing append buffer\n");
-      return ret;
-    }
+    if (FLA_ERR(ret, "Error writing append buffer, error: %d\n", ret))
+        return ret;
   }
   // Write out all of the aligned data
   bufpos += al_start - offset;
@@ -657,12 +656,8 @@ int flan_zns_object_write(struct flan_oinfo *oinfo, void *buf, size_t offset,
         al_len, FLAN_MULTI_OBJ_ACTION_WRITE);
     free(al_buf);
   }
-
-  if (ret)
-  {
-    printf("ZNS write of the aligned portion of append data fails\n");
+  if(FLA_ERR(ret, "ZNS write of the aligned portion of append data fails, error: %d\n", ret))
     return ret;
-  }
 
   bufpos += al_len;
   // Copy the unaligned tail to the buffer
@@ -699,7 +694,8 @@ flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
   if (offset + len
       > fla_object_size_nbytes(flanh->fs, flanh->ph) * num_active)
   {
-    if ((ret = FLA_ERR(num_active == FLAN_MAX_FLA_OBJ_IN_OINFO, "flan_object_write_(): exceeded FLAN_MAX_FLA_OBJ_IN_OINFO")))
+    if ((ret = FLA_ERR(num_active == FLAN_MAX_FLA_OBJ_IN_OINFO,
+                       "flan_object_write_(): exceeded FLAN_MAX_FLA_OBJ_IN_OINFO")))
       return ret;
     ret = fla_object_create(flanh->fs, flanh->ph, &oinfo->fla_oh[num_active]);
     if (FLA_ERR(ret, "fla_object_create()"))
@@ -711,11 +707,8 @@ flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
   else
     ret = flan_conv_object_write(oinfo, buf, offset, len, flanh);
 
-  if (ret)
-  {
-    printf("flan_object_write fla object write fails\n");
+  if(FLA_ERR(ret, "flan_object_write fla object write fails : %d\n", ret))
     return -EIO;
-  }
 
   if (offset + len > oinfo->size)
     oinfo->size = offset + len;
