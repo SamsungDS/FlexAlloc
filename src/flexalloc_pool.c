@@ -238,7 +238,7 @@ fla_print_pool_entries(struct flexalloc *fs)
         fprintf(stderr, "|    -->next : %"PRIu32", prev : %"PRIu32", refcount : %"PRIu32"\n",
                 curr_slab->next, curr_slab->prev, curr_slab->refcount);
         tmp = curr_slab->next;
-        allocated_nbytes += (curr_slab->refcount * pool_entry->obj_nlb * fs->geo.lb_nbytes);
+        allocated_nbytes += (curr_slab->refcount * (uint64_t)pool_entry->obj_nlb * fs->geo.lb_nbytes);
       }
     }
   }
