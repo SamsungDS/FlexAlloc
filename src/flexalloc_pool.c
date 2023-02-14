@@ -193,6 +193,12 @@ fla_pool_init(struct flexalloc *fs, struct fla_geo *geo, uint8_t *pool_sgmt_base
 }
 
 void
+fla_pool_fini(struct flexalloc *fs)
+{
+  free(fs->pools.entrie_funcs);
+}
+
+void
 fla_print_pool_entries(struct flexalloc *fs)
 {
   int err = 0;
