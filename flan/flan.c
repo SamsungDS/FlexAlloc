@@ -301,7 +301,7 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   if (flags & FLAN_OPEN_FLAG_WRITE)
     flan_otable[ff_oh].append_off = flan_otable[ff_oh].oinfo->size; // Verify zero on new entry
   else if (flags & FLAN_OPEN_FLAG_READ)
-    flan_otable[ff_oh].read_buf_off = UINT64_MAX;
+    flan_otable[ff_oh].read_buf_off = 0;
 
   flan_otable[ff_oh].use_count++;
   flan_otable[ff_oh].append_buf = fla_buf_alloc(flanh->fs, flanh->append_sz);
