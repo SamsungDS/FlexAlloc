@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
   /* We allocate a write and read buffer that is bigger than the flan
    * read buffer size*/
-  size_t buf_sz = FLAN_APPEND_SIZE * 5;
+  size_t buf_sz = flanh->append_sz * 5;
   r_buf = flan_buf_alloc(buf_sz, flanh);
   if (!r_buf)
     goto out_close;
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
   if (ret)
     goto out_close;
 
-  uint64_t offset = obj_sz - (2*FLAN_APPEND_SIZE);
+  uint64_t offset = obj_sz - (2*flanh->append_sz);
   ret = flan_object_write(oh, w_buf, offset, buf_sz, flanh);
   if (ret)
     goto out_close;
@@ -98,7 +98,7 @@ int main(int argc, char **argv)
     goto out_close;
 
 
-  size_t l_offset = FLAN_APPEND_SIZE / 2;
+  size_t l_offset = flanh->append_sz / 2;
   size_t l_step = 1000;
   size_t l_len = buf_sz - l_offset;
 

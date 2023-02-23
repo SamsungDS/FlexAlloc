@@ -213,7 +213,7 @@ flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph
   void * loop_buf = buf;
 
   loop_r_offset = r_offset % obj_nbytes;
-  for (int obj_offset = r_offset / obj_nbytes;r_len_toread > 0 ;
+  for (int obj_offset = r_offset / obj_nbytes; r_len_toread > 0 ;
       r_len_toread -= loop_r_len)
   {
     if ((err = FLA_ERR(obj_offset > 1, "fla_multi_object_action()")))
@@ -294,7 +294,7 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   if (flags & FLAN_OPEN_FLAG_WRITE)
     flan_otable[ff_oh].append_off = flan_otable[ff_oh].oinfo->size; // Verify zero on new entry
   else if (flags & FLAN_OPEN_FLAG_READ)
-    flan_otable[ff_oh].read_buf_off = 0;
+    flan_otable[ff_oh].read_buf_off = UINT64_MAX;
 
   flan_otable[ff_oh].use_count++;
   flan_otable[ff_oh].append_buf = fla_buf_alloc(flanh->fs, flanh->append_sz);
@@ -482,54 +482,53 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
   uint64_t *rb_off = &flan_otable[oh].read_buf_off;
   char *rb = flan_otable[oh].read_buf;
   char *bufpos = buf;
-  size_t from_buffer = 0, toRead = len, append_sz = FLAN_APPEND_SIZE;
+  size_t from_buffer = 0, toRead = len;
 
   // Read in the correct block if the starting address does not fall within the buffer
-  if (offset < *rb_off || offset >= (*rb_off + FLAN_APPEND_SIZE))
+  if (offset < *rb_off || offset >= (*rb_off + flanh->append_sz))
   {
-    *rb_off = (offset / FLAN_APPEND_SIZE) * FLAN_APPEND_SIZE;
+    *rb_off = (offset / flanh->append_sz) * flanh->append_sz;
     err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off,
-        FLAN_APPEND_SIZE, FLAN_MULTI_OBJ_ACTION_READ);
+        flanh->append_sz, FLAN_MULTI_OBJ_ACTION_READ);
     if (err)
       FLA_ERR(err, "flan_object_read_r() uncaught error");
-
   }
 
   // Read completely contained in buffer
-  if (offset >= *rb_off && offset + len <= *rb_off + FLAN_APPEND_SIZE)
+  if (offset >= *rb_off && offset + len <= *rb_off + flanh->append_sz)
   {
-    memcpy(bufpos, rb + (offset % FLAN_APPEND_SIZE), len);
+    memcpy(bufpos, rb + (offset % flanh->append_sz), len);
     return len;
   }
 
-  from_buffer = FLAN_APPEND_SIZE - (offset % FLAN_APPEND_SIZE);
-  memcpy(bufpos, rb + offset % FLAN_APPEND_SIZE, from_buffer);
+  from_buffer = flanh->append_sz - (offset % flanh->append_sz);
+  memcpy(bufpos, rb + offset % flanh->append_sz, from_buffer);
 
   toRead -= from_buffer;
   bufpos += from_buffer;
   offset += from_buffer;
 
   // TODO set the rb_off if it hasn't been initialized
-  while (toRead > append_sz)
+  while (toRead > flanh->append_sz)
   {
 
-    *rb_off += FLAN_APPEND_SIZE;
+    *rb_off += flanh->append_sz;
     err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off,
-        FLAN_APPEND_SIZE, FLAN_MULTI_OBJ_ACTION_READ);
+        flanh->append_sz, FLAN_MULTI_OBJ_ACTION_READ);
     if (err)
       FLA_ERR(err, "flan_object_read_r() uncaught error");
-    memcpy(bufpos, rb, FLAN_APPEND_SIZE);
-    toRead -= FLAN_APPEND_SIZE;
-    bufpos += FLAN_APPEND_SIZE;
-    offset += FLAN_APPEND_SIZE;
+    memcpy(bufpos, rb, flanh->append_sz);
+    toRead -= flanh->append_sz;
+    bufpos += flanh->append_sz;
+    offset += flanh->append_sz;
   }
 
-  err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off + FLAN_APPEND_SIZE,
-      FLAN_APPEND_SIZE, FLAN_MULTI_OBJ_ACTION_READ);
+  err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off + flanh->append_sz,
+      flanh->append_sz, FLAN_MULTI_OBJ_ACTION_READ);
   if (err)
     FLA_ERR(err, "flan_object_read_r() uncaught error");
-  *rb_off += FLAN_APPEND_SIZE;
-  memcpy(bufpos, rb + offset % FLAN_APPEND_SIZE, toRead);
+  *rb_off += flanh->append_sz;
+  memcpy(bufpos, rb + offset % flanh->append_sz, toRead);
 
   return len;
 
