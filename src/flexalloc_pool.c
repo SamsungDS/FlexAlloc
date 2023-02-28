@@ -203,10 +203,11 @@ fla_print_pool_entries(struct flexalloc *fs)
 {
   int err = 0;
   struct fla_slab_header * curr_slab;
-  uint32_t slab_heads[3];
   uint32_t tmp;
   struct fla_pool_entry * pool_entry;
   uint64_t allocated_nbytes = 0;
+  uint32_t slab_heads[3];
+  char * slab_head_names[3] = {"Empty Slabs List", "Full Slabs List", "Partial Slabs List"};
 
   for (uint32_t npool = 0 ; npool < fs->geo.npools ; ++npool)
   {
@@ -222,7 +223,7 @@ fla_print_pool_entries(struct flexalloc *fs)
     fprintf(stderr, "|  flags: \n");
     fprintf(stderr, "|  `-> Stripped: %d\n", (int)(pool_entry->flags & FLA_POOL_ENTRY_STRP));
     fprintf(stderr, "|  non-stripped obj_nlb : %"PRIu32"\n", pool_entry->obj_nlb);
-    fprintf(stderr, "|  root_obj_hndl : ");
+    fprintf(stderr, "|  root_obj_hndl : \n");
     fprintf(stderr, "|  `-> slab_id : %"PRIu32"\n",
         ((struct fla_object*)(&pool_entry->root_obj_hndl))->slab_id);
     fprintf(stderr, "|  `-> entry_ndx %"PRIu32"\n",
@@ -232,7 +233,7 @@ fla_print_pool_entries(struct flexalloc *fs)
     fprintf(stderr, "|  Slabs:\n");
     for(size_t i = 0 ; i < 3 ; ++i)
     {
-      fprintf(stderr, "|    Head : %d, offset %ld\n", slab_heads[i], i);
+      fprintf(stderr, "|    Head : %d, offset %ld, name : %s\n", slab_heads[i], i, slab_head_names[i]);
       tmp = slab_heads[i];
       for(uint32_t j = 0 ; j < fs->geo.nslabs && tmp != FLA_LINKED_LIST_NULL; ++j)
       {
