@@ -708,6 +708,7 @@ fla_print_geo(struct flexalloc *fs)
   fprintf(stderr, "|    * total blocks: %"PRIu32"\n", fla_geo_pool_sgmt_nblocks(&geo->pool_sgmt));
   fprintf(stderr, "|  slab segment:\n");
   fprintf(stderr, "|    * slabs: %"PRIu32"\n", geo->nslabs);
+  fprintf(stderr, "|    * slab num LBAs: %"PRIu32"\n", geo->slab_nlb);
   fprintf(stderr, "|    * slab total blocks: %"PRIu32"\n", geo->slab_sgmt.slab_sgmt_nlb);
   fprintf(stderr, "\n");
 }
