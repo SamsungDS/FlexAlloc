@@ -18,7 +18,6 @@
 
 unsigned int num_objects;
 unsigned int flan_obj_sz;
-unsigned int flan_oi_ob;
 struct flan_handle *root;
 static pthread_mutex_t flan_mutex;
 
@@ -102,7 +101,9 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
   }
 
   flan_obj_sz = obj_nlb * fla_fs_lb_nbytes((*flanh)->fs);
-  flan_oi_ob = flan_obj_sz / sizeof(struct flan_oinfo);
+  if (pool_arg->flags && FLA_POOL_ENTRY_STRP)
+    flan_obj_sz *= pool_arg->strp_nobjs;
+
 
   ret = flan_md_init((*flanh)->fs, (*flanh)->ph, flan_elem_nbytes, flan_has_key, &(*flanh)->md);
   open_opts.opts->sync = "io_uring";
@@ -319,7 +320,7 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   memset(flan_otable[ff_oh].append_buf, 0, bs);
 
   // Read the data into the append buffer
-  if (flan_otable[ff_oh].append_off < flan_obj_sz * 64 && flags & FLAN_OPEN_FLAG_WRITE)
+  if (flan_otable[ff_oh].append_off < flan_obj_sz && flags & FLAN_OPEN_FLAG_WRITE)
   {
     ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, flan_otable[ff_oh].append_buf,
                     (flan_otable[ff_oh].append_off / bs) * bs, bs, FLAN_MULTI_OBJ_ACTION_READ);
