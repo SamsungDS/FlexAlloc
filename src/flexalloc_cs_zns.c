@@ -84,7 +84,8 @@ int
 fla_cs_zns_pool_check(struct flexalloc *fs, uint32_t const obj_nlb)
 {
   if (FLA_ERR(obj_nlb != fs->fla_cs.fla_cs_zns->nzsect,
-              "object size != formated zone size"))
+              "object size (%"PRIu32") != formated zone size(%"PRIu64")",
+              obj_nlb, fs->fla_cs.fla_cs_zns->nzsect))
     return 1;
   return 0;
 }
