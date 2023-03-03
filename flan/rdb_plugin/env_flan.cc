@@ -123,7 +123,7 @@ LibFlanEnv::LibFlanEnv(Env *env, const std::string &flan_opts)
     // When we do stripping, our object is smaller than the sstable.
     if (obj_nbytes % pool_arg.strp_nobjs != 0)
       throw std::runtime_error(std::string("Error number of obj in stripe "
-            "is not a multiple of sstable size");
+            "is not a multiple of sstable size"));
 
     obj_nbytes = obj_nbytes / pool_arg.strp_nobjs;
   }
