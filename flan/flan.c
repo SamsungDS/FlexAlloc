@@ -79,6 +79,11 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
   else
     (*flanh)->append_sz = objsz;
 
+  if ((ret = FLA_ERR(objsz % fla_fs_lb_nbytes((*flanh)->fs) != 0,
+        "Flan object size %"PRIu64" not a multiple of lb_nbytes %"PRIu32"",
+        objsz, fla_fs_lb_nbytes((*flanh)->fs))))
+      goto out_free;
+
   obj_nlb = objsz / fla_fs_lb_nbytes((*flanh)->fs);
   ret = fla_pool_open((*flanh)->fs, pool_arg->name, &((*flanh)->ph));
   if (ret == -1)
