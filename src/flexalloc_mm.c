@@ -806,24 +806,25 @@ exit:
   return err;
 }
 
-int
+static int
 fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab,
-                            struct fla_object * obj, uint32_t num_objs)
+                            struct fla_object * obj)
 {
   int err = 0;
-  uint32_t slab_id;
+  uint32_t slab_id, num_objs;
   struct fla_pool_entry const * pool_entry;
 
   err = fla_slab_id(slab, fs, &slab_id);
   if(FLA_ERR(err, "fla_slab_id()"))
     return err;
 
+  pool_entry = &fs->pools.entries[slab->pool];
+  num_objs = (fs->pools.entrie_funcs + slab->pool)->fla_pool_num_fla_objs(pool_entry);
+
   err = fla_slab_cache_obj_alloc(&fs->slab_cache, slab_id, obj, num_objs);
   if(FLA_ERR(err, "fla_slab_cache_obj_alloc()"))
     return err;
-
-  pool_entry = &fs->pools.entries[slab->pool];
-  slab->refcount += (fs->pools.entrie_funcs + slab->pool)->fla_pool_num_fla_objs(pool_entry);
+  slab->refcount += num_objs;
 
   return err;
 }
@@ -874,7 +875,6 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
   struct fla_slab_header * slab;
   struct fla_pool_entry * pool_entry;
   uint32_t * from_head, * to_head, slab_id;
-  struct fla_pool_entry_fnc const * pool_entry_fnc;
 
   pool_entry = &fs->pools.entries[pool_handle->ndx];
   err = fla_pool_next_available_slab(fs, pool_entry, &slab);
@@ -900,10 +900,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
 
   from_head = fla_pool_best_slab_list(slab, &fs->pools);
 
-  pool_entry_fnc = fs->pools.entrie_funcs + slab->pool;
-  uint32_t num_fla_objs = pool_entry_fnc->fla_pool_num_fla_objs(pool_entry);
-
-  err = fla_slab_next_available_obj(fs, slab, obj, num_fla_objs);
+  err = fla_slab_next_available_obj(fs, slab, obj);
   if(FLA_ERR(err, "fla_slab_next_available_obj()"))
   {
     goto exit;
