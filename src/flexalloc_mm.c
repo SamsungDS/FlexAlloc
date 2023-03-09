@@ -824,6 +824,7 @@ fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab
   if(FLA_ERR(err, "fla_slab_cache_obj_alloc()"))
     return err;
   slab->refcount += num_objs;
+  slab->nobj_since_trim += num_objs;
 
   return err;
 }
@@ -1110,6 +1111,11 @@ fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t ob
   err = fla_slab_id(slab, fs, &slab_id);
   if(FLA_ERR(err, "fla_slab_id()"))
     goto exit;
+
+  err = fla_xne_dev_send_deallocate(fs->dev.dev, fla_geo_slab_lb_off(fs, slab_id), fs->super->slab_nlb);
+  if (FLA_ERR(err, "fla_xne_dev_send_deallocate()"))
+    goto exit;
+  slab->nobj_since_trim = 0;
 
   err = fla_slab_cache_elem_init(&fs->slab_cache, slab_id, obj_num);
   if(FLA_ERR(err, "fla_slab_cache_elem_init()"))

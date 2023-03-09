@@ -63,6 +63,9 @@ struct fla_slab_header
 
   /// number of objects allocated from slab
   uint32_t refcount; // TODO: should have a var in cache structure describing n_entries/slab
+
+  /// Number of ojbects that have been added since the last trim
+  uint32_t nobj_since_trim;
 };
 
 
