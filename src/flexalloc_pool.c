@@ -76,9 +76,9 @@ fla_pool_entry_reset_default(struct fla_pool_entry *pool_entry,
   memcpy(pool_entry->name, arg->name, arg->name_len);
   pool_entry->obj_nlb = arg->obj_nlb;
   pool_entry->slab_nobj = slab_nobj;
-  pool_entry->empty_slabs = FLA_LINKED_LIST_NULL;
-  pool_entry->full_slabs = FLA_LINKED_LIST_NULL;
-  pool_entry->partial_slabs = FLA_LINKED_LIST_NULL;
+  pool_entry->slab_list_id_0 = FLA_LINKED_LIST_NULL;
+  pool_entry->slab_list_id_1 = FLA_LINKED_LIST_NULL;
+  pool_entry->slab_list_id_2 = FLA_LINKED_LIST_NULL;
   pool_entry->root_obj_hndl = FLA_ROOT_OBJ_NONE;
   return 0;
 }
@@ -207,15 +207,14 @@ fla_print_pool_entries(struct flexalloc *fs)
   struct fla_pool_entry * pool_entry;
   uint64_t allocated_nbytes = 0;
   uint32_t slab_heads[3];
-  char * slab_head_names[3] = {"Empty Slabs List", "Full Slabs List", "Partial Slabs List"};
 
   for (uint32_t npool = 0 ; npool < fs->geo.npools ; ++npool)
   {
     pool_entry = &fs->pools.entries[npool];
 
-    slab_heads[0] = pool_entry->empty_slabs;
-    slab_heads[1] = pool_entry->full_slabs;
-    slab_heads[2] = pool_entry->partial_slabs;
+    slab_heads[0] = pool_entry->slab_list_id_0;
+    slab_heads[1] = pool_entry->slab_list_id_1;
+    slab_heads[2] = pool_entry->slab_list_id_2;
     if(pool_entry->obj_nlb == 0 && pool_entry->slab_nobj == 0)
       continue; //as this pool has not been initialized
 
@@ -233,7 +232,7 @@ fla_print_pool_entries(struct flexalloc *fs)
     fprintf(stderr, "|  Slabs:\n");
     for(size_t i = 0 ; i < 3 ; ++i)
     {
-      fprintf(stderr, "|    Head : %d, offset %ld, name : %s\n", slab_heads[i], i, slab_head_names[i]);
+      fprintf(stderr, "|    Head : %d, offset %ld, name : List %ld\n", slab_heads[i], i, i);
       tmp = slab_heads[i];
       for(uint32_t j = 0 ; j < fs->geo.nslabs && tmp != FLA_LINKED_LIST_NULL; ++j)
       {
@@ -277,7 +276,9 @@ int
 fla_pool_release_all_slabs(struct flexalloc *fs, struct fla_pool_entry * pool_entry)
 {
   int err = 0;
-  uint32_t * heads[3] = {&pool_entry->empty_slabs, &pool_entry->full_slabs, &pool_entry->partial_slabs};
+  uint32_t * heads[3] = { &pool_entry->slab_list_id_0,
+                          &pool_entry->slab_list_id_1,
+                          &pool_entry->slab_list_id_2};
   for(size_t i = 0 ; i < 3 ; ++i)
   {
     err = fla_hdll_remove_all(fs, heads[i], fla_release_slab);
