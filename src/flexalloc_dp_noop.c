@@ -10,11 +10,9 @@ fla_dp_noop_pool_slab_list_id(struct fla_slab_header const *slab,
 {
   struct fla_pool_entry * pool_entry = pools->entries + slab->pool;
   struct fla_dp_noop_slab_list_ids * slab_list_ids = (struct fla_dp_noop_slab_list_ids*)pool_entry;
-  struct fla_pool_entry_fnc const * pool_entry_fnc = pools->entrie_funcs + slab->pool;
-  uint32_t num_fla_objs = pool_entry_fnc->fla_pool_num_fla_objs(pool_entry);
 
   return slab->refcount == 0 ? &slab_list_ids->empty_slabs
-         : slab->refcount + num_fla_objs > pool_entry->slab_nobj ? &slab_list_ids->full_slabs
+         : slab->refcount >= pool_entry->slab_nobj ? &slab_list_ids->full_slabs
          : &slab_list_ids->partial_slabs;
 }
 
