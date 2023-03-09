@@ -95,6 +95,10 @@ struct fla_dp_fncs
   int (*init_dp)(struct flexalloc *fs, uint64_t flags);
   int (*fini_dp)(struct flexalloc *fs);
   int (*prep_dp_ctx)(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx);
+  uint32_t* (*get_pool_slab_list_id)(struct fla_slab_header const *slab,
+                                    struct fla_pools const *pools);
+  int (*get_next_available_slab)(struct flexalloc * fs, struct fla_pool_entry * pool_entry,
+                                 struct fla_slab_header ** slab);
 };
 
 struct fla_dp
