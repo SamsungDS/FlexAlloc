@@ -47,10 +47,10 @@ struct fla_pool_strp
 
 struct fla_pool_entry
 {
-  /// identifier for each slab depending on its "fullness"
-  uint32_t empty_slabs;
-  uint32_t full_slabs;
-  uint32_t partial_slabs;
+  /// DP implementations have 3 linked lists ids that they can use
+  uint32_t slab_list_id_0;
+  uint32_t slab_list_id_1;
+  uint32_t slab_list_id_2;
 
   /// Number of LBA's used for each object in the cache
   ///
