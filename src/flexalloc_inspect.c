@@ -171,9 +171,9 @@ validate_pool_entries(struct flexalloc *fs)
       memcpy(name_buffer, pentry->name, FLA_NAME_SIZE_POOL);
       name_buffer[FLA_NAME_SIZE_POOL - 1] = '\0';
       fprintf(stdout, "   pool entry: {name: %s, obj_nlb: %"PRIu32", ", name_buffer, pentry->obj_nlb);
-      fprintf(stdout, "slablist_empty: %"PRIu32", ", pentry->empty_slabs);
-      fprintf(stdout, "slablist_full: %"PRIu32", ", pentry->full_slabs);
-      fprintf(stdout, "slablist_partial: %"PRIu32"\n}", pentry->partial_slabs);
+      fprintf(stdout, "slab list id 0: %"PRIu32", ", pentry->slab_list_id_0);
+      fprintf(stdout, "slab list id 1: %"PRIu32", ", pentry->slab_list_id_1);
+      fprintf(stdout, "slab list id 2: %"PRIu32"\n}", pentry->slab_list_id_2);
     }
 
     fprintf(stdout, "   errors:\n");
