@@ -3,6 +3,8 @@
 #include "flexalloc.h"
 #include "flexalloc_xnvme_env.h"
 #include "flexalloc_freelist.h"
+#include "flexalloc_mm.h"
+#include "flexalloc_ll.h"
 #include <stdint.h>
 #include <stdarg.h>
 
@@ -212,6 +214,75 @@ fla_fdp_init_md_pid(struct flexalloc const *fs)
   return 0;
 }
 
+static uint32_t*
+fla_dp_fdp_pool_slab_list_id(struct fla_slab_header const *slab,
+                        struct fla_pools const *pools)
+{
+  struct fla_pool_entry * pool_entry = pools->entries + slab->pool;
+  struct fla_dp_fdp_slab_list_ids * slab_list_ids = (struct fla_dp_fdp_slab_list_ids*)pool_entry;
+
+  return slab->nobj_since_trim == 0 && slab->refcount == 0 ? &slab_list_ids->ready_slabs
+    : slab->nobj_since_trim < pool_entry->slab_nobj ? &slab_list_ids->filling_slabs
+    : &slab_list_ids->emptying_slabs;
+}
+
+static int
+fla_dp_fdp_get_next_available_slab(struct flexalloc * fs, struct fla_pool_entry * pool_entry,
+                             struct fla_slab_header ** slab)
+{
+  int err, ret;
+  struct fla_dp_fdp_slab_list_ids * slab_list_ids = (struct fla_dp_fdp_slab_list_ids*)pool_entry;
+
+  if(slab_list_ids->ready_slabs == FLA_LINKED_LIST_NULL)
+  {
+    if(slab_list_ids->filling_slabs == FLA_LINKED_LIST_NULL)
+    {
+      // ACQUIRE A NEW ONE
+      err = fla_acquire_slab(fs, pool_entry->obj_nlb, slab);
+      if(FLA_ERR(err, "fla_acquire_slab()"))
+      {
+        goto exit;
+      }
+
+      // Add to READY
+      err = fla_hdll_prepend(fs, *slab, &slab_list_ids->ready_slabs);
+      if(FLA_ERR(err, "fla_hdll_prepend()"))
+      {
+        goto release_slab;
+      }
+
+      goto exit;
+release_slab:
+      ret = fla_release_slab(fs, *slab);
+      if(FLA_ERR(ret, "fla_release_slab()"))
+      {
+        goto exit;
+      }
+    }
+    else
+    {
+      // TAKE FROM FILLING
+      *slab = fla_slab_header_ptr(slab_list_ids->filling_slabs, fs);
+      if((err = -FLA_ERR(!slab, "fla_slab_header_ptr()")))
+      {
+        goto exit;
+      }
+    }
+  }
+  else
+  {
+    // TAKE FROM READY
+    *slab = fla_slab_header_ptr(slab_list_ids->ready_slabs, fs);
+    if((err = -FLA_ERR(!slab, "fla_slab_header_ptr()")))
+    {
+      goto exit;
+    }
+  }
+
+exit:
+  return err;
+}
+
 int
 fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
 {
@@ -224,8 +295,8 @@ fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
   fs->fla_dp.fla_dp_fdp->ctx_set = FLA_DP_FDP_ON_WRITE;
   fs->fla_dp.fncs.init_dp = fla_dp_fdp_init;
   fs->fla_dp.fncs.fini_dp = fla_dp_fdp_fini;
-  fs->fla_dp.fncs.get_pool_slab_list_id = NULL; // so it errors in fdp mode
-  fs->fla_dp.fncs.get_next_available_slab = NULL;
+  fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_fdp_pool_slab_list_id;
+  fs->fla_dp.fncs.get_next_available_slab = fla_dp_fdp_get_next_available_slab;
 
   fla_fdp_set_prep_ctx(fs, &fs->fla_dp.fncs.prep_dp_ctx);
 
@@ -244,5 +315,4 @@ fla_dp_fdp_fini(struct flexalloc *fs)
   free(fs->fla_dp.fla_dp_fdp);
   return 0;
 }
-
 
