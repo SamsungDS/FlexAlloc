@@ -5,6 +5,17 @@
 #include "flexalloc_shared.h"
 #include "flexalloc_xnvme_env.h"
 
+struct fla_dp_fdp_slab_list_ids
+{
+  // slabs that are ready to be used from scratch
+  uint32_t ready_slabs;
+  //slabs that are ready to be used
+  uint32_t filling_slabs;
+  // slabs that are not necessarily full but need to empty
+  // before being used.
+  uint32_t emptying_slabs;
+};
+
 enum fla_dp_fdp_t
 {
   FLA_DP_FDP_ON_SLAB,
