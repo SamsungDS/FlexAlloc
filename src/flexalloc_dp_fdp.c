@@ -118,11 +118,9 @@ fla_fdp_cached_prep_ctx(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx)
   if (FLA_ERR(ret, "fla_flist_search_wfunc()"))
     return ret;
 
-  if (found == 1)
-    ctx->cmd.nvm.cdw13.dspec = pid;
-
-  else if (found == 0)
+  switch (found)
   {
+  case 0:
     ret = fla_flist_entries_alloc(fdp->free_pids, 1);
     if (FLA_ERR(ret < 0, "fla_fdp_cached_prep_ctx()"))
       return -ENOSPC;
@@ -133,7 +131,18 @@ fla_fdp_cached_prep_ctx(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx)
     ret = fla_fdp_get_pid_n(xne_io->dev, &pid_to_id->pid, 1);
     if (FLA_ERR(ret, "fla_fdp_get_pid_n()"))
       return ret;
+    pid = pid_to_id->pid;
+
+  case 1:
+    ctx->cmd.nvm.cdw13.dspec = pid;
+    break;
+
+  default:
+    FLA_ERR(true, "fla_fdp_cached_prep_ctx()");
+    return -EINVAL;
+
   }
+
   ctx->cmd.nvm.dtype = 2;
   return 0;
 }
@@ -292,7 +301,7 @@ fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
   if (FLA_ERR(!fs->fla_dp.fla_dp_fdp, "malloc()"))
     return -ENOMEM;
 
-  fs->fla_dp.fla_dp_fdp->ctx_set = FLA_DP_FDP_ON_WRITE;
+  fs->fla_dp.fla_dp_fdp->ctx_set = FLA_DP_FDP_ON_SLAB;
   fs->fla_dp.fncs.init_dp = fla_dp_fdp_init;
   fs->fla_dp.fncs.fini_dp = fla_dp_fdp_fini;
   fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_fdp_pool_slab_list_id;
