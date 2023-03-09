@@ -99,6 +99,7 @@ struct fla_dp_fncs
                                     struct fla_pools const *pools);
   int (*get_next_available_slab)(struct flexalloc * fs, struct fla_pool_entry * pool_entry,
                                  struct fla_slab_header ** slab);
+  int (*slab_format)(struct flexalloc * fs, uint32_t const slab_id, struct fla_slab_header * slab);
 };
 
 struct fla_dp

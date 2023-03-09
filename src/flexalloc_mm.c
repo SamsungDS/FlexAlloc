@@ -1042,10 +1042,9 @@ fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t ob
   if(FLA_ERR(err, "fla_slab_id()"))
     goto exit;
 
-  err = fla_xne_dev_send_deallocate(fs->dev.dev, fla_geo_slab_lb_off(fs, slab_id), fs->super->slab_nlb);
-  if (FLA_ERR(err, "fla_xne_dev_send_deallocate()"))
+  err = fs->fla_dp.fncs.slab_format(fs, slab_id, slab);
+  if (FLA_ERR(err, "slab_format()"))
     goto exit;
-  slab->nobj_since_trim = 0;
 
   err = fla_slab_cache_elem_init(&fs->slab_cache, slab_id, obj_num);
   if(FLA_ERR(err, "fla_slab_cache_elem_init()"))
