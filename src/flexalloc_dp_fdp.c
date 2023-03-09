@@ -224,6 +224,8 @@ fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
   fs->fla_dp.fla_dp_fdp->ctx_set = FLA_DP_FDP_ON_WRITE;
   fs->fla_dp.fncs.init_dp = fla_dp_fdp_init;
   fs->fla_dp.fncs.fini_dp = fla_dp_fdp_fini;
+  fs->fla_dp.fncs.get_pool_slab_list_id = NULL; // so it errors in fdp mode
+  fs->fla_dp.fncs.get_next_available_slab = NULL;
 
   fla_fdp_set_prep_ctx(fs, &fs->fla_dp.fncs.prep_dp_ctx);
 

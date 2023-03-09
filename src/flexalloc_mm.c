@@ -750,63 +750,6 @@ fla_base_pool_close(struct flexalloc *fs, struct fla_pool * handle)
   free(handle);
 }
 
-
-int
-fla_pool_next_available_slab(struct flexalloc * fs, struct fla_pool_entry * pool_entry,
-                             struct fla_slab_header ** slab)
-{
-  int err, ret;
-
-  if(pool_entry->partial_slabs == FLA_LINKED_LIST_NULL)
-  {
-    if(pool_entry->empty_slabs == FLA_LINKED_LIST_NULL)
-    {
-      // ACQUIRE A NEW ONE
-      err = fla_acquire_slab(fs, pool_entry->obj_nlb, slab);
-      if(FLA_ERR(err, "fla_acquire_slab()"))
-      {
-        goto exit;
-      }
-
-      // Add to empty
-      err = fla_hdll_prepend(fs, *slab, &pool_entry->empty_slabs);
-      if(FLA_ERR(err, "fla_hdll_prepend()"))
-      {
-        goto release_slab;
-      }
-
-      goto exit;
-release_slab:
-      ret = fla_release_slab(fs, *slab);
-      if(FLA_ERR(ret, "fla_release_slab()"))
-      {
-        goto exit;
-      }
-    }
-    else
-    {
-      // TAKE FROM EMPTY
-      *slab = fla_slab_header_ptr(pool_entry->empty_slabs, fs);
-      if((err = -FLA_ERR(!slab, "fla_slab_header_ptr()")))
-      {
-        goto exit;
-      }
-    }
-  }
-  else
-  {
-    // TAKE FROM PARTIAL
-    *slab = fla_slab_header_ptr(pool_entry->partial_slabs, fs);
-    if((err = -FLA_ERR(!slab, "fla_slab_header_ptr()")))
-    {
-      goto exit;
-    }
-  }
-
-exit:
-  return err;
-}
-
 static int
 fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab,
                             struct fla_object * obj)
@@ -829,19 +772,6 @@ fla_slab_next_available_obj(struct flexalloc * fs, struct fla_slab_header * slab
   slab->nobj_since_trim += num_objs;
 
   return err;
-}
-
-static uint32_t*
-fla_pool_best_slab_list(struct fla_slab_header const *slab,
-                        struct fla_pools const *pools)
-{
-  struct fla_pool_entry * pool_entry = pools->entries + slab->pool;
-  struct fla_pool_entry_fnc const * pool_entry_fnc = pools->entrie_funcs + slab->pool;
-  uint32_t num_fla_objs = pool_entry_fnc->fla_pool_num_fla_objs(pool_entry);
-
-  return slab->refcount == 0 ? &pool_entry->empty_slabs
-         : slab->refcount + num_fla_objs > pool_entry->slab_nobj ? &pool_entry->full_slabs
-         : &pool_entry->partial_slabs;
 }
 
 int
@@ -879,8 +809,8 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
   uint32_t * from_head, * to_head, slab_id;
 
   pool_entry = &fs->pools.entries[pool_handle->ndx];
-  err = fla_pool_next_available_slab(fs, pool_entry, &slab);
-  if(FLA_ERR(err, "fla_pool_next_available_slab()"))
+  err = fs->fla_dp.fncs.get_next_available_slab(fs, pool_entry, &slab);
+  if(FLA_ERR(err, "get_next_available_slab()"))
   {
     goto exit;
   }
@@ -900,7 +830,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
     goto exit;
   }
 
-  from_head = fla_pool_best_slab_list(slab, &fs->pools);
+  from_head = fs->fla_dp.fncs.get_pool_slab_list_id(slab, &fs->pools);
 
   err = fla_slab_next_available_obj(fs, slab, obj);
   if(FLA_ERR(err, "fla_slab_next_available_obj()"))
@@ -908,7 +838,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
     goto exit;
   }
 
-  to_head = fla_pool_best_slab_list(slab, &fs->pools);
+  to_head = fs->fla_dp.fncs.get_pool_slab_list_id(slab, &fs->pools);
 
   if(from_head != to_head)
   {
@@ -971,7 +901,7 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
     goto exit;
 
   pool_entry = &fs->pools.entries[pool_handle->ndx];
-  from_head = fla_pool_best_slab_list(slab, &fs->pools);
+  from_head = fs->fla_dp.fncs.get_pool_slab_list_id(slab, &fs->pools);
 
   pool_entry_fnc = fs->pools.entrie_funcs + slab->pool;
   uint32_t num_fla_objs = pool_entry_fnc->fla_pool_num_fla_objs(pool_entry);
@@ -981,7 +911,7 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
     goto exit;
 
   slab->refcount -= num_fla_objs;
-  to_head = fla_pool_best_slab_list(slab, &fs->pools);
+  to_head = fs->fla_dp.fncs.get_pool_slab_list_id(slab, &fs->pools);
 
   err = fla_hdll_remove(fs, slab, from_head);
   if(FLA_ERR(err, "fla_hdll_remove()"))
