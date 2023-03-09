@@ -209,8 +209,8 @@ fla_fdp_init_pid_to_id(struct flexalloc const *fs)
   if (FLA_ERR(!fs->fla_dp.fla_dp_fdp->pids, "malloc()"))
     return -ENOMEM;
 
-  if ((err = FLA_ERR(fla_flist_new(pid_to_id_cache_size, &fla_dp_fdp->free_pids),
-                     "fla_flist_new()")))
+  err = fla_flist_new(pid_to_id_cache_size, &fla_dp_fdp->free_pids);
+  if (FLA_ERR(err, "fla_flist_new()"))
     return err;
 
   return 0;
@@ -292,6 +292,42 @@ exit:
   return err;
 }
 
+static int
+fla_dp_fdp_slab_format(struct flexalloc * fs, uint32_t slab_id, struct fla_slab_header * slab)
+{
+  int err;
+  uint32_t fla_id, pid, found = 0;
+  err = fla_xne_dev_send_deallocate(fs->dev.dev, fla_geo_slab_lb_off(fs, slab_id),
+                                    fs->super->slab_nlb);
+  if (FLA_ERR(err, "fla_xne_dev_send_deallocate()"))
+    goto exit;
+
+  slab->nobj_since_trim = 0;
+
+  err = fla_flist_search_wfunc(fs->fla_dp.fla_dp_fdp->free_pids, FLA_FLIST_SEARCH_FROM_START,
+                               &found, fla_fdp_get_id, &pid, &fla_id, fs->fla_dp.fla_dp_fdp);
+  if (FLA_ERR(err, "fla_flist_search_wfunc()"))
+    return err;
+
+  switch (found)
+  {
+  case 1:
+    err = fla_flist_entries_free(fs->fla_dp.fla_dp_fdp->free_pids, fla_id, 1);
+    if (FLA_ERR(err, "fla_flist_entries_free()"))
+      goto exit;
+    break;
+
+  default:
+    FLA_ERR(true, "fla_fdp_cached_prep_ctx()");
+    return -EINVAL;
+  }
+
+  return 0;
+
+exit:
+  return err;
+}
+
 int
 fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
 {
@@ -306,6 +342,7 @@ fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
   fs->fla_dp.fncs.fini_dp = fla_dp_fdp_fini;
   fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_fdp_pool_slab_list_id;
   fs->fla_dp.fncs.get_next_available_slab = fla_dp_fdp_get_next_available_slab;
+  fs->fla_dp.fncs.slab_format = fla_dp_fdp_slab_format;
 
   fla_fdp_set_prep_ctx(fs, &fs->fla_dp.fncs.prep_dp_ctx);
 
