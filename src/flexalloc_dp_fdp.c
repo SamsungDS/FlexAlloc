@@ -296,7 +296,6 @@ static int
 fla_dp_fdp_slab_format(struct flexalloc * fs, uint32_t slab_id, struct fla_slab_header * slab)
 {
   int err;
-  uint32_t fla_id, pid, found = 0;
   err = fla_xne_dev_send_deallocate(fs->dev.dev, fla_geo_slab_lb_off(fs, slab_id),
                                     fs->super->slab_nlb);
   if (FLA_ERR(err, "fla_xne_dev_send_deallocate()"))
@@ -304,25 +303,48 @@ fla_dp_fdp_slab_format(struct flexalloc * fs, uint32_t slab_id, struct fla_slab_
 
   slab->nobj_since_trim = 0;
 
-  err = fla_flist_search_wfunc(fs->fla_dp.fla_dp_fdp->free_pids, FLA_FLIST_SEARCH_FROM_START,
-                               &found, fla_fdp_get_id, &pid, &fla_id, fs->fla_dp.fla_dp_fdp);
-  if (FLA_ERR(err, "fla_flist_search_wfunc()"))
-    return err;
+exit:
+  return err;
+}
 
-  switch (found)
+static int
+fla_dp_fdp_on_object_destroy(struct flexalloc * fs, struct fla_object * obj, struct fla_pool_entry * pool_entry)
+{
+  int err;
+  uint32_t fla_id, pid, found = 0;
+  struct fla_slab_header *slab;
+
+  //FIXME: Add the other types to this
+  if (fs->fla_dp.dp_type != FLA_DP_FDP_ON_SLAB)
+    return 0;
+
+  slab = fla_slab_header_ptr(obj->slab_id, fs);
+  if((err = FLA_ERR(!slab, "fla_slab_header_ptr()")))
+    goto exit;
+
+  if(slab->nobj_since_trim >= pool_entry->slab_nobj)
   {
-  case 1:
-    err = fla_flist_entries_free(fs->fla_dp.fla_dp_fdp->free_pids, fla_id, 1);
-    if (FLA_ERR(err, "fla_flist_entries_free()"))
-      goto exit;
-    break;
+    fla_id = obj->slab_id;
+    err = fla_flist_search_wfunc(fs->fla_dp.fla_dp_fdp->free_pids, FLA_FLIST_SEARCH_FROM_START,
+                               &found, fla_fdp_get_id, &pid, &fla_id, fs->fla_dp.fla_dp_fdp);
+    if (FLA_ERR(err, "fla_flist_search_wfunc()"))
+      return err;
 
-  default:
-    FLA_ERR(true, "fla_fdp_cached_prep_ctx()");
-    return -EINVAL;
+    switch (found)
+    {
+    case 1:
+      err = fla_flist_entries_free(fs->fla_dp.fla_dp_fdp->free_pids, fla_id, 1);
+      if (FLA_ERR(err, "fla_flist_entries_free()"))
+        goto exit;
+      //fall through
+    case 0:
+      break;
+
+    default:
+      FLA_ERR(true, "fla_fdp_cached_prep_ctx()");
+      return -EINVAL;
+    }
   }
-
-  return 0;
 
 exit:
   return err;
@@ -343,6 +365,8 @@ fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
   fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_fdp_pool_slab_list_id;
   fs->fla_dp.fncs.get_next_available_slab = fla_dp_fdp_get_next_available_slab;
   fs->fla_dp.fncs.slab_format = fla_dp_fdp_slab_format;
+  fs->fla_dp.fncs.on_obj_destroy = fla_dp_fdp_on_object_destroy;
+
 
   fla_fdp_set_prep_ctx(fs, &fs->fla_dp.fncs.prep_dp_ctx);
 
