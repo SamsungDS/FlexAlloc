@@ -35,7 +35,7 @@ fla_init_dp(struct flexalloc *fs)
 static bool
 fla_dp_fdp_supported(struct xnvme_spec_idfy_ctrlr *idfy_ctrl)
 {
-  return idfy_ctrl->ctratt.val & (1 << 16);
+  return idfy_ctrl->ctratt.flexible_data_placement;
 }
 
 static bool
