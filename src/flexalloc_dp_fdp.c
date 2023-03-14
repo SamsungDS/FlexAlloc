@@ -11,22 +11,26 @@
 int
 fla_fdp_get_pid_n(struct xnvme_dev * dev, uint32_t *pid, const int npid)
 {
-  int err;
-  uint32_t *pids;
-
-  pids = fla_xne_alloc_buf(dev, sizeof(uint32_t) * npid);
-  if (FLA_ERR(!pids, "fla_xne_alloc_buf()"))
-    return -errno;
-
-  err = fla_xne_get_usable_pids(dev, npid, &pids);
-  if (FLA_ERR(err, "fla_xne_get_usable_pids()"))
-    return err;
-
-  for (int i = 0; i < npid; ++i)
-    *(pid + i) = *(pids + i);
-
-  fla_xne_free_buf(dev, pids);
+  /* while we wait for the FW to catch up*/
+  for (int i = 0; i < npid ; ++i)
+    *(pid + i) = 1;
   return 0;
+//  int err;
+//  uint32_t *pids;
+//
+//  pids = fla_xne_alloc_buf(dev, sizeof(uint32_t) * npid);
+//  if (FLA_ERR(!pids, "fla_xne_alloc_buf()"))
+//    return -errno;
+//
+//  err = fla_xne_get_usable_pids(dev, npid, &pids);
+//  if (FLA_ERR(err, "fla_xne_get_usable_pids()"))
+//    return err;
+//
+//  for (int i = 0; i < npid; ++i)
+//    *(pid + i) = *(pids + i);
+//
+//  fla_xne_free_buf(dev, pids);
+//  return 0;
 }
 
 static int
