@@ -244,7 +244,7 @@ fla_slab_cache_obj_alloc(struct fla_slab_flist_cache *cache, uint32_t slab_id,
 
   entry_ndx = fla_flist_entries_alloc(e->freelist, num_objs);
   if ((err = FLA_ERR(entry_ndx < 0,
-                     "fla_flist_entry_alloc() - failed to allocate an object in freelist")))
+                     "fla_flist_entries_alloc() - failed to allocate an object in freelist")))
     return err;
 
   obj_id->slab_id = slab_id;
