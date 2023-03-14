@@ -21,17 +21,23 @@ extern "C" {
 #define FLAN_APPEND_SIZE 2097152
 #define FLAN_MAX_FLA_OBJ_IN_OINFO 2
 
+enum flan_pool_t{
+  FLAN_POOL_SSTABLE,
+  FLAN_POOL_OTHER
+};
 struct flan_oinfo
 {
   uint64_t size;
   struct fla_object fla_oh[FLAN_MAX_FLA_OBJ_IN_OINFO];
   char name[FLAN_OBJ_NAME_LEN_MAX];
+  enum flan_pool_t pool_type;
 };
 
 struct flan_handle
 {
   struct flexalloc *fs;
   struct fla_pool *ph;
+  struct fla_pool *other_ph;
   uint32_t append_sz;
   bool is_zns;
   bool is_dirty;
