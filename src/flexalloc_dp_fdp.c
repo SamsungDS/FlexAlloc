@@ -9,18 +9,6 @@
 #include <stdarg.h>
 
 int
-fla_fdp_get_placement_identifier(uint32_t *pid, struct fla_dp_fdp *fdp)
-{
-  int err = fla_flist_entries_alloc(fdp->free_pids, 1);
-  if(FLA_ERR(err < 0, "fla_flist_entries_alloc()"))
-    return err;
-
-  //pid = fdp->pids + err;
-
-  return err;
-}
-
-int
 fla_fdp_get_pid_n(struct xnvme_dev * dev, uint32_t *pid, const int npid)
 {
   int err;
