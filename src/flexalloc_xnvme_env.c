@@ -123,6 +123,7 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
   if (ident->dtype != 1 && ident->dtype != 2)
     return 0; // we skil non nvme devices
 
+  return 0;
   nsid = xnvme_dev_get_nsid(dev);
 
   /*
