@@ -222,8 +222,12 @@ fla_dp_fdp_pool_slab_list_id(struct fla_slab_header const *slab,
   struct fla_pool_entry * pool_entry = pools->entries + slab->pool;
   struct fla_dp_fdp_slab_list_ids * slab_list_ids = (struct fla_dp_fdp_slab_list_ids*)pool_entry;
 
-  return slab->nobj_since_trim == 0 && slab->refcount == 0 ? &slab_list_ids->ready_slabs
-    : slab->nobj_since_trim < pool_entry->slab_nobj ? &slab_list_ids->filling_slabs
+  bool slab_for_ready = (slab->nobj_since_trim == 0 && slab->refcount == 0)
+                        || (slab->nobj_since_trim == pool_entry->slab_nobj && slab->refcount == 0);
+  bool slab_for_filling = slab->nobj_since_trim < pool_entry->slab_nobj ;
+
+  return slab_for_ready ? &slab_list_ids->ready_slabs
+    : slab_for_filling ? &slab_list_ids->filling_slabs
     : &slab_list_ids->emptying_slabs;
 }
 
