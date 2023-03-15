@@ -17,14 +17,24 @@ extern "C" {
 #define FLAN_OPEN_FLAG_CREATE 0x1
 #define FLAN_OPEN_FLAG_READ 0x2
 #define FLAN_OPEN_FLAG_WRITE 0x4
+#define FLAN_OPEN_FLAG_POOL_SHORT 1<<(3+FLAN_POOL_SHORT)
+#define FLAN_OPEN_FLAG_POOL_MEDIUM 1<<(3+FLAN_POOL_MEDIUM)
+#define FLAN_OPEN_FLAG_POOL_LONG 1<<(3+FLAN_POOL_LONG)
+#define FLAN_OPEN_FLAG_POOL_EXTREME 1<<(3+FLAN_POOL_EXTREME)
+#define FLAN_OPEN_FLAG_POOL_NONE 1<<(3+FLAN_POOL_NONE)
 #define FLAN_MAX_OPEN_OBJECTS 16384
 #define FLAN_APPEND_SIZE 2097152
 #define FLAN_MAX_FLA_OBJ_IN_OINFO 2
 
 enum flan_pool_t{
-  FLAN_POOL_SSTABLE,
-  FLAN_POOL_OTHER
+  FLAN_POOL_SHORT,
+  FLAN_POOL_MEDIUM,
+  FLAN_POOL_LONG,
+  FLAN_POOL_EXTREME,
+  FLAN_POOL_NONE,
+  FLAN_POOL_LAST
 };
+
 struct flan_oinfo
 {
   uint64_t size;
@@ -36,8 +46,7 @@ struct flan_oinfo
 struct flan_handle
 {
   struct flexalloc *fs;
-  struct fla_pool *ph;
-  struct fla_pool *other_ph;
+  struct fla_pool *p_ptrs[FLAN_POOL_LAST];
   uint32_t append_sz;
   bool is_zns;
   bool is_dirty;
