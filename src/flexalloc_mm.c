@@ -807,7 +807,7 @@ fla_base_object_create(struct flexalloc * fs, struct fla_pool * pool_handle,
   uint32_t * from_head, * to_head, slab_id;
 
   pool_entry = &fs->pools.entries[pool_handle->ndx];
-  err = fs->fla_dp.fncs.get_next_available_slab(fs, pool_entry, &slab);
+  err = fs->fla_dp.fncs.get_next_available_slab(fs, pool_handle, &slab);
   if(FLA_ERR(err, "get_next_available_slab()"))
   {
     goto exit;
