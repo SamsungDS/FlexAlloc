@@ -43,6 +43,9 @@ fla_dp_noop_get_next_available_slab(struct flexalloc * fs, struct fla_pool * fla
         goto release_slab;
       }
 
+      // make sure we relate slab to pool
+      (*slab)->pool = fla_pool->ndx;
+
       goto exit;
 release_slab:
       ret = fla_release_slab(fs, *slab);
