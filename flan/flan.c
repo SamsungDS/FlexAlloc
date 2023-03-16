@@ -90,6 +90,11 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
   else
     (*flanh)->append_sz = objsz;
 
+  if (objsz % (*flanh)->append_sz > 0)
+  {
+    objsz = ((objsz / (*flanh)->append_sz) * (*flanh)->append_sz) + (*flanh)->append_sz;
+  }
+
   if ((ret = FLA_ERR(objsz % fla_fs_lb_nbytes((*flanh)->fs) != 0,
         "Flan object size %"PRIu64" not a multiple of lb_nbytes %"PRIu32"",
         objsz, fla_fs_lb_nbytes((*flanh)->fs))))
@@ -542,6 +547,11 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
   char *bufpos = buf;
   size_t from_buffer = 0, toRead = len;
 
+  if (offset + len > flan_otable[oh].oinfo->size)
+  {
+    fprintf(stderr, "Huston we have a problem offset %"PRIu64" len %"PRIu64" size %"PRIu64"\n",
+        offset, len, flan_otable[oh].oinfo->size);
+  }
   // Read in the correct block if the starting address does not fall within the buffer
   if (offset < *rb_off || offset >= (*rb_off + flanh->append_sz))
   {
@@ -549,7 +559,10 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
     err = flan_multi_object_action(flanh, oinfo, rb, *rb_off,
         flanh->append_sz, FLAN_MULTI_OBJ_ACTION_READ);
     if (err)
-      FLA_ERR(err, "flan_object_read_r() uncaught error");
+      FLA_ERR(err, "flan_object_read_r() uncaught error "
+          "offset %"PRIu64" len %"PRIu64" size %"PRIu64" "
+          "rb_off %"PRIu64" append_sz %"PRIu64"\n",
+          offset, len, flan_otable[oh].oinfo->size, *rb_off, flanh->append_sz);
   }
 
   // Read completely contained in buffer
@@ -589,7 +602,6 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
   memcpy(bufpos, rb + offset % flanh->append_sz, toRead);
 
   return len;
-
 }
 
 static ssize_t
