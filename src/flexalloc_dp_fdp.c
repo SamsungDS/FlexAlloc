@@ -5,6 +5,7 @@
 #include "flexalloc_freelist.h"
 #include "flexalloc_mm.h"
 #include "flexalloc_ll.h"
+#include "flexalloc_dp_noop.h"
 #include <stdint.h>
 #include <stdarg.h>
 
@@ -120,9 +121,14 @@ fla_fdp_cached_prep_ctx(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx)
     pid_to_id = fdp->pids + ret;
     pid_to_id->fla_id = fla_id;
 
-    ret = fla_fdp_get_pid_n(xne_io->dev, &pid_to_id->pid, 1);
-    if (FLA_ERR(ret, "fla_fdp_get_pid_n()"))
-      return ret;
+    if (fdp->ctx_set == FLA_DP_FDP_ON_POOL)
+      // +1 one because we do not want PID zero.
+      pid_to_id->pid = xne_io->pool_handle->ndx + 1;
+    else {
+      ret = fla_fdp_get_pid_n(xne_io->dev, &pid_to_id->pid, 1);
+      if (FLA_ERR(ret, "fla_fdp_get_pid_n()"))
+        return ret;
+    }
     pid = pid_to_id->pid;
 
   case 1:
@@ -216,7 +222,7 @@ fla_fdp_init_md_pid(struct flexalloc const *fs)
 }
 
 static uint32_t*
-fla_dp_fdp_pool_slab_list_id(struct fla_slab_header const *slab,
+fla_dp_fdp_onslab_pool_slab_list_id(struct fla_slab_header const *slab,
                         struct fla_pools const *pools)
 {
   struct fla_pool_entry * pool_entry = pools->entries + slab->pool;
@@ -232,7 +238,7 @@ fla_dp_fdp_pool_slab_list_id(struct fla_slab_header const *slab,
 }
 
 static int
-fla_dp_fdp_get_next_available_slab(struct flexalloc * fs, struct fla_pool * fla_pool,
+fla_dp_fdp_onslab_get_next_available_slab(struct flexalloc * fs, struct fla_pool * fla_pool,
                              struct fla_slab_header ** slab)
 {
   int err, ret;
@@ -338,13 +344,27 @@ fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
   if (FLA_ERR(!fs->fla_dp.fla_dp_fdp, "malloc()"))
     return -ENOMEM;
 
-  fs->fla_dp.fla_dp_fdp->ctx_set = FLA_DP_FDP_ON_SLAB;
+  fs->fla_dp.fla_dp_fdp->ctx_set = FLA_DP_FDP_ON_POOL;
   fs->fla_dp.fncs.init_dp = fla_dp_fdp_init;
   fs->fla_dp.fncs.fini_dp = fla_dp_fdp_fini;
-  fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_fdp_pool_slab_list_id;
-  fs->fla_dp.fncs.get_next_available_slab = fla_dp_fdp_get_next_available_slab;
-  fs->fla_dp.fncs.slab_format = fla_dp_fdp_slab_format;
 
+  switch (fs->fla_dp.fla_dp_fdp->ctx_set)
+  {
+  case FLA_DP_FDP_ON_SLAB:
+    fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_fdp_onslab_pool_slab_list_id;
+    fs->fla_dp.fncs.get_next_available_slab = fla_dp_fdp_onslab_get_next_available_slab;
+    break;
+  case FLA_DP_FDP_ON_OBJECT:
+  case FLA_DP_FDP_ON_POOL:
+  case FLA_DP_FDP_ON_WRITE:
+    fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_noop_pool_slab_list_id;
+    fs->fla_dp.fncs.get_next_available_slab = fla_dp_noop_get_next_available_slab;
+    break;
+  default:
+    return FLA_ERR(-EIO, "unknown fdp data placement type");
+  }
+
+  fs->fla_dp.fncs.slab_format = fla_dp_fdp_slab_format;
   fla_fdp_set_prep_ctx(fs, &fs->fla_dp.fncs.prep_dp_ctx);
 
   if ((err = FLA_ERR(fla_fdp_init_md_pid(fs), "fla_fdp_init_md_pid()")))
