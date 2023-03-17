@@ -158,7 +158,9 @@ struct flan_oinfo
   int err;
   struct flan_oinfo *oinfo;
 
-  err = flan_md_find(flanh->md, name, (void**)&oinfo);
+  char *base_name = basename((char *)name);
+
+  err = flan_md_find(flanh->md, base_name, (void**)&oinfo);
   if (FLA_ERR(err, "flan_md_find()"))
     return NULL;
 
