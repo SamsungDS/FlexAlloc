@@ -5,7 +5,7 @@
 #include "flexalloc_xnvme_env.h"
 #include "flexalloc.h"
 
-static uint32_t*
+uint32_t*
 fla_dp_noop_pool_slab_list_id(struct fla_slab_header const *slab,
                         struct fla_pools const *pools)
 {
@@ -17,7 +17,7 @@ fla_dp_noop_pool_slab_list_id(struct fla_slab_header const *slab,
          : &slab_list_ids->partial_slabs;
 }
 
-static int
+int
 fla_dp_noop_get_next_available_slab(struct flexalloc * fs, struct fla_pool * fla_pool,
                              struct fla_slab_header ** slab)
 {
