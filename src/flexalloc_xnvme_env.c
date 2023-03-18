@@ -102,9 +102,12 @@ fla_xne_dev_get_znd_mor(struct xnvme_dev *dev)
 int
 fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const uint32_t nlb)
 {
+  return 0;
   int err;
   uint32_t nsid;
-  struct xnvme_spec_dsm_range dsm_range = {.cattr = 0, .slba = slba, .nlb = nlb};
+  //struct xnvme_spec_dsm_range dsm_range = {.cattr = 0, .slba = slba, .nlb = nlb};
+  struct xnvme_spec_dsm_range * dsm_range;
+
   struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
   struct xnvme_ident const * ident;
 
@@ -123,8 +126,18 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
   if (ident->dtype != 1 && ident->dtype != 2)
     return 0; // we skil non nvme devices
 
-  return 0;
   nsid = xnvme_dev_get_nsid(dev);
+
+  dsm_range = xnvme_buf_alloc(dev, sizeof(*dsm_range));
+  if (!dsm_range)
+  {
+    err = -errno;
+    xnvmec_perr("xnvme_buf_alloc()", err);
+    return err;
+  }
+  dsm_range->cattr = 0;
+  dsm_range->slba = slba;
+  dsm_range->nlb = nlb;
 
   /*
    * 0 -> 1 range to deallocate
@@ -132,11 +145,15 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
    * false -> wether to optimize write
    * false -> wether to optimize read
    */
-  err = xnvme_nvm_dsm(&ctx, nsid, &dsm_range, 0, true, false, false);
-  if (FLA_ERR(err, "xnvme_nvm_dsm() %d", err))
-    return err;
+  err = xnvme_nvm_dsm(&ctx, nsid, dsm_range, 1, true, false, false);
+  if (FLA_ERR(err, "xnvme_nvm_dsm() err: %d, dsm->cattr %"PRIu32", "
+        "dsm->slba %"PRIu64", dsm->nlb %"PRIu32", nsid %"PRIu32"",
+        err, dsm_range->cattr, dsm_range->slba, dsm_range->nlb, nsid))
+    goto free_buf;
 
-  return 0;
+free_buf:
+  xnvme_buf_free(dev, dsm_range);
+  return err;
 }
 
 int
