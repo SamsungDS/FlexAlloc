@@ -424,7 +424,7 @@ int flan_object_delete(const char *name, struct flan_handle *flanh)
   // Invalidate any open handles
   if (oh != FLAN_MAX_OPEN_OBJECTS)
   {
-    free(flan_otable[oh].append_buf);
+    fla_buf_free(flanh->fs, flan_otable[oh].append_buf);
     err = flan_multi_object_destroy(flanh, oinfo);
     if (FLA_ERR(err, "fla_object_destroy()"))
     {
@@ -533,7 +533,7 @@ flan_object_unaligned_read(uint64_t oh,  struct flan_oinfo *oinfo, void *buf,
   }
 
 out_free:
-  free(al_buf);
+  fla_buf_free(flanh->fs, al_buf);
   return ret;
 }
 
@@ -892,7 +892,7 @@ int flan_object_close(uint64_t oh, struct flan_handle *flanh)
     if (append_off)
       flan_multi_object_seal(flanh, flan_otable[oh].oinfo);
 
-    free(flan_otable[oh].append_buf);
+    fla_buf_free(flanh->fs, flan_otable[oh].append_buf);
     memset(&flan_otable[oh], 0, sizeof(struct flan_ohandle));
   }
 
