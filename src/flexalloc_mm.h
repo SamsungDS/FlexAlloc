@@ -226,5 +226,13 @@ fla_open_common(char const *dev_uri, struct flexalloc *fs);
 
 void
 fla_print_fs(struct flexalloc *fs);
+
+uint64_t
+fla_object_soffset(struct flexalloc const * fs, struct fla_object const * obj,
+                   const struct fla_pool * pool_handle);
+
+uint64_t
+fla_object_eoffset(struct flexalloc const * fs, struct fla_object const * obj,
+                   struct fla_pool const * pool_handle);
 #endif // __FLEXALLOC_MM_H_
 

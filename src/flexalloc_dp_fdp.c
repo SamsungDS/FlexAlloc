@@ -335,6 +335,21 @@ exit:
   return err;
 }
 
+static int
+fla_dp_fdp_obj_destroy(struct flexalloc *fs, struct fla_object * obj, struct fla_pool * pool_handle)
+{
+  fprintf(stderr, "destroying fdp object \n");
+  int err;
+  uint64_t obj_soffset = fla_object_slba(fs, obj, pool_handle);
+  struct fla_pool_entry * pool_entry = &fs->pools.entries[pool_handle->ndx];
+
+  err = fla_xne_dev_send_deallocate(fs->dev.dev, obj_soffset, pool_entry->obj_nlb);
+  if (FLA_ERR(err, "fla_xne_dev_send_deallocate()"))
+    return -1;
+  return 0;
+}
+
+
 int
 fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
 {
@@ -347,24 +362,26 @@ fla_dp_fdp_init(struct flexalloc *fs, uint64_t flags)
   fs->fla_dp.fla_dp_fdp->ctx_set = FLA_DP_FDP_ON_POOL;
   fs->fla_dp.fncs.init_dp = fla_dp_fdp_init;
   fs->fla_dp.fncs.fini_dp = fla_dp_fdp_fini;
+  fs->fla_dp.fncs.obj_destroy = fla_dp_fdp_obj_destroy;
 
   switch (fs->fla_dp.fla_dp_fdp->ctx_set)
   {
   case FLA_DP_FDP_ON_SLAB:
     fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_fdp_onslab_pool_slab_list_id;
     fs->fla_dp.fncs.get_next_available_slab = fla_dp_fdp_onslab_get_next_available_slab;
+    fs->fla_dp.fncs.slab_format = fla_dp_fdp_slab_format;
     break;
   case FLA_DP_FDP_ON_OBJECT:
   case FLA_DP_FDP_ON_POOL:
   case FLA_DP_FDP_ON_WRITE:
     fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_noop_pool_slab_list_id;
     fs->fla_dp.fncs.get_next_available_slab = fla_dp_noop_get_next_available_slab;
+    fs->fla_dp.fncs.slab_format = fla_dp_noop_slab_format;
     break;
   default:
     return FLA_ERR(-EIO, "unknown fdp data placement type");
   }
 
-  fs->fla_dp.fncs.slab_format = fla_dp_fdp_slab_format;
   fla_fdp_set_prep_ctx(fs, &fs->fla_dp.fncs.prep_dp_ctx);
 
   if ((err = FLA_ERR(fla_fdp_init_md_pid(fs), "fla_fdp_init_md_pid()")))

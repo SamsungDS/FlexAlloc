@@ -102,16 +102,15 @@ fla_xne_dev_get_znd_mor(struct xnvme_dev *dev)
 int
 fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const uint32_t nlb)
 {
-  return 0;
   int err;
   uint32_t nsid;
   //struct xnvme_spec_dsm_range dsm_range = {.cattr = 0, .slba = slba, .nlb = nlb};
   struct xnvme_spec_dsm_range * dsm_range;
 
   struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
-  struct xnvme_ident const * ident;
+//  struct xnvme_ident const * ident;
 
-  ident = xnvme_dev_get_ident(dev);
+  //ident = xnvme_dev_get_ident(dev);
 
   /*
    * This is the xnvme enum where I take the values from
@@ -123,8 +122,8 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
    * XNVME_DEV_TYPE_RAMDISK,
    */
 
-  if (ident->dtype != 1 && ident->dtype != 2)
-    return 0; // we skil non nvme devices
+//  if (ident->dtype != 1 && ident->dtype != 2)
+//    return 0; // we skil non nvme devices
 
   nsid = xnvme_dev_get_nsid(dev);
 

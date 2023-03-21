@@ -78,7 +78,7 @@ exit:
   return err;
 }
 
-static int
+int
 fla_dp_noop_slab_format(struct flexalloc * fs, uint32_t const slab_id, struct fla_slab_header * h)
 {
   int err;
@@ -96,6 +96,12 @@ fla_dp_noop_prep_ctx(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx)
 }
 
 int
+fla_dp_noop_obj_destroy(struct flexalloc *fs, struct fla_object * obj, struct fla_pool * pool_handle)
+{
+  return 0;
+}
+
+int
 fla_dp_noop_init(struct flexalloc *fs, const uint64_t flags)
 {
   fs->fla_dp.fncs.init_dp = fla_dp_noop_init;
@@ -104,6 +110,7 @@ fla_dp_noop_init(struct flexalloc *fs, const uint64_t flags)
   fs->fla_dp.fncs.get_pool_slab_list_id = fla_dp_noop_pool_slab_list_id;
   fs->fla_dp.fncs.get_next_available_slab = fla_dp_noop_get_next_available_slab;
   fs->fla_dp.fncs.slab_format = fla_dp_noop_slab_format;
+  fs->fla_dp.fncs.obj_destroy = fla_dp_noop_obj_destroy;
 
   return 0;
 }

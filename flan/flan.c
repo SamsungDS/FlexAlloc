@@ -127,7 +127,7 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
 
   ret = flan_md_init((*flanh)->fs, (*flanh)->p_ptrs[FLAN_POOL_NONE],
                        flan_elem_nbytes, flan_has_key, &(*flanh)->md);
-  open_opts.opts->sync = "io_uring";
+  open_opts.opts->sync = "io_uring_cmd";
   if (FLA_ERR(ret, "flan_md_init()"))
     goto out_free;
 
