@@ -917,6 +917,10 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
   if(FLA_ERR(err, "fla_hdll_remove()"))
     goto exit;
 
+  err = fs->fla_dp.fncs.obj_destroy(fs, obj, pool_handle);
+  if(FLA_ERR(err, "obj_destroy()"))
+    goto exit;
+
   if (slab->refcount == 0)
   {
     err = fla_release_slab(fs, slab);
