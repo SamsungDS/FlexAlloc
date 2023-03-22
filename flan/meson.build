@@ -30,6 +30,13 @@ executable('flan_test', 'test.c',
   include_directories : libflexalloc_header_dirs
   )
 
+executable('flan_test_overwrite', 'test_overwrite.c',
+  fla_common_files, flan_files, libflexalloc_files, xnvme_env_files,
+  fla_util_files,
+  dependencies: xnvme_deps,
+  include_directories : libflexalloc_header_dirs
+  )
+
 executable('flan_test_write_over_obj_size', 'test_write_over_obj_size.c',
   fla_common_files, flan_files, libflexalloc_files, xnvme_env_files,
   fla_util_files,
