@@ -156,6 +156,8 @@ int read_object(uint64_t obj_handle, size_t buf_size,
   // for (int i = 0; i < num_bytes_read; i++)
   //   printf("%02X ", buf[i]);
   // printf("\n");
+  //
+  fla_buf_free(flanh->fs, buf);
 
 exit:
   return err;
