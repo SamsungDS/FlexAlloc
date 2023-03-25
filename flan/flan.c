@@ -879,7 +879,7 @@ int flan_object_close(uint64_t oh, struct flan_handle *flanh)
   // Use count drops to zero lets free
   if (flan_otable[oh].use_count < 1)
   {
-    if (append_off % bs && !flan_otable[oh].frozen)
+    if (append_off % bs && !flan_otable[oh].frozen && flanh->is_zns)
     {
       // Append the last block
       ret = flan_multi_object_action(flanh, flan_otable[oh].oinfo, flan_otable[oh].append_buf,
