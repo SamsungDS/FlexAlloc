@@ -136,7 +136,7 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
   }
   dsm_range->cattr = 0;
   dsm_range->slba = slba;
-  dsm_range->nlb = nlb;
+  dsm_range->llb = nlb;
 
   /*
    * 0 -> 1 range to deallocate
@@ -147,7 +147,7 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
   err = xnvme_nvm_dsm(&ctx, nsid, dsm_range, 1, true, false, false);
   if (FLA_ERR(err, "xnvme_nvm_dsm() err: %d, dsm->cattr %"PRIu32", "
         "dsm->slba %"PRIu64", dsm->nlb %"PRIu32", nsid %"PRIu32"",
-        err, dsm_range->cattr, dsm_range->slba, dsm_range->nlb, nsid))
+        err, dsm_range->cattr, dsm_range->slba, dsm_range->llb, nsid))
     goto free_buf;
 
 free_buf:
