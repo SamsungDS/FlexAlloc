@@ -338,7 +338,6 @@ exit:
 static int
 fla_dp_fdp_obj_destroy(struct flexalloc *fs, struct fla_object * obj, struct fla_pool * pool_handle)
 {
-  fprintf(stderr, "destroying fdp object \n");
   int err;
   uint64_t obj_soffset = fla_object_slba(fs, obj, pool_handle);
   struct fla_pool_entry * pool_entry = &fs->pools.entries[pool_handle->ndx];
