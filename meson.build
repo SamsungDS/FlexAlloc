@@ -146,37 +146,6 @@ foreach suite : suites
 
     test_data = configuration_data()
     test_data.set('flex_alloc_test_executable_name', t_exec)
-    configure_file(input : './tests/flexalloc_pyt.py.in',
-      output : t_exec + '.py',
-      configuration : test_data)
 
   endforeach
 endforeach
-
-## Python Bindings && wheel ##
-#tgt_build_py_bindings = custom_target(
-#  'build_py_bindings',
-#  output: 'dummy',
-#  build_always: false,
-#  command: [
-#    meson.current_source_dir() + '/scripts/build_python_bindings.sh',
-#  ],
-#  env: {
-#    'MESON_SOURCE_ROOT': meson.current_source_dir(),
-#    'MESON_BUILD_ROOT': meson.current_build_dir(),
-#    'PYTHON_BIN': py.full_path()
-#  },
-#  depends: [library],
-#)
-#
-#run_target(
-#  'run-tests',
-#  command: [
-#    meson.current_source_dir() + '/scripts/run_tests.sh',
-#  ],
-#  depends: [tgt_build_py_bindings, c_test_progs, daemon_exe],
-#  env: {
-#    'MESON_SOURCE_ROOT': meson.current_source_dir(),
-#    'MESON_BUILD_ROOT': meson.current_build_dir(),
-#    'PYTHON_BIN': py.full_path()
-#  })
