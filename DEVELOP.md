@@ -1,9 +1,9 @@
 # Building
 **Dependencies**
 * Flexalloc depends on the following projects
-	- [xnvme](https://github.com/OpenMPDK/xNVMe) - a library for flexible access to storage device
-	- [meson](https://mesonbuild.com) - build system leveraged by flexalloc. [How to install](#installmesonninja)
-	- [ninja](https://pypi.org/project/ninja/) - small build system leveraged by meson. [How to install](#installmesonninja)
+  - [xnvme](https://github.com/OpenMPDK/xNVMe) - a library for flexible access to storage device
+  - [meson](https://mesonbuild.com) - build system leveraged by flexalloc. [How to install](#installmesonninja)
+  - [ninja](https://pypi.org/project/ninja/) - small build system leveraged by meson. [How to install](#installmesonninja)
 
 
 **Obtain Source**
@@ -25,7 +25,7 @@ meson install -C build
 
 **Running tests**
 ```shell
-meson compile -C build run-tests
+meson test -C build
 ```
 
 # Conventions:
@@ -35,13 +35,13 @@ meson compile -C build run-tests
 **Return Value**
 * Always return int as error: In general methods should return an int where
   zero means that no errors occured and any other value means an error.
-	- If errno is detected or set within the function it should be returned as -errno
-	- If an error different from what errno defines is detected or set it should be
-		returned as a positive number.
+  - If errno is detected or set within the function it should be returned as -errno
+  - If an error different from what errno defines is detected or set it should be
+    returned as a positive number.
 
 * Return void when there are no errors to handle: Use void when there are no
   errors to handle within the method. This is quite rare but happens when you for
-	example wrap a simple free.
+  example wrap a simple free.
 
 **Naming**
 * Prefix "fla_" for functions and variables : In general, functions that might
@@ -56,8 +56,8 @@ meson compile -C build run-tests
   Using these macros allows us to control the message format and how these get
   output.
 * Regular execution of libflexalloc should NOT output anything to
-	std{out,err,in}.  Only when there is an error should the stderr be used. This
-	is true only when FLA_VERBOSITY is set to 0.
+  std{out,err,in}.  Only when there is an error should the stderr be used. This
+  is true only when FLA_VERBOSITY is set to 0.
 * Where desired, use the `FLA_DBG_\*` macros. The output will then be shown when
   FlexAlloc is compiled with debugging enabled, such as the unit- and regression tests.
 
@@ -101,8 +101,8 @@ this Python module is shipped separately. For Ubuntu/Debian you will need to ins
 
 **Cannot open loopback-control for writing**
 * Most tests create a loopback device in lieu of using a real hardware device.
-	To do this, your user must be able to create loopback devices. Try the following and if
-	you don't see `permission denied`, you are ready to run the tests.
+  To do this, your user must be able to create loopback devices. Try the following and if
+  you don't see `permission denied`, you are ready to run the tests.
 ```shell
 # Create an image file to test with:
 dd if=/dev/zero of=/tmp/loop1.img bs=1M count=10
@@ -117,11 +117,11 @@ $ ls -la /dev/loop-control
 crw-rw---- 1 root disk 10, 237 Mar 17 13:06 /dev/loop-control
 ```
   - In this case, the `disk` group also has read-write access. In this case, run the
-	  following command to add your user to the `disk` group:
+    following command to add your user to the `disk` group:
 ```sell
 usermod -aG disk `whoami`
 ```
   - Log out and then back into your desktop environment or run `newgrp disk` in the
-		relevant terminal window for the permissions change to take effect.
+    relevant terminal window for the permissions change to take effect.
 
 
