@@ -102,6 +102,7 @@ fla_xne_dev_get_znd_mor(struct xnvme_dev *dev)
 int
 fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const uint32_t nlb)
 {
+  return 0;
   int err;
   uint32_t nsid;
   //struct xnvme_spec_dsm_range dsm_range = {.cattr = 0, .slba = slba, .nlb = nlb};
