@@ -150,6 +150,7 @@ public:
   virtual Status Flush() override;
   virtual Status Sync() override;
   virtual Status Close() override;
+  void AdjustOpenFlagsWithHints(int *flags, Env::WriteLifeTimeHint hint);
 };
 
 class LibFlanEnvDirectory : public Directory
