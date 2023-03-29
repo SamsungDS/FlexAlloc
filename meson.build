@@ -47,6 +47,11 @@ executable('flexalloc_client',
     'src/flexalloc_daemon_base.c', libflexalloc_set],
   dependencies: [xnvme_deps])
 
+executable('flexalloc_print',
+  ['src/flexalloc_print.c', fla_common_set, libflexalloc_set],
+  dependencies: [xnvme_deps],
+  install : true)
+
 ### Libraries ###
 library = both_libraries('flexalloc', [libflexalloc_set, flexalloc_daemon_files],
                          dependencies: xnvme_deps, install : true)
