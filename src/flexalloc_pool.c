@@ -200,6 +200,7 @@ fla_print_pool_entries(struct flexalloc *fs)
   uint32_t slab_heads[3];
   uint32_t tmp;
   struct fla_pool_entry * pool_entry;
+  uint64_t allocated_nbytes = 0;
 
   for (uint32_t npool = 0 ; npool < fs->geo.npools ; ++npool)
   {
@@ -236,9 +237,15 @@ fla_print_pool_entries(struct flexalloc *fs)
         fprintf(stderr, "|    -->next : %"PRIu32", prev : %"PRIu32", refcount : %"PRIu32"\n",
                 curr_slab->next, curr_slab->prev, curr_slab->refcount);
         tmp = curr_slab->next;
+        allocated_nbytes += (curr_slab->refcount * pool_entry->obj_nlb * fs->geo.lb_nbytes);
       }
     }
   }
+
+  fprintf(stderr, "Size Counter\n");
+  fprintf(stderr, "|  Allocatable size : %"PRIu64"\n",
+      fs->geo.nslabs * (uint64_t)fs->geo.slab_nlb *fs->geo.lb_nbytes);
+  fprintf(stderr, "|  Allocated size : %"PRIu64"\n", allocated_nbytes);
 }
 
 int
