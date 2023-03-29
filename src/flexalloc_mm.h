@@ -211,6 +211,9 @@ uint64_t
 fla_object_slba(struct flexalloc const * fs, struct fla_object const * obj,
                 const struct fla_pool * pool_handle);
 
+uint64_t
+fla_object_size_nbytes(struct flexalloc const * fs, struct fla_pool const * pool_handle);
+
 /**
  * @brief Opens a flexalloc device
  *
