@@ -36,7 +36,7 @@ fla_strdup(char const *s)
 
 uint32_t
 fla_nelems_max(uint64_t units_total, uint32_t elem_sz_nunit,
-    uint32_t (*calc_md_size_nunits)(uint32_t nelems, va_list), ...)
+               uint32_t (*calc_md_size_nunits)(uint32_t nelems, va_list), ...)
 {
   uint32_t nelems = units_total / elem_sz_nunit;
   uint32_t md_nunits;

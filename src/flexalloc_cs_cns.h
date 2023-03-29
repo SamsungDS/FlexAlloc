@@ -13,7 +13,7 @@ int fla_cs_cns_slab_offset(struct flexalloc const *fs, uint32_t const slab_id,
 int fla_cs_cns_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle,
                            struct fla_object *obj);
 int fla_cs_cns_object_destroy(struct flexalloc *fs, struct fla_pool const *pool_handle,
-                           struct fla_object *obj);
+                              struct fla_object *obj);
 int fla_cs_cns_init(struct flexalloc *fs, const uint64_t flags);
 int fla_cs_cns_fini(struct flexalloc *fs, const uint64_t flags);
 

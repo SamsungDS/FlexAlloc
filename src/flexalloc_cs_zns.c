@@ -41,8 +41,9 @@ fla_znd_manage_zones_object_reset(struct flexalloc *fs, struct fla_pool const *p
   return err;
 }
 
-int fla_cs_zns_slab_offset(struct flexalloc const *fs, uint32_t const slab_id,
-                           uint64_t const slabs_base, uint64_t *slab_offset)
+int
+fla_cs_zns_slab_offset(struct flexalloc const *fs, uint32_t const slab_id,
+                       uint64_t const slabs_base, uint64_t *slab_offset)
 {
   int err = fla_cs_cns_slab_offset(fs, slab_id, slabs_base, slab_offset);
   if (FLA_ERR(err, "fls_cs_cns_slab_offset()"))
@@ -54,7 +55,8 @@ int fla_cs_zns_slab_offset(struct flexalloc const *fs, uint32_t const slab_id,
   return 0;
 }
 
-int fla_cs_zns_init(struct flexalloc *fs, uint64_t const flags)
+int
+fla_cs_zns_init(struct flexalloc *fs, uint64_t const flags)
 {
   fs->fla_cs.fla_cs_zns = malloc(sizeof(struct fla_cs_zns));
   if (FLA_ERR(!fs->fla_cs.fla_cs_zns, "malloc()"))
@@ -71,13 +73,15 @@ int fla_cs_zns_init(struct flexalloc *fs, uint64_t const flags)
   return 0;
 }
 
-int fla_cs_zns_fini(struct flexalloc *fs, uint64_t const flags)
+int
+fla_cs_zns_fini(struct flexalloc *fs, uint64_t const flags)
 {
   free(fs->fla_cs.fla_cs_zns);
   return 0;
 }
 
-int fla_cs_zns_pool_check(struct flexalloc *fs, uint32_t const obj_nlb)
+int
+fla_cs_zns_pool_check(struct flexalloc *fs, uint32_t const obj_nlb)
 {
   if (FLA_ERR(obj_nlb != fs->fla_cs.fla_cs_zns->nzsect,
               "object size != formated zone size"))
@@ -85,14 +89,16 @@ int fla_cs_zns_pool_check(struct flexalloc *fs, uint32_t const obj_nlb)
   return 0;
 }
 
-int fla_cs_zns_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle,
-                           struct fla_object *obj)
+int
+fla_cs_zns_object_seal(struct flexalloc *fs, struct fla_pool const *pool_handle,
+                       struct fla_object *obj)
 {
   return fla_znd_manage_zones_object_finish(fs, pool_handle, obj);
 }
 
-int fla_cs_zns_object_destroy(struct flexalloc *fs, struct fla_pool const *pool_handle,
-                              struct fla_object *obj)
+int
+fla_cs_zns_object_destroy(struct flexalloc *fs, struct fla_pool const *pool_handle,
+                          struct fla_object *obj)
 {
   return fla_znd_manage_zones_object_reset(fs, pool_handle, obj);
 }
