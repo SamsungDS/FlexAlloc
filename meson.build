@@ -51,6 +51,11 @@ executable('flexalloc_print',
   dependencies: [xnvme_deps],
   install : true)
 
+executable('flexalloc_fill',
+  ['src/flexalloc_print.c', fla_common_set, libflexalloc_set],
+  dependencies: [xnvme_deps],
+  install : true)
+
 ### Libraries ###
 library = both_libraries('flexalloc', [libflexalloc_set, flexalloc_daemon_files],
                          dependencies: xnvme_deps, install : true)
