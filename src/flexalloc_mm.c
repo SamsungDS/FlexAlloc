@@ -212,7 +212,7 @@ fla_mkfs_geo_calc(const struct xnvme_dev *dev, const struct xnvme_dev *md_dev,
   int err;
   uint32_t nslabs_approx;
   uint32_t lb_nbytes = fla_xne_dev_lba_nbytes(dev);
-  struct fla_geo md_geo;
+  struct fla_geo md_geo = {0};
 
   fla_geo_init(dev, npools, slab_nlb, lb_nbytes, geo);
   fla_geo_init(dev, npools, slab_nlb, lb_nbytes, &md_geo);
