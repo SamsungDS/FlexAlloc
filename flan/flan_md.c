@@ -218,12 +218,14 @@ flan_md_write_root_obj(struct flan_md *md, struct flan_md_root_obj_buf *root_obj
       root_obj->end->write_offset_nbytes + end_obj_nbytes,
       md->fs->geo.lb_nbytes) * md->fs->geo.lb_nbytes;
 
-  void *dst_end_ptr = root_obj->buf + dest_write_nbytes - end_obj_nbytes;
+  uint64_t src_write_len_nbytes = dest_write_nbytes - src_write_nbytes;
   void *src_end_ptr = root_obj->buf + root_obj->buf_nbytes - end_obj_nbytes;
+  void *dst_end_ptr = root_obj->buf + dest_write_nbytes - end_obj_nbytes;
+  root_obj->end->write_offset_nbytes = src_write_nbytes + src_write_len_nbytes;
   memcpy(dst_end_ptr, src_end_ptr, end_obj_nbytes);
 
   err = fla_object_write(md->fs, md->ph, &root_obj->fla_obj, root_obj->buf,
-      src_write_nbytes, dest_write_nbytes - src_write_nbytes);
+      src_write_nbytes, src_write_len_nbytes);
   if (FLA_ERR(err, "fla_object_write() src_nbytes : %"PRIu64", len %"PRIu64"",
         src_write_nbytes, dest_write_nbytes))
     return err;
