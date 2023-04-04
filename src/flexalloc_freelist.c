@@ -8,8 +8,17 @@
 size_t
 fla_flist_size(uint32_t len)
 {
-  // the leading uint32_t element keeps the length of the freelist
   return sizeof(uint32_t) * (1 + FLA_FREELIST_U32_ELEMS(len));
+  //             |           |   `-> Number of 32bit words needed to
+  //             |           |       keep len number of elements.
+  //             |           |
+  //             |           `-> There is always an additional 32 bit
+  //             |               element that has the length of the
+  //             |               freelist
+  //             |
+  //             `> Since we want to know the number of bytes we
+  //                multiply by however many bytes are needed for
+  //                a uint32_t.
 }
 
 uint32_t
