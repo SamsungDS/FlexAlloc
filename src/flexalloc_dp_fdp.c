@@ -122,8 +122,8 @@ fla_fdp_cached_prep_ctx(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx)
     pid_to_id->fla_id = fla_id;
 
     if (fdp->ctx_set == FLA_DP_FDP_ON_POOL)
-      // +1 one because we do not want PID zero.
-      pid_to_id->pid = xne_io->pool_handle->ndx + 1;
+      // +2 one because we do not want PID zero nor 1.
+      pid_to_id->pid = xne_io->pool_handle->ndx + 2;
     else {
       ret = fla_fdp_get_pid_n(xne_io->dev, &pid_to_id->pid, 1);
       if (FLA_ERR(ret, "fla_fdp_get_pid_n()"))
