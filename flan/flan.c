@@ -264,6 +264,18 @@ exit:
   return err;
 }
 
+static void
+flan_otable_free_append_buf(struct flan_handle const * flanh, uint64_t oh)
+{
+  if (flan_otable[oh].append_buf)
+  {
+    fla_buf_free(flanh->fs, flan_otable[oh].append_buf);
+    if (flan_otable[oh].append_buf == flan_otable[oh].read_buf)
+      flan_otable[oh].read_buf = NULL;
+    flan_otable[oh].append_buf = NULL;
+  }
+}
+
 int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, int flags)
 {
   struct flan_oinfo *oinfo;
@@ -332,7 +344,8 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
                     (flan_otable[ff_oh].append_off / bs) * bs, bs, FLAN_MULTI_OBJ_ACTION_READ);
     if (FLA_ERR(ret, "flan_multi_object_action()"))
     {
-      fla_buf_free(flanh->fs, flan_otable[ff_oh].append_buf);
+
+      flan_otable_free_append_buf(flanh, ff_oh);
       return ret;
     }
   }
@@ -381,7 +394,8 @@ int flan_object_delete(const char *name, struct flan_handle *flanh)
   // Invalidate any open handles
   if (oh != FLAN_MAX_OPEN_OBJECTS)
   {
-    fla_buf_free(flanh->fs, flan_otable[oh].append_buf);
+
+    flan_otable_free_append_buf(flanh, oh);
     err = flan_multi_object_destroy(flanh, oinfo);
     if (FLA_ERR(err, "fla_object_destroy()"))
     {
@@ -763,15 +777,24 @@ int flan_object_rename(const char *oldname, const char *newname, struct flan_han
   if (namelen > FLAN_OBJ_NAME_LEN_MAX)
     return FLA_ERR(-1, "flan_object_rename()");
 
-  uint64_t oh = flan_otable_search(base_oldname, NULL);
-  if (FLA_ERR(oh == FLAN_MAX_OPEN_OBJECTS, "flan_otable_search()"))
+  uint64_t old_oh = flan_otable_search(base_oldname, NULL);
+  if (FLA_ERR(old_oh == FLAN_MAX_OPEN_OBJECTS, "flan_otable_search()"))
     return -EIO;
+
+  uint32_t old_new_oh_usecount = 0;
+  uint64_t new_oh = flan_otable_search(base_newname, NULL);
+  if (new_oh != FLAN_MAX_OPEN_OBJECTS)
+  { // we forget about new existing new_on except for the count
+    old_new_oh_usecount = flan_otable[new_oh].use_count;
+    flan_otable_free_append_buf(flanh, new_oh);
+    memset(&flan_otable[new_oh], 0, sizeof(struct flan_ohandle));
+  }
 
   err = flan_md_rmap_elem(flanh->md, base_oldname, base_newname, (void**)&oinfo);
   if (FLA_ERR(err, "flan_md_rmap_elem()"))
     return -EIO;
 
-  if (FLA_ERR(oinfo != flan_otable[oh].oinfo, "flan_object_rename() : oinfo mismatch"))
+  if (FLA_ERR(oinfo != flan_otable[old_oh].oinfo, "flan_object_rename() : oinfo mismatch"))
     return -EIO;
 
   if (oinfo->fla_oh[0].entry_ndx == UINT32_MAX && oinfo->fla_oh[0].slab_id == UINT32_MAX
@@ -780,6 +803,8 @@ int flan_object_rename(const char *oldname, const char *newname, struct flan_han
 
   memset(oinfo->name, 0, FLAN_OBJ_NAME_LEN_MAX);
   memcpy(oinfo->name, base_newname, namelen + 1);
+
+  flan_otable[old_oh].use_count += old_new_oh_usecount;
 
   return 0;
 }
