@@ -78,5 +78,6 @@ int flan_md_umap_elem(struct flan_md *md, const char *key);
 int flan_md_mod_dirty(struct flan_md *md, const char *key, void *elem, bool val);
 int flan_md_rmap_elem(struct flan_md *md, const char *curr_key, const char *new_key,
     void** rmapped_elem);
-
+void
+flan_md_print_md(struct flan_md const * md);
 #endif //__LIBFLAN_MD_H

@@ -51,6 +51,13 @@ executable('flan_test_unaligned_read', 'test_unaligned_read.c',
   include_directories : libflexalloc_header_dirs
   )
 
+executable('flan_print', 'flan_print.c',
+  fla_common_files, flan_files, libflexalloc_files, xnvme_env_files,
+  fla_util_files, flexalloc_testing,
+  dependencies: xnvme_deps,
+  include_directories : libflexalloc_header_dirs,
+  install : true)
+
 #fuse_deps = dependency('fuse3')
 #executable('flan_fuse', flan_fuse_files,
 #  fla_common_files,  flan_files, libflexalloc_files, xnvme_env_files,
