@@ -137,8 +137,29 @@ free_buf:
   return err;
 }
 
+static int
+flan_md_print_root_obj_elem(const uint32_t ndx, va_list ag)
+{
+  void * root_buf = va_arg(ag, void*);
+
+  struct tmp_{
+    uint64_t size;
+    struct fla_object fla_oh[2];
+    char name[112];
+    int pool_type;
+  } *tmp ;
+
+  tmp = (((struct tmp_*)root_buf) + ndx);
+  fprintf(stderr, "`-> Object (%s)\n", tmp->name);
+  fprintf(stderr, "    Size : (%"PRIu64"\n", tmp->size);
+  fprintf(stderr, "    Pool : (%d)\n", tmp->pool_type);
+  fprintf(stderr, "    ndx : (%"PRIu32")\n" , ndx);
+
+  return FLA_FLIST_SEARCH_RET_FOUND_CONTINUE;
+}
+
 static void
-flan_md_print_root_obj(struct flan_md_root_obj_buf *root_obj)
+flan_md_print_root_obj(struct flan_md_root_obj_buf const * root_obj)
 {
   fprintf(stderr, "Root Object\n");
   fprintf(stderr, "`-> buf ptr : %p\n", root_obj->buf);
@@ -172,7 +193,28 @@ flan_md_print_root_obj(struct flan_md_root_obj_buf *root_obj)
     fprintf(stderr, "   `-> flist_nbytes : %"PRIu32"\n", root_obj->end->flist_nbytes);
     fprintf(stderr, "   `-> signature : %x\n", root_obj->end->signature);
   }
-  fprintf(stderr, "=====================================\n");
+
+  uint32_t found = 0;
+  fprintf(stderr, "Elements in Root\n");
+  int err = fla_flist_search_wfunc(root_obj->freelist, FLA_FLIST_SEARCH_FROM_START, &found,
+      flan_md_print_root_obj_elem, root_obj->buf);
+  if (err)
+    fprintf(stderr, "Found an error (%d) during freelist search\n", err);
+
+ 
+}
+
+void
+flan_md_print_md(struct flan_md const * md)
+{
+  for (uint32_t i = 0 ; i < FLAN_MD_MAX_OPEN_ROOT_OBJECTS ; ++i)
+  {
+    struct flan_md_root_obj_buf const *root_obj = &md->r_objs[i];
+    if (root_obj->state == INACTIVE)
+      continue;
+
+    flan_md_print_root_obj(root_obj);
+  }
 }
 
 static int
