@@ -218,19 +218,68 @@ flan_md_print_md(struct flan_md const * md)
   }
 }
 
+//only called from flan_md_write_root_obj
 static int
-flan_md_forward_dirty_elements(const uint32_t ndx, va_list ag)
+flan_md_forward_dirty_elements(const uint32_t src_ndx, va_list ag)
 {
+  int err = 0, isalloc;
   struct flan_md_root_obj_buf * root_obj = va_arg(ag, struct flan_md_root_obj_buf*);
   struct flan_md * md = va_arg(ag, struct flan_md*);
 
-  void *src = root_obj->buf + (md->elem_nbytes() * ndx);
-  void *dest = root_obj->buf + root_obj->end->write_offset_nbytes;
+  uint64_t dest_ndx = root_obj->end->write_offset_nbytes / md->elem_nbytes();
+  if (root_obj->end->write_offset_nbytes % md->elem_nbytes() != 0)
+    dest_ndx++; // make sure we start after the original write_offset_nbytes
+
+  void *src = root_obj->buf + (md->elem_nbytes() * src_ndx);
+  void *dest = root_obj->buf + (dest_ndx * md->elem_nbytes());
+
+  // We are lucky as we don't have to copy.
+  if (src == dest)
+    goto set_write_offset_remove_from_dirties;
+
+  isalloc = fla_flist_entry_isalloc(root_obj->freelist, dest_ndx);
+  if (FLA_ERR(isalloc < 0 || isalloc > 1, "fla_flist_entry_isalloc()"))
+    return FLA_FLIST_SEARCH_RET_ERR;
+
+  // find the next free ndx after dest_ndx
+  if(isalloc)
+  {
+    for (dest_ndx+=1; dest_ndx < fla_flist_len(root_obj->freelist); ++ dest_ndx)
+    {
+      isalloc = fla_flist_entry_isalloc(root_obj->freelist, dest_ndx);
+      if (FLA_ERR(isalloc < 0 || isalloc > 1, "fla_flist_entry_isalloc()"))
+        return FLA_FLIST_SEARCH_RET_ERR;
+      if (!isalloc)
+      {
+        dest = root_obj->buf + (dest_ndx * md->elem_nbytes());
+        break;
+      }
+    }
+  }
+
+  err = fla_flist_entry_unfree(root_obj->freelist, dest_ndx);
+  if (FLA_ERR(err, "fla_flist_entry_unfree()"))
+    return FLA_FLIST_SEARCH_RET_ERR;
+
   memcpy(dest, src, md->elem_nbytes());
-  root_obj->end->write_offset_nbytes += md->elem_nbytes();
+
+  err = fla_flist_entry_free(root_obj->freelist, src_ndx);
+  if (FLA_ERR(err, "fla_flist_entry_free()"))
+    return FLA_FLIST_SEARCH_RET_ERR;
+
+set_write_offset_remove_from_dirties:
+  if ((dest_ndx + 1) * md->elem_nbytes() > root_obj->end->write_offset_nbytes)
+    root_obj->end->write_offset_nbytes = (dest_ndx + 1) * md->elem_nbytes();
+
+  err = fla_flist_entry_free(root_obj->dirties, src_ndx);
+  if (FLA_ERR(err, "fla_flist_entry_free()"))
+    return FLA_FLIST_SEARCH_RET_ERR;
+
   return FLA_FLIST_SEARCH_RET_FOUND_CONTINUE;
 }
 
+// This can only be called when closing flan. It will not update the hashes
+// It will leave the fs in an undefined state
 static int
 flan_md_write_root_obj(struct flan_md *md, struct flan_md_root_obj_buf *root_obj)
 {
@@ -266,7 +315,7 @@ flan_md_write_root_obj(struct flan_md *md, struct flan_md_root_obj_buf *root_obj
   root_obj->end->write_offset_nbytes = src_write_nbytes + src_write_len_nbytes;
   memcpy(dst_end_ptr, src_end_ptr, end_obj_nbytes);
 
-  err = fla_object_write(md->fs, md->ph, &root_obj->fla_obj, root_obj->buf,
+  err = fla_object_write(md->fs, md->ph, &root_obj->fla_obj, root_obj->buf + src_write_nbytes,
       src_write_nbytes, src_write_len_nbytes);
   if (FLA_ERR(err, "fla_object_write() src_nbytes : %"PRIu64", len %"PRIu64"",
         src_write_nbytes, dest_write_nbytes))
@@ -509,11 +558,11 @@ flan_md_umap_(struct flan_md_root_obj_buf * root_obj,
     struct fla_htbl_entry *htbl_entry, uint32_t const ndx)
 {
   int err;
-  err = fla_flist_entries_free(root_obj->freelist, ndx, 1);
-  if (FLA_ERR(err, "fla_flist_entries_free()"))
+  err = fla_flist_entry_free(root_obj->freelist, ndx);
+  if (FLA_ERR(err, "fla_flist_entry_free()"))
     return err;
 
-  err = fla_flist_entries_free(root_obj->dirties, ndx, 1);
+  err = fla_flist_entry_free(root_obj->dirties, ndx);
   if (FLA_ERR(err, "fla_flist_entry_free()"))
     return err;
 
@@ -541,7 +590,6 @@ int flan_md_umap_elem(struct flan_md *md, const char *key)
     if (FLA_ERR(err, "fla_md_umap_elem()"))
       return err;
 
-    htbl_remove_entry(htbl, htbl_entry);
     return 0;
   }
 
