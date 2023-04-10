@@ -94,6 +94,11 @@ flan_md_root_object_create(struct flan_md const *md, struct flan_md_root_obj_buf
   if (FLA_ERR(err, "fla_object_create()"))
     goto free_buf;
 
+//  // This will zero out the root object
+//  err = fla_object_write(md->fs, md->ph, &root_obj->fla_obj, root_obj->buf, 0, root_obj->buf_nbytes);
+//  if (FLA_ERR(err, "fla_object_write()"))
+//    goto obj_destroy;
+
   err = fla_pool_set_root_object(md->fs, md->ph, &root_obj->fla_obj, false);
   if (FLA_ERR(err, "fla_pool_set_root_object()"))
     goto obj_destroy;
