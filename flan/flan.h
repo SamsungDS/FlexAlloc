@@ -25,6 +25,7 @@ extern "C" {
 #define FLAN_MAX_OPEN_OBJECTS 16384
 #define FLAN_APPEND_SIZE 2097152
 #define FLAN_MAX_FLA_OBJ_IN_OINFO 2
+#define FLAN_RET_NOT_FOUND 6001
 
 enum flan_pool_t{
   FLAN_POOL_SHORT,

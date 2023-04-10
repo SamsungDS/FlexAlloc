@@ -356,7 +356,7 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   }
 
   if (oinfo == NULL)
-    return -EINVAL;
+    return FLAN_RET_NOT_FOUND;
 
   flan_otable[ff_oh].oinfo = oinfo;
   if (flags & FLAN_OPEN_FLAG_WRITE)
@@ -425,7 +425,7 @@ flan_multi_object_destroy(struct flan_handle * flanh, struct flan_oinfo *oinfo)
 
 int flan_object_delete(const char *name, struct flan_handle *flanh)
 {
-  int err;
+  int err = 0, ret = 0;
   char *base_name = basename((char *)name);
   uint64_t oh = flan_otable_search(base_name, NULL);
   struct flan_oinfo *oinfo = NULL;
@@ -439,20 +439,19 @@ int flan_object_delete(const char *name, struct flan_handle *flanh)
   // Invalidate any open handles
   if (oh != FLAN_MAX_OPEN_OBJECTS)
   {
-
     flan_otable_free_append_buf(flanh, oh);
     err = flan_multi_object_destroy(flanh, oinfo);
-    if (FLA_ERR(err, "fla_object_destroy()"))
-    {
-      printf("Error while destroying object in fla %d\n", err);
+    if (FLA_ERR(err, "fla_object_destroy()"
+                     "Error while destroying object in fla %d, name %s, size %ld\n",
+                     err, name, oinfo->size))
       return err;
-    }
+
     memset(&flan_otable[oh], 0, sizeof(struct flan_ohandle) - sizeof(uint32_t));
   }
 
-  err = flan_md_umap_elem(flanh->md, base_name);
-  if (err == -1 || FLA_ERR(err, "flan_md_umap_elem()"))
-    return err;
+  ret = flan_md_umap_elem(flanh->md, base_name);
+  if (ret == -1 || FLA_ERR(ret, "flan_md_umap_elem()"))
+    err += ret;
 
   memset(oinfo->name, 0, FLAN_OBJ_NAME_LEN_MAX);
   oinfo->size = 0;
