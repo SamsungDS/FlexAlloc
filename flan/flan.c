@@ -125,7 +125,6 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
     goto out_free;
 
   root = *flanh;
-  atexit(flan_cleanup);
   return ret;
 
 out_free:
