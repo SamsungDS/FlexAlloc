@@ -32,7 +32,7 @@ class LibFlanEnv : public EnvWrapper
     };
     struct LibFlanEnv_Options
     {
-      std::mutex *flan_mut;
+      //std::mutex *flan_mut;
     };
 
   private:
@@ -84,7 +84,7 @@ private:
   std::string fname;
   struct flan_handle *flanh;
   std::shared_ptr<LibFlanEnv::LibFlanEnv_F> fh;
-  std::mutex *lnfs_mut;
+  //std::mutex *lnfs_mut;
 
   Status ZNSRead(size_t n, Slice *result, char *scratch);
 
