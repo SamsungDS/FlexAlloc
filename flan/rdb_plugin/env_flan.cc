@@ -131,9 +131,8 @@ LibFlanEnv::LibFlanEnv(Env *env, const std::string &flan_opts)
 
 LibFlanEnv::~LibFlanEnv()
 {
-  //std::cout << "Executing the destructor function ===================================" << std::endl;
-  //std::lock_guard<std::mutex> guard(*(options->flan_mut));
-  //flan_close(this->flanh); // TODO flan close returns status so should flan_close
+  std::lock_guard<std::mutex> guard(flan_mut);
+  flan_close(this->flanh); // TODO flan close returns status so should flan_close
 }
 
 Status
