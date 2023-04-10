@@ -185,7 +185,7 @@ fla_xne_sync_seq_w(const struct xnvme_lba_range * lba_range,
 
   for(uint64_t slba = lba_range->slba; slba <= lba_range->elba; slba += mdts_naddrs)
   {
-    /* mdts_naddrs -1 because it is not a zero based value */
+    /* mdts_naddrs -1 because it is a zero based value */
     nlb = XNVME_MIN(lba_range->elba - slba, mdts_naddrs - 1);
 
     err = xnvme_nvm_write(ctx, nsid, slba, nlb, wbuf, NULL);
