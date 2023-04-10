@@ -153,6 +153,8 @@ fla_flist_entries_free(freelist_t flist, uint32_t ndx, unsigned int num);
 int
 fla_flist_entry_unfree(freelist_t flist, uint32_t ndx);
 
+int
+fla_flist_entry_isalloc(freelist_t flist, uint32_t ndx);
 /**
  * Search all the used element by executing a function.
  *

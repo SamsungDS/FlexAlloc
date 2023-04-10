@@ -162,6 +162,21 @@ fla_flist_entry_free(freelist_t flist, uint32_t ndx)
 }
 
 int
+fla_flist_entry_isalloc(freelist_t flist, uint32_t ndx)
+{
+  uint32_t *elem = flist + 1;
+  if (ndx > *flist)
+    return -1;
+
+  while (ndx >= sizeof(uint32_t) * CHAR_BIT)
+  {
+    elem++;
+    ndx -= sizeof(uint32_t) * CHAR_BIT;
+  }
+  return !(*elem & (1 << ndx));
+}
+
+int
 fla_flist_entries_free(freelist_t flist, uint32_t ndx, unsigned int num)
 {
   for(uint32_t i = 0 ; i < num ; ++i)
