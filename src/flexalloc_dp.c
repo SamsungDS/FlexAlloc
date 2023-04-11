@@ -38,11 +38,11 @@ fla_dp_fdp_supported(struct xnvme_spec_idfy_ctrlr *idfy_ctrl)
   return idfy_ctrl->ctratt.flexible_data_placement;
 }
 
-//static bool
-//fla_dp_fdp_enabled(uint32_t const dw0)
-//{
-//  return dw0 & (1 << 0);
-//}
+static bool
+fla_dp_fdp_enabled(uint32_t const dw0)
+{
+  return dw0 & (1 << 0);
+}
 
 int
 fla_dp_type(struct flexalloc *fs, enum fla_dp_t *dp_t)
@@ -52,27 +52,26 @@ fla_dp_type(struct flexalloc *fs, enum fla_dp_t *dp_t)
   idfy_ctrl = xnvme_buf_alloc(fs->dev.dev, sizeof(*idfy_ctrl));
 
   //struct xnvme_spec_idfy idfy_ctrl = {0};
-//  const struct xnvme_spec_idfy_ns * idfy_ns = NULL;
-//  uint32_t dw0;
-
   err = fla_xne_ctrl_idfy(fs->dev.dev, idfy_ctrl);
   if (FLA_ERR(err, "fla_xne_ctrl_idfy()"))
     return err;
 
   if (fla_dp_fdp_supported(&idfy_ctrl->ctrlr))
   {
-//    idfy_ns = xnvme_dev_get_ns(fs->dev.dev);
-//    if ((err = FLA_ERR(idfy_ns == NULL, "xnvme_dev_get_ns_css()")))
-//      return err;
-//    err = fla_xne_feat_idfy(fs->dev.dev, idfy_ns->endgid, &dw0);
-//    if (FLA_ERR(err, "fla_xne_feat_idfy()"))
-//      return err;
-//    if(fla_dp_fdp_enabled(dw0))
-//    {
-//      *dp_t = FLA_DP_FDP;
-//      return 0;
-//    }
-    *dp_t = FLA_DP_FDP;
+    const struct xnvme_spec_idfy_ns * idfy_ns = NULL;
+    uint32_t dw0;
+
+    idfy_ns = xnvme_dev_get_ns(fs->dev.dev);
+    if ((err = FLA_ERR(idfy_ns == NULL, "xnvme_dev_get_ns_css()")))
+      return err;
+    err = fla_xne_feat_idfy(fs->dev.dev, idfy_ns->endgid, &dw0);
+    if (FLA_ERR(err, "fla_xne_feat_idfy()"))
+      return err;
+    if(fla_dp_fdp_enabled(dw0))
+      *dp_t = FLA_DP_FDP;
+    else
+      *dp_t = FLA_DP_DEFAULT;
+
     goto free_idfy;
   }
 
