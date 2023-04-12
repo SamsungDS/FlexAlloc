@@ -81,12 +81,7 @@ exit:
 int
 fla_dp_noop_slab_format(struct flexalloc * fs, uint32_t const slab_id)
 {
-  int err;
-  err = fla_xne_dev_send_deallocate(fs->dev.dev, fla_geo_slab_lb_off(fs, slab_id),
-                                    fs->super->slab_nlb);
-  if (FLA_ERR(err, "fla_xne_dev_send_deallocate()"))
-    return -1;
-  return 0;
+  return fs->fla_cs.fncs.slab_trim(fs, slab_id);
 }
 
 static int
