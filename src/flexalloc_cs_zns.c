@@ -54,6 +54,31 @@ int fla_cs_zns_slab_offset(struct flexalloc const *fs, uint32_t const slab_id,
   return 0;
 }
 
+static int
+fla_cs_zns_slab_trim(struct flexalloc *fs, uint32_t const slab_id)
+{
+  int err;
+  struct fla_slab_header *slab = fla_slab_header_ptr(slab_id, fs);
+  if((err = FLA_ERR(!slab, "fla_slab_header_ptr()")))
+    goto exit;
+
+  uint64_t slba = fla_geo_slab_lb_off(fs, slab_id);
+  err = slba % fs->fla_cs.fla_cs_zns->nzsect;
+  if (FLA_ERR(err, "slab slba is not a multiple of zone size"))
+    goto exit;
+
+  uint64_t zones_in_slab = fs->geo.slab_nlb / fs->fla_cs.fla_cs_zns->nzsect;
+  for (uint32_t i = 0; i < zones_in_slab; ++i)
+  {
+    slba = fs->fla_cs.fla_cs_zns->nzsect * i;
+    err |= fla_xne_dev_znd_send_mgmt(fs->dev.dev, slba,
+                                     XNVME_SPEC_ZND_CMD_MGMT_SEND_RESET, false);
+  }
+
+exit:
+   return err;
+}
+
 int fla_cs_zns_init(struct flexalloc *fs, uint64_t const flags)
 {
   fs->fla_cs.fla_cs_zns = malloc(sizeof(struct fla_cs_zns));
@@ -68,6 +93,7 @@ int fla_cs_zns_init(struct flexalloc *fs, uint64_t const flags)
   fs->fla_cs.fncs.slab_offset = fla_cs_zns_slab_offset;
   fs->fla_cs.fncs.object_seal = fla_cs_zns_object_seal;
   fs->fla_cs.fncs.object_destroy = fla_cs_zns_object_destroy;
+  fs->fla_cs.fncs.slab_trim = fla_cs_zns_slab_trim;
   return 0;
 }
 
