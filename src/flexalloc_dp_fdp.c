@@ -299,10 +299,15 @@ exit:
 }
 
 static int
-fla_dp_fdp_slab_format(struct flexalloc * fs, uint32_t slab_id, struct fla_slab_header * slab)
+fla_dp_fdp_slab_format(struct flexalloc * fs, uint32_t slab_id)
 {
   int err;
   uint32_t fla_id, pid, found = 0;
+
+  struct fla_slab_header *slab = fla_slab_header_ptr(slab_id, fs);
+  if((err = FLA_ERR(!slab, "fla_slab_header_ptr()")))
+    goto exit;
+
   err = fla_xne_dev_send_deallocate(fs->dev.dev, fla_geo_slab_lb_off(fs, slab_id),
                                     fs->super->slab_nlb);
   if (FLA_ERR(err, "fla_xne_dev_send_deallocate()"))
