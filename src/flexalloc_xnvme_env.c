@@ -102,7 +102,6 @@ fla_xne_dev_get_znd_mor(struct xnvme_dev *dev)
 int
 fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const uint32_t nlb)
 {
-  return 0;
   int err;
   uint32_t nsid;
   //struct xnvme_spec_dsm_range dsm_range = {.cattr = 0, .slba = slba, .nlb = nlb};
@@ -145,7 +144,7 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
    * false -> wether to optimize write
    * false -> wether to optimize read
    */
-  err = xnvme_nvm_dsm(&ctx, nsid, dsm_range, 1, true, false, false);
+  err = xnvme_nvm_dsm(&ctx, nsid, dsm_range, 0, true, false, false);
   if (FLA_ERR(err, "xnvme_nvm_dsm() err: %d, dsm->cattr %"PRIu32", "
         "dsm->slba %"PRIu64", dsm->nlb %"PRIu32", nsid %"PRIu32"",
         err, dsm_range->cattr, dsm_range->slba, dsm_range->llb, nsid))
