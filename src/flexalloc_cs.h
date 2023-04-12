@@ -20,7 +20,7 @@ struct fla_cs_fncs
                      struct fla_object *obj);
   int (*object_destroy)(struct flexalloc *fs, struct fla_pool const *pool_handle,
                         struct fla_object *obj);
-  //int (*slab_trim)(struct flexalloc *fs, uint32_t const slab_id, struct fla_slab_header * h);
+  int (*slab_trim)(struct flexalloc *fs, uint32_t const slab_id);
 };
 
 struct fla_cs
