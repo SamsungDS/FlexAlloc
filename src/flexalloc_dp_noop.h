@@ -19,5 +19,5 @@ fla_dp_noop_obj_destroy(struct flexalloc *fs, struct fla_object * obj, struct fl
 uint32_t* fla_dp_noop_pool_slab_list_id(struct fla_slab_header const *slab,
                         struct fla_pools const *pools);
 int
-fla_dp_noop_slab_format(struct flexalloc * fs, uint32_t const slab_id, struct fla_slab_header * h);
+fla_dp_noop_slab_format(struct flexalloc * fs, uint32_t const slab_id);
 #endif // __FLEXALLOC_DP_NOOP_H

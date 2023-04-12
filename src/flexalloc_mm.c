@@ -927,9 +927,9 @@ fla_base_object_destroy(struct flexalloc *fs, struct fla_pool * pool_handle,
     if (FLA_ERR(err, "fla_release_slab()"))
       goto exit;
 
-//    err = fs->fla_dp.fncs.slab_format(fs, obj->slab_id, slab);
-//    if (FLA_ERR(err, "slab_format()"))
-//      goto exit;
+    err = fs->fla_dp.fncs.slab_format(fs, obj->slab_id);
+    if (FLA_ERR(err, "slab_format()"))
+      goto exit;
 
   } else {
     err = fla_hdll_prepend(fs, slab, to_head);
@@ -1060,7 +1060,7 @@ fla_format_slab(struct flexalloc *fs, struct fla_slab_header * slab, uint32_t ob
   if(FLA_ERR(err, "fla_slab_id()"))
     goto exit;
 
-  err = fs->fla_dp.fncs.slab_format(fs, slab_id, slab);
+  err = fs->fla_dp.fncs.slab_format(fs, slab_id);
   if (FLA_ERR(err, "slab_format()"))
     goto exit;
 
