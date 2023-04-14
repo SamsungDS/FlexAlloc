@@ -124,6 +124,7 @@ flan_md_root_object_create(struct flan_md const *md, struct flan_md_root_obj_buf
     goto htbl_destroy;
 
   return 0;
+
 htbl_destroy:
   htbl_free(root_obj->elem_htbl);
 
@@ -132,7 +133,7 @@ obj_destroy:
   FLA_ERR(err, "fla_object_destroy()");
 
 free_buf:
-  free(root_obj->buf);
+  fla_buf_free(md->fs, root_obj->buf);
 
   return err;
 }
@@ -341,7 +342,7 @@ free_htbl:
   htbl_free(root_obj->elem_htbl);
 
 free_buf:
-  free(root_obj->buf);
+  fla_buf_free(md->fs, root_obj->buf);
 
   return err;
 }
@@ -385,7 +386,7 @@ int flan_md_init(struct flexalloc *fs, struct fla_pool *ph,
     struct flan_md **md)
 {
   int err = 0;
-  *md = malloc(sizeof(struct flan_md));
+  *md = fla_buf_alloc(fs, sizeof(struct flan_md));
   if ((err = FLA_ERR(!*md, "malloc()")))
     return err;
   (*md)->fs = fs;
@@ -400,13 +401,14 @@ int flan_md_init(struct flexalloc *fs, struct fla_pool *ph,
   return 0;
 
 free_md:
-  free(*md);
+  fla_buf_free(fs, *md);
 
   return err;
 }
 
 int flan_md_fini(struct flan_md *md)
 {
+  struct flexalloc * fs = md->fs;
   int err = 0;
   for (uint32_t i = 0 ; i < FLAN_MD_MAX_OPEN_ROOT_OBJECTS ; ++i)
   {
@@ -423,14 +425,14 @@ int flan_md_fini(struct flan_md *md)
 
     memset(root_obj->buf, 0, root_obj->buf_nbytes);
     memset(root_obj->end, 0, sizeof(struct flan_md_root_obj_buf_end));
-    free(root_obj->buf);
+    fla_buf_free(fs, root_obj->buf);
   }
 
   if (FLA_ERR(err, "flan_md_fini()"))
     return err;
 
   memset(md, 0, sizeof(struct flan_md));
-  free(md);
+  fla_buf_free(fs, md);
   return 0;
 }
 
