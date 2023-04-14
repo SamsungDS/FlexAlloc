@@ -1375,7 +1375,7 @@ fla_object_unaligned_write(struct flexalloc * fs, struct fla_pool const * pool_h
     goto free_bounce_buf;
 
 free_bounce_buf:
-  free(bounce_buf);
+  fla_xne_free_buf(fs->dev.dev, bounce_buf);
 
 exit:
   return err;
@@ -1482,7 +1482,7 @@ fla_open(struct fla_open_opts *opts, struct flexalloc **fs)
   if (FLA_ERR(err, "fla_slab_cache_init()"))
     goto free_md;
 
-  free(super);
+  fla_xne_free_buf(dev, super);
 
   (*fs)->dev.dev_uri = fla_strdup(opts->dev_uri);
   if ((*fs)->dev.dev_uri == NULL)
