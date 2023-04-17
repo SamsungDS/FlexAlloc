@@ -97,7 +97,7 @@ struct fla_dp_fncs
   int (*prep_dp_ctx)(struct fla_xne_io *xne_io, struct xnvme_cmd_ctx *ctx);
   uint32_t* (*get_pool_slab_list_id)(struct fla_slab_header const *slab,
                                     struct fla_pools const *pools);
-  int (*get_next_available_slab)(struct flexalloc * fs, struct fla_pool_entry * pool_entry,
+  int (*get_next_available_slab)(struct flexalloc * fs, struct fla_pool * fla_pool,
                                  struct fla_slab_header ** slab);
   int (*slab_format)(struct flexalloc * fs, uint32_t const slab_id, struct fla_slab_header * slab);
 };

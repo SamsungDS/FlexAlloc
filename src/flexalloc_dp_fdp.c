@@ -228,10 +228,11 @@ fla_dp_fdp_pool_slab_list_id(struct fla_slab_header const *slab,
 }
 
 static int
-fla_dp_fdp_get_next_available_slab(struct flexalloc * fs, struct fla_pool_entry * pool_entry,
+fla_dp_fdp_get_next_available_slab(struct flexalloc * fs, struct fla_pool * fla_pool,
                              struct fla_slab_header ** slab)
 {
   int err, ret;
+  struct fla_pool_entry * pool_entry = &fs->pools.entries[fla_pool->ndx];
   struct fla_dp_fdp_slab_list_ids * slab_list_ids = (struct fla_dp_fdp_slab_list_ids*)pool_entry;
 
   if(slab_list_ids->ready_slabs == FLA_LINKED_LIST_NULL)
@@ -251,6 +252,9 @@ fla_dp_fdp_get_next_available_slab(struct flexalloc * fs, struct fla_pool_entry 
       {
         goto release_slab;
       }
+
+      // make sure we relate slab to pool
+      (*slab)->pool = fla_pool->ndx;
 
       goto exit;
 release_slab:
