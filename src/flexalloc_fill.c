@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -5,6 +6,7 @@
 #include "libxnvme.h"
 #include "flexalloc_util.h"
 #include "flexalloc_mm.h"
+#include "flexalloc_cs_zns.h"
 
 // We write in maximum 1G steps
 #define WRITE_BUF_SIZE 1*1024*1024*1024
@@ -13,7 +15,7 @@
 static void
 usage()
 {
-    fprintf(stderr, "Usage: flexalloc_print DEV [MD_DEV] PERCENT\n"
+    fprintf(stderr, "Usage: flexalloc_fill DEV [MD_DEV] PERCENT\n"
                     "   DEV     The defice\n"
                     "   MD_DEV  The metadata device\n"
                     "   PERCENT The percentage that you want to fill\n"
@@ -35,6 +37,15 @@ fill_up_object(struct flexalloc * fs, struct fla_pool * pool_handle,
 
 exit:
   return ret;
+}
+
+static uint32_t
+calc_best_object_size( struct flexalloc *fs)
+{
+  if (fs->fla_cs.cs_t == FLA_CS_ZNS)
+    return fs->fla_cs.fla_cs_zns->nzsect;
+  else
+    return fs->geo.slab_nlb;
 }
 
 static int
@@ -73,7 +84,7 @@ fill(char const * dev, char const * md_dev, long int percent)
     pool_arg.name = FILL_POOL_NAME;
     pool_arg.name_len = strlen(FILL_POOL_NAME);
     // -2 so we can fit the slab metadata
-    pool_arg.obj_nlb = fs->geo.slab_nlb - 2;
+    pool_arg.obj_nlb = calc_best_object_size(fs);
 
     ret = fla_pool_create(fs, &pool_arg, &fill_pool);
     if (FLA_ERR(ret, "fla_pool_create()"))
@@ -86,17 +97,19 @@ fill(char const * dev, char const * md_dev, long int percent)
   uint32_t nobj_to_write, nobj_to_write_ = w_nlb / fill_pool_entry->obj_nlb; //always round down
   for (nobj_to_write = nobj_to_write_; nobj_to_write > 0; --nobj_to_write)
   {
-    struct fla_object * obj;
-    ret = fla_object_create(fs, fill_pool, obj);
+    struct fla_object obj = {0};
+    ret = fla_object_create(fs, fill_pool, &obj);
     if (FLA_ERR(ret, "fla_object_create()"))
       goto free_buf;
 
-    ret = fill_up_object(fs, fill_pool, obj, write_buf);
+    ret = fill_up_object(fs, fill_pool, &obj, write_buf);
     if (FLA_ERR(ret, "fill_up_object()"))
       goto free_buf;
+
+    fprintf(stderr, "\rObjects to go : %"PRIu32"", nobj_to_write);
   }
 
-  fprintf(stderr, "Wrote %"PRIu32" objects out of %"PRIu32"\n",
+  fprintf(stderr, "\nWrote %"PRIu32" objects out of %"PRIu32"\n",
       nobj_to_write_ - nobj_to_write, nobj_to_write_);
 
   fla_print_fs(fs);
@@ -133,7 +146,7 @@ main(int argc, char **argv)
 
   char * endptr;
   long int percent;
-  percent = strtol(argv[3], &endptr, 10);
+  percent = strtol(argv[percent_offset], &endptr, 10);
   if ((ret = (*endptr != '%')))
   {
     fprintf(stderr, "PERCENT must be follwed by a '%%'");

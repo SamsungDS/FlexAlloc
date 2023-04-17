@@ -52,7 +52,7 @@ executable('flexalloc_print',
   install : true)
 
 executable('flexalloc_fill',
-  ['src/flexalloc_print.c', fla_common_set, libflexalloc_set],
+  ['src/flexalloc_fill.c', fla_common_set, libflexalloc_set],
   dependencies: [xnvme_deps],
   install : true)
 
