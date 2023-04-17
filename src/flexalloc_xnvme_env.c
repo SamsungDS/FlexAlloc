@@ -109,9 +109,6 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
   struct xnvme_spec_dsm_range * dsm_range;
 
   struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
-  struct xnvme_ident const * ident;
-
-  ident = xnvme_dev_get_ident(dev);
 
   /*
    * This is the xnvme enum where I take the values from
@@ -122,9 +119,9 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
    * XNVME_DEV_TYPE_FS_FILE,
    * XNVME_DEV_TYPE_RAMDISK,
    */
-
+  struct xnvme_ident const * ident = xnvme_dev_get_ident(dev);
   if (ident->dtype != 1 && ident->dtype != 2)
-    return 0; // we skil non nvme devices
+    return 0; // we skip non nvme devices
 
   nsid = xnvme_dev_get_nsid(dev);
 
