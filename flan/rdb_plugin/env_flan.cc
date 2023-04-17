@@ -2,6 +2,7 @@
 // Copyright (c) 2022-present, Joel Granados <j.granados@samsung.com>
 // Copyright (c) 2022-present, Jesper Devantier <j.devantier@samsung.com>
 
+#include <flan.h>
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include "env_flan.h"
 
@@ -40,7 +41,6 @@ void split(const std::string &in, char delim, std::vector<std::string> &pieces)
     p_start = p_end + 1;
     p_end = in.find(delim, p_start);
   }
-
 
   pieces.push_back(in.substr(p_start, in.size() - p_start));
 }
@@ -119,6 +119,7 @@ LibFlanEnv::LibFlanEnv(Env *env, const std::string &flan_opts)
     pool_arg.strp_nbytes = strp_nbytes;
 
     pool_arg.flags |= FLA_POOL_ENTRY_STRP;
+
   }
 
   //std::cout << "Starting a flan environmnet" << std::endl;
@@ -440,6 +441,34 @@ LibFlanEnvRandAccessFile::InvalidateCache(size_t offset, size_t length)
   throw;
 };
 
+void LibFlanEnvWriteableFile::AdjustOpenFlagsWithHints(int *flags, Env::WriteLifeTimeHint hint)
+{
+  switch(hint)
+  {
+    case Env::WLTH_NOT_SET:
+      *flags = *flags | FLAN_OPEN_FLAG_POOL_NONE;
+      return;
+    case Env::WLTH_NONE:
+      *flags = *flags | FLAN_OPEN_FLAG_POOL_NONE;
+      return;
+    case Env::WLTH_SHORT:
+      *flags = *flags | FLAN_OPEN_FLAG_POOL_SHORT;
+      return;
+    case Env::WLTH_MEDIUM:
+      *flags = *flags | FLAN_OPEN_FLAG_POOL_MEDIUM;
+      return;
+    case Env::WLTH_LONG:
+      *flags = *flags | FLAN_OPEN_FLAG_POOL_LONG;
+      return;
+    case Env::WLTH_EXTREME:
+      *flags = *flags | FLAN_OPEN_FLAG_POOL_EXTREME;
+      return;
+  };
+
+  *flags = *flags & FLAN_POOL_NONE;
+  return;
+}
+
 LibFlanEnvWriteableFile::LibFlanEnvWriteableFile(
     const std::string & fname_, std::shared_ptr<LibFlanEnv::LibFlanEnv_Options>& options, struct flan_handle *flanh_)
   :fname(fname_), flanh(flanh_), fh(NULL), _prevwr(0)
@@ -449,13 +478,14 @@ LibFlanEnvWriteableFile::LibFlanEnvWriteableFile(
   std::lock_guard<std::mutex> guard(*lnfs_mut);
   fh = std::make_shared<LibFlanEnv::LibFlanEnv_F>();
   fh->flanh = flanh;
+  fh->opens = 0;
 
-  int ret = flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_CREATE |
-                             FLAN_OPEN_FLAG_WRITE);
-  if(ret)
-    throw std::runtime_error(std::string("Error allocating object for file:") + fname +
-        std::string(" error: ") + std::to_string(ret));
-  fh->opens++;
+//  int ret = flan_object_open(fname.c_str(), flanh, &fh->object_handle, FLAN_OPEN_FLAG_CREATE |
+//                             FLAN_OPEN_FLAG_WRITE);
+//  if(ret)
+//    throw std::runtime_error(std::string("Error allocating object for file:") + fname +
+//        std::string(" error: ") + std::to_string(ret));
+//  fh->opens++;
 }
 
 LibFlanEnvWriteableFile::~LibFlanEnvWriteableFile()
@@ -466,6 +496,17 @@ Status
 LibFlanEnvWriteableFile::Append(const Slice& slice)
 {
   std::lock_guard<std::mutex> guard(*lnfs_mut);
+  if (fh->opens == 0)
+  {
+    int flags =  FLAN_OPEN_FLAG_CREATE | FLAN_OPEN_FLAG_WRITE;
+    AdjustOpenFlagsWithHints(&flags, this->GetWriteLifeTimeHint());
+
+    int ret = flan_object_open(fname.c_str(), fh->flanh, &fh->object_handle, flags);
+    if(ret)
+      throw std::runtime_error(std::string("Error allocating object for file:") + fname +
+          std::string(" error: ") + std::to_string(ret));
+    fh->opens++;
+  }
 
   int ret = flan_object_write(fh->object_handle, (void*)slice.data_, fh->woffset_,
       slice.size_, fh->flanh);
@@ -482,6 +523,17 @@ Status
 LibFlanEnvWriteableFile::PositionedAppend(const Slice& slice, uint64_t offset)
 {
   std::lock_guard<std::mutex> guard(*lnfs_mut);
+  if (fh->opens == 0)
+  {
+    int flags =  FLAN_OPEN_FLAG_CREATE | FLAN_OPEN_FLAG_WRITE;
+    AdjustOpenFlagsWithHints(&flags, this->GetWriteLifeTimeHint());
+
+    int ret = flan_object_open(fname.c_str(), fh->flanh, &fh->object_handle, flags);
+    if(ret)
+      throw std::runtime_error(std::string("Error allocating object for file:") + fname +
+          std::string(" error: ") + std::to_string(ret));
+    fh->opens++;
+  }
 
   int ret = flan_object_write(fh->object_handle, (void*)slice.data_, offset,
       slice.size_, fh->flanh);
