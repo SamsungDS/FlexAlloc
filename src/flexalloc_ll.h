@@ -60,7 +60,7 @@ fla_edll_remove_head(struct flexalloc * fs, uint32_t * head, uint32_t * tail,
                      struct fla_slab_header ** a_slab);
 
 /**
- * @brief Append slab to slit that has a head and tail pointers
+ * @brief Append slab to list that has a head and tail pointers
  *
  * Always adds to tail
  *
