@@ -18,10 +18,11 @@ fla_dp_noop_pool_slab_list_id(struct fla_slab_header const *slab,
 }
 
 static int
-fla_dp_noop_get_next_available_slab(struct flexalloc * fs, struct fla_pool_entry * pool_entry,
+fla_dp_noop_get_next_available_slab(struct flexalloc * fs, struct fla_pool * fla_pool,
                              struct fla_slab_header ** slab)
 {
   int err, ret;
+  struct fla_pool_entry * pool_entry = &fs->pools.entries[fla_pool->ndx];
   struct fla_dp_noop_slab_list_ids * slab_list_ids = (struct fla_dp_noop_slab_list_ids*)pool_entry;
 
   if(slab_list_ids->partial_slabs == FLA_LINKED_LIST_NULL)
