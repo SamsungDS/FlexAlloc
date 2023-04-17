@@ -4,6 +4,7 @@
 
 #include <libxnvme.h>
 #include <libxnvme_dev.h>
+#include <libxnvme_geo.h>
 #include <libxnvme_pp.h>
 #include <libxnvme_lba.h>
 #include <libxnvme_spec.h>
@@ -96,6 +97,63 @@ fla_xne_dev_get_znd_mor(struct xnvme_dev *dev)
 {
   const struct xnvme_spec_znd_idfy_ns *zns = (void *)xnvme_dev_get_ns_css(dev);
   return zns->mor;
+}
+
+int
+fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const uint32_t nlb)
+{
+  return 0;
+  int err;
+  uint32_t nsid;
+  //struct xnvme_spec_dsm_range dsm_range = {.cattr = 0, .slba = slba, .nlb = nlb};
+  struct xnvme_spec_dsm_range * dsm_range;
+
+  struct xnvme_cmd_ctx ctx = xnvme_cmd_ctx_from_dev(dev);
+  struct xnvme_ident const * ident;
+
+  ident = xnvme_dev_get_ident(dev);
+
+  /*
+   * This is the xnvme enum where I take the values from
+   * XNVME_DEV_TYPE_UNKNOWN,
+   * XNVME_DEV_TYPE_NVME_CONTROLLER,
+   * XNVME_DEV_TYPE_NVME_NAMESPACE,
+   * XNVME_DEV_TYPE_BLOCK_DEVICE,
+   * XNVME_DEV_TYPE_FS_FILE,
+   * XNVME_DEV_TYPE_RAMDISK,
+   */
+
+  if (ident->dtype != 1 && ident->dtype != 2)
+    return 0; // we skil non nvme devices
+
+  nsid = xnvme_dev_get_nsid(dev);
+
+  dsm_range = xnvme_buf_alloc(dev, sizeof(*dsm_range));
+  if (!dsm_range)
+  {
+    err = -errno;
+    xnvmec_perr("xnvme_buf_alloc()", err);
+    return err;
+  }
+  dsm_range->cattr = 0;
+  dsm_range->slba = slba;
+  dsm_range->llb = nlb;
+
+  /*
+   * 0 -> 1 range to deallocate
+   * true -> may deallocate ranges
+   * false -> wether to optimize write
+   * false -> wether to optimize read
+   */
+  err = xnvme_nvm_dsm(&ctx, nsid, dsm_range, 0, true, false, false);
+  if (FLA_ERR(err, "xnvme_nvm_dsm() err: %d, dsm->cattr %"PRIu32", "
+        "dsm->slba %"PRIu64", dsm->nlb %"PRIu32", nsid %"PRIu32"",
+        err, dsm_range->cattr, dsm_range->slba, dsm_range->llb, nsid))
+    goto free_buf;
+
+free_buf:
+  xnvme_buf_free(dev, dsm_range);
+  return err;
 }
 
 int
