@@ -80,7 +80,7 @@ static int
 flan_md_root_object_create(struct flan_md const *md, struct flan_md_root_obj_buf *root_obj)
 {
   int err;
-  uint32_t num_elems;
+  uint32_t num_elems = 0;
   void *buf_end;
 
   root_obj->buf_nbytes = fla_object_size_nbytes(md->fs, md->ph);
@@ -236,7 +236,7 @@ flan_md_write_root_obj(struct flan_md *md, struct flan_md_root_obj_buf *root_obj
   int err;
   uint32_t forwarded;
   uint64_t src_write_nbytes = root_obj->end->write_offset_nbytes;
-  uint32_t num_elems, end_obj_nbytes;
+  uint32_t num_elems = 0, end_obj_nbytes;
 
   if (fla_flist_num_reserved(root_obj->dirties) <= 0)
     return 0; /* no need to update a clean cache */
@@ -439,7 +439,7 @@ flan_md_get_usable_root_ndx(struct flan_md *md, struct flan_md_root_obj_buf **ro
 {
   int err, free_ndx;
   struct flan_md_root_obj_buf *root_obj;
-  struct flan_md_root_obj_buf_end *prev_root_obj_end;
+  struct flan_md_root_obj_buf_end *prev_root_obj_end = NULL;
   for (uint32_t i = 0 ; i < FLAN_MD_MAX_OPEN_ROOT_OBJECTS; ++ i)
   {
     root_obj = &md->r_objs[i];
@@ -481,8 +481,8 @@ flan_md_get_usable_root_ndx(struct flan_md *md, struct flan_md_root_obj_buf **ro
 int flan_md_map_new_elem(struct flan_md *md, const char *key,  void **elem)
 {
   int err;
-  struct flan_md_root_obj_buf *root_obj;
-  int root_ndx;
+  struct flan_md_root_obj_buf *root_obj = NULL;
+  int root_ndx = -1;
   err =  flan_md_get_usable_root_ndx(md, &root_obj, &root_ndx);
   if (FLA_ERR(err, "flan_md_get_usable_root_ndx()"))
     return err;
