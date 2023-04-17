@@ -107,8 +107,8 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
   if (pool_arg->flags && FLA_POOL_ENTRY_STRP)
     flan_obj_sz *= pool_arg->strp_nobjs;
 
-
-  ret = flan_md_init((*flanh)->fs, (*flanh)->ph, flan_elem_nbytes, flan_has_key, &(*flanh)->md);
+  ret = flan_md_init((*flanh)->fs, (*flanh)->ph,
+                       flan_elem_nbytes, flan_has_key, &(*flanh)->md);
   open_opts.opts->sync = "io_uring";
   if (FLA_ERR(ret, "flan_md_init()"))
     goto out_free;
@@ -211,12 +211,14 @@ enum flan_mnulti_object_action_t
 };
 
 static int
-flan_multi_object_action(const struct flexalloc * fs, struct fla_pool const * ph,
+flan_multi_object_action(struct flan_handle *flanh,
     struct flan_oinfo *oinfo, void * buf, size_t r_offset, size_t r_len,
     enum flan_mnulti_object_action_t at)
 {
   int err;
   struct fla_object *fla_obj_tmp;
+  const struct flexalloc * fs = flanh->fs;
+  struct fla_pool const * ph = flanh->ph;
   uint64_t obj_nbytes = fla_object_size_nbytes(fs, ph);
   uint64_t r_len_toread = r_len;
 
@@ -326,7 +328,7 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   // Read the data into the append buffer
   if (flan_otable[ff_oh].append_off < flan_obj_sz && flags & FLAN_OPEN_FLAG_WRITE)
   {
-    ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, flan_otable[ff_oh].append_buf,
+    ret = flan_multi_object_action(flanh, oinfo, flan_otable[ff_oh].append_buf,
                     (flan_otable[ff_oh].append_off / bs) * bs, bs, FLAN_MULTI_OBJ_ACTION_READ);
     if (FLA_ERR(ret, "flan_multi_object_action()"))
     {
@@ -344,10 +346,11 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
 }
 
 static int
-flan_multi_object_destroy(struct flexalloc * fs, struct fla_pool * ph,
-    struct flan_oinfo *oinfo)
+flan_multi_object_destroy(struct flan_handle * flanh, struct flan_oinfo *oinfo)
 {
   int err = 0;
+  struct flexalloc * fs = flanh->fs;
+  struct fla_pool * ph = flanh->ph;
 
   for(int i = 0; i < FLAN_MAX_FLA_OBJ_IN_OINFO; ++i)
   {
@@ -379,7 +382,7 @@ int flan_object_delete(const char *name, struct flan_handle *flanh)
   if (oh != FLAN_MAX_OPEN_OBJECTS)
   {
     free(flan_otable[oh].append_buf);
-    err = flan_multi_object_destroy(flanh->fs, flanh->ph, oinfo);
+    err = flan_multi_object_destroy(flanh, oinfo);
     if (FLA_ERR(err, "fla_object_destroy()"))
     {
       printf("Error while destroying object in fla %d\n", err);
@@ -457,7 +460,7 @@ flan_object_unaligned_read(uint64_t oh,  struct flan_oinfo *oinfo, void *buf,
   }
 
   if (al_len)
-    ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, al_buf, al_offset,
+    ret = flan_multi_object_action(flanh, oinfo, al_buf, al_offset,
         al_len, FLAN_MULTI_OBJ_ACTION_READ);
 
   if (ret)
@@ -508,7 +511,7 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
   if (offset < *rb_off || offset >= (*rb_off + flanh->append_sz))
   {
     *rb_off = (offset / flanh->append_sz) * flanh->append_sz;
-    err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off,
+    err = flan_multi_object_action(flanh, oinfo, rb, *rb_off,
         flanh->append_sz, FLAN_MULTI_OBJ_ACTION_READ);
     if (err)
       FLA_ERR(err, "flan_object_read_r() uncaught error "
@@ -536,7 +539,7 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
   {
 
     *rb_off += flanh->append_sz;
-    err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off,
+    err = flan_multi_object_action(flanh, oinfo, rb, *rb_off,
         flanh->append_sz, FLAN_MULTI_OBJ_ACTION_READ);
     if (err)
       FLA_ERR(err, "flan_object_read_r() uncaught error");
@@ -546,7 +549,7 @@ flan_object_read_r(uint64_t oh, void *buf, size_t offset, size_t len,
     offset += flanh->append_sz;
   }
 
-  err = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, rb, *rb_off + flanh->append_sz,
+  err = flan_multi_object_action(flanh, oinfo, rb, *rb_off + flanh->append_sz,
       flanh->append_sz, FLAN_MULTI_OBJ_ACTION_READ);
   if (err)
     FLA_ERR(err, "flan_object_read_r() uncaught error");
@@ -574,7 +577,7 @@ flan_object_read_rw(uint64_t oh, void *buf, size_t offset, size_t len,
   {
     if (!((uintptr_t)buf % bs))
     {
-      ret =  flan_multi_object_action(flanh->fs, flanh->ph, oinfo, buf, offset,
+      ret =  flan_multi_object_action(flanh, oinfo, buf, offset,
           len, FLAN_MULTI_OBJ_ACTION_READ);
       if (ret)
         return ret;
@@ -616,10 +619,10 @@ int flan_conv_object_write(struct flan_oinfo *oinfo, void *buf, size_t offset,
   int ret;
 
   if (len % flan_dev_bs(flanh) || offset % flan_dev_bs(flanh))
-    ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, buf, offset,
+    ret = flan_multi_object_action(flanh, oinfo, buf, offset,
         len, FLAN_MULTI_OBJ_ACTION_WRITE_UNALIGNED);
   else
-    ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, buf, offset,
+    ret = flan_multi_object_action(flanh, oinfo, buf, offset,
         len, FLAN_MULTI_OBJ_ACTION_WRITE);
 
   return ret;
@@ -663,7 +666,7 @@ int flan_zns_object_write(struct flan_oinfo *oinfo, void *buf, size_t offset,
   if (al_start != offset)
   {
     memcpy(flan_otable[oh].append_buf + (offset % bs), buf, al_start - offset);
-    ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, flan_otable[oh].append_buf,
+    ret = flan_multi_object_action(flanh, oinfo, flan_otable[oh].append_buf,
         buf_offset, bs, FLAN_MULTI_OBJ_ACTION_WRITE);
     if (FLA_ERR(ret, "Error writing append buffer, error: %d\n", ret))
         return ret;
@@ -673,7 +676,7 @@ int flan_zns_object_write(struct flan_oinfo *oinfo, void *buf, size_t offset,
   if (al_len) {
     al_buf = flan_buf_alloc(al_len, flanh);
     memcpy(al_buf, bufpos, al_len);
-    ret = flan_multi_object_action(flanh->fs, flanh->ph, oinfo, al_buf, al_start,
+    ret = flan_multi_object_action(flanh, oinfo, al_buf, al_start,
         al_len, FLAN_MULTI_OBJ_ACTION_WRITE);
     free(al_buf);
   }
@@ -709,16 +712,17 @@ flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
                         struct flan_handle *flanh)
 {
   struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
+  struct fla_pool * ph = flanh->ph;
   uint32_t num_active = flan_object_oinfo_num_active_objs(oinfo);
   int ret = 0;
 
   if (offset + len
-      > fla_object_size_nbytes(flanh->fs, flanh->ph) * num_active)
+      > fla_object_size_nbytes(flanh->fs, ph) * num_active)
   {
     if ((ret = FLA_ERR(num_active == FLAN_MAX_FLA_OBJ_IN_OINFO,
                        "flan_object_write_(): exceeded FLAN_MAX_FLA_OBJ_IN_OINFO")))
       return ret;
-    ret = fla_object_create(flanh->fs, flanh->ph, &oinfo->fla_oh[num_active]);
+    ret = fla_object_create(flanh->fs, ph, &oinfo->fla_oh[num_active]);
     if (FLA_ERR(ret, "fla_object_create()"))
       return ret;
   }
@@ -781,10 +785,12 @@ int flan_object_rename(const char *oldname, const char *newname, struct flan_han
 }
 
 static int
-flan_multi_object_seal(struct flexalloc *fs, struct fla_pool *ph,
+flan_multi_object_seal(struct flan_handle * flanh,
                 struct flan_oinfo *oinfo)
 {
   int err;
+  struct flexalloc * fs = flanh->fs;
+  struct fla_pool * ph = flanh->ph;
 
   for(int i = 0; i < FLAN_MAX_FLA_OBJ_IN_OINFO; ++i)
   {
@@ -818,7 +824,7 @@ int flan_object_close(uint64_t oh, struct flan_handle *flanh)
     if (append_off % bs && !flan_otable[oh].frozen)
     {
       // Append the last block
-      ret = flan_multi_object_action(flanh->fs, flanh->ph, flan_otable[oh].oinfo, flan_otable[oh].append_buf,
+      ret = flan_multi_object_action(flanh, flan_otable[oh].oinfo, flan_otable[oh].append_buf,
                              (append_off / bs) * bs, bs, FLAN_MULTI_OBJ_ACTION_WRITE);
       if (FLA_ERR(ret, "Error writing last block, corruption abound\n"))
         return ret;
@@ -826,7 +832,7 @@ int flan_object_close(uint64_t oh, struct flan_handle *flanh)
 
     // Seal the object
     if (append_off)
-      flan_multi_object_seal(flanh->fs, flanh->ph, flan_otable[oh].oinfo);
+      flan_multi_object_seal(flanh, flan_otable[oh].oinfo);
 
     free(flan_otable[oh].append_buf);
     memset(&flan_otable[oh], 0, sizeof(struct flan_ohandle));
