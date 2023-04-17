@@ -22,6 +22,10 @@ struct flan_handle *root;
 static pthread_mutex_t flan_mutex;
 
 struct flan_ohandle flan_otable[FLAN_MAX_OPEN_OBJECTS];
+char * flan_pool_names[FLAN_POOL_LAST] =
+{ "FLAN_POOL_SHORT", "FLAN_POOL_MEDIUM", "FLAN_POOL_LONG",
+  "FLAN_POOL_EXTREME", "FLAN_POOL_NONE"};
+
 
 void flan_cleanup(void)
 {
@@ -90,24 +94,31 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
       goto out_free;
 
   obj_nlb = objsz / fla_fs_lb_nbytes((*flanh)->fs);
-  ret = fla_pool_open((*flanh)->fs, pool_arg->name, &((*flanh)->ph));
-  if (ret == -1)
-  {
-    pool_arg->obj_nlb = obj_nlb;
-    ret = fla_pool_create((*flanh)->fs, pool_arg, &((*flanh)->ph));
-  }
 
-  if (ret)
+  // Create a pool for all the possible flan pool types
+  for (int p_offset = 0; p_offset < FLAN_POOL_LAST; ++p_offset)
   {
-    printf("Error opening fla pool:%s\n", pool_arg->name);
-    goto out_free;
+    ret = fla_pool_open((*flanh)->fs, flan_pool_names[p_offset], &((*flanh)->p_ptrs[p_offset]));
+    if (ret == -1)
+    {
+      pool_arg->obj_nlb = obj_nlb;
+      pool_arg->name = flan_pool_names[p_offset];
+      pool_arg->name_len = fla_strnlen(pool_arg->name, FLAN_OBJ_NAME_LEN_MAX);
+      ret = fla_pool_create((*flanh)->fs, pool_arg, &((*flanh)->p_ptrs[p_offset]));
+    }
+
+    if (ret)
+    {
+      printf("Error opening fla pool:%s\n", flan_pool_names[p_offset]);
+      goto out_free;
+    }
   }
 
   flan_obj_sz = obj_nlb * fla_fs_lb_nbytes((*flanh)->fs);
   if (pool_arg->flags && FLA_POOL_ENTRY_STRP)
     flan_obj_sz *= pool_arg->strp_nobjs;
 
-  ret = flan_md_init((*flanh)->fs, (*flanh)->ph,
+  ret = flan_md_init((*flanh)->fs, (*flanh)->p_ptrs[FLAN_POOL_NONE],
                        flan_elem_nbytes, flan_has_key, &(*flanh)->md);
   open_opts.opts->sync = "io_uring";
   if (FLA_ERR(ret, "flan_md_init()"))
@@ -123,12 +134,30 @@ out_free:
   return ret;
 }
 
+static enum flan_pool_t
+flan_get_pool_type_flags(struct flan_handle *flanh, int flags)
+{
+  for (int p_offset = 0; p_offset < FLAN_POOL_LAST; ++p_offset)
+  {
+    if (flags & (1<<(3 + p_offset)))
+      return p_offset;
+  }
+  return FLAN_POOL_NONE;
+}
+
+static struct fla_pool*
+flan_get_pool_handle_oinfo(struct flan_handle *flanh, struct flan_oinfo * oinfo)
+{
+  return flanh->p_ptrs[oinfo->pool_type];
+}
+
 static int
-flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinfo **oinfo)
+flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinfo **oinfo, int flags)
 {
   int ret;
   unsigned int namelen = strlen(name);
   struct fla_object fla_obj;
+  struct fla_pool * ph;
 
   if (namelen > FLAN_OBJ_NAME_LEN_MAX)
   {
@@ -136,7 +165,13 @@ flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinf
     return -EINVAL;
   }
 
-  ret = fla_object_create(flanh->fs, flanh->ph, &fla_obj);
+  enum flan_pool_t pool_type = flan_get_pool_type_flags(flanh, flags);
+  if (FLA_ERR(pool_type < 0, "flan_get_pool_type_flags()"))
+    return -EIO;
+
+  ph = flanh->p_ptrs[pool_type];
+
+  ret = fla_object_create(flanh->fs, ph, &fla_obj);
   if (FLA_ERR(ret, "fla_object_create()"))
     return ret;
 
@@ -149,6 +184,7 @@ flan_object_create(const char *name, struct flan_handle *flanh, struct flan_oinf
   (*oinfo)->fla_oh[0] = fla_obj;
   (*oinfo)->fla_oh[1].entry_ndx = UINT32_MAX;
   (*oinfo)->fla_oh[1].slab_id = UINT32_MAX;
+  (*oinfo)->pool_type = pool_type;
 
   flanh->is_dirty = true;
   num_objects++;
@@ -218,7 +254,7 @@ flan_multi_object_action(struct flan_handle *flanh,
   int err;
   struct fla_object *fla_obj_tmp;
   const struct flexalloc * fs = flanh->fs;
-  struct fla_pool const * ph = flanh->ph;
+  struct fla_pool const * ph = flan_get_pool_handle_oinfo(flanh, oinfo);
   uint64_t obj_nbytes = fla_object_size_nbytes(fs, ph);
   uint64_t r_len_toread = r_len;
 
@@ -308,7 +344,7 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
 
   if (!oinfo && (flags & FLAN_OPEN_FLAG_CREATE))
   {
-    ret = flan_object_create(base_name, flanh, &oinfo);
+    ret = flan_object_create(base_name, flanh, &oinfo, flags);
     if (ret)
       return ret;
   }
@@ -363,7 +399,7 @@ flan_multi_object_destroy(struct flan_handle * flanh, struct flan_oinfo *oinfo)
 {
   int err = 0;
   struct flexalloc * fs = flanh->fs;
-  struct fla_pool * ph = flanh->ph;
+  struct fla_pool * ph = flan_get_pool_handle_oinfo(flanh, oinfo);
 
   for(int i = 0; i < FLAN_MAX_FLA_OBJ_IN_OINFO; ++i)
   {
@@ -440,7 +476,9 @@ void flan_close(struct flan_handle *flanh)
   err = flan_md_fini(flanh->md);
   FLA_ERR(err, "flan_md_fini() : Unhandled error on closing md");
 
-  fla_pool_close(flanh->fs, flanh->ph);
+  for (int p_offset = 0; p_offset < FLAN_POOL_LAST; ++p_offset)
+    fla_pool_close(flanh->fs, flanh->p_ptrs[p_offset]);
+
   fla_close(flanh->fs);
   free(flanh);
   root = NULL;
@@ -726,7 +764,7 @@ flan_object_write(uint64_t oh, void *buf, size_t offset, size_t len,
                         struct flan_handle *flanh)
 {
   struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
-  struct fla_pool * ph = flanh->ph;
+  struct fla_pool * ph = flan_get_pool_handle_oinfo(flanh, oinfo);
   uint32_t num_active = flan_object_oinfo_num_active_objs(oinfo);
   int ret = 0;
 
@@ -815,7 +853,7 @@ flan_multi_object_seal(struct flan_handle * flanh,
 {
   int err;
   struct flexalloc * fs = flanh->fs;
-  struct fla_pool * ph = flanh->ph;
+  struct fla_pool * ph = flan_get_pool_handle_oinfo(flanh, oinfo);
 
   for(int i = 0; i < FLAN_MAX_FLA_OBJ_IN_OINFO; ++i)
   {
