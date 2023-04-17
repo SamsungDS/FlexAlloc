@@ -262,7 +262,7 @@ int flan_object_open(const char *name, struct flan_handle *flanh, uint64_t *oh, 
   struct flan_oinfo *oinfo;
   int ret = 0;
   uint64_t oh_num;
-  uint64_t ff_oh;
+  uint64_t ff_oh = FLAN_MAX_OPEN_OBJECTS;
   uint32_t bs = flanh->append_sz;
   char * base_name = basename((char *)name);
 
@@ -342,7 +342,7 @@ static int
 flan_multi_object_destroy(struct flexalloc * fs, struct fla_pool * ph,
     struct flan_oinfo *oinfo)
 {
-  int err;
+  int err = 0;
 
   for(int i = 0; i < FLAN_MAX_FLA_OBJ_IN_OINFO; ++i)
   {
@@ -362,7 +362,10 @@ int flan_object_delete(const char *name, struct flan_handle *flanh)
   int err;
   char *base_name = basename((char *)name);
   uint64_t oh = flan_otable_search(base_name, NULL);
-  struct flan_oinfo *oinfo = flan_otable[oh].oinfo;
+  struct flan_oinfo *oinfo = NULL;
+
+  if (oh < FLAN_MAX_OPEN_OBJECTS)
+    oinfo = flan_otable[oh].oinfo;
 
   if (!oinfo)
     return -EINVAL;
