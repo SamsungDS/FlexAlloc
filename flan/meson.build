@@ -6,6 +6,8 @@ library = both_libraries('flan',
   fla_common_files, flan_files, libflexalloc_files, xnvme_env_files,
   fla_util_files,
   dependencies: xnvme_deps,
+  build_rpath: xnvme_lib_dir,
+  install_rpath: xnvme_lib_dir,
   include_directories : libflexalloc_header_dirs,
   install : true)
 
