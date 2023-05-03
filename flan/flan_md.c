@@ -1,4 +1,5 @@
 #include "flan_md.h"
+#include "flan.h"
 #include "flexalloc_util.h"
 #include "libflexalloc.h"
 #include "flexalloc_mm.h"
@@ -147,18 +148,11 @@ static int
 flan_md_print_root_obj_elem(const uint32_t ndx, va_list ag)
 {
   void * root_buf = va_arg(ag, void*);
+  struct flan_oinfo *tmp;
 
-  struct tmp_{
-    uint64_t size;
-    struct fla_object fla_oh[2];
-    char name[112];
-    int pool_type;
-  } *tmp ;
-
-  tmp = (((struct tmp_*)root_buf) + ndx);
+  tmp = (((struct flan_oinfo*)root_buf) + ndx);
   fprintf(stderr, "`-> Object (%s)\n", tmp->name);
-  fprintf(stderr, "    Size : (%"PRIu64"\n", tmp->size);
-  fprintf(stderr, "    Pool : (%d)\n", tmp->pool_type);
+  fprintf(stderr, "    Size : (%"PRIu64")\n", tmp->size);
   fprintf(stderr, "    ndx : (%"PRIu32")\n" , ndx);
 
   return FLA_FLIST_SEARCH_RET_FOUND_CONTINUE;
