@@ -77,7 +77,8 @@ flan_md_reset_root_end(struct flan_md const *md, struct flan_md_root_obj_buf_end
 }
 
 static int
-flan_md_root_object_create(struct flan_md const *md, struct flan_md_root_obj_buf *root_obj)
+flan_md_root_obj_initialize(struct flan_md *md, struct flan_md_root_obj_buf *root_obj,
+                            bool zero_out)
 {
   int err;
   uint32_t num_elems = 0;
@@ -94,14 +95,16 @@ flan_md_root_object_create(struct flan_md const *md, struct flan_md_root_obj_buf
   if (FLA_ERR(err, "fla_object_create()"))
     goto free_buf;
 
-//  // This will zero out the root object
-//  err = fla_object_write(md->fs, md->ph, &root_obj->fla_obj, root_obj->buf, 0, root_obj->buf_nbytes);
-//  if (FLA_ERR(err, "fla_object_write()"))
-//    goto obj_destroy;
+  if (zero_out)
+  {
+    err = fla_object_write(md->fs, md->ph, &root_obj->fla_obj, root_obj->buf, 0, root_obj->buf_nbytes);
+    if (FLA_ERR(err, "fla_object_write()"))
+      goto obj_destroy;
+  }
 
-  err = fla_pool_set_root_object(md->fs, md->ph, &root_obj->fla_obj, false);
-  if (FLA_ERR(err, "fla_pool_set_root_object()"))
-    goto obj_destroy;
+//  err = fla_pool_set_root_object(md->fs, md->ph, &root_obj->fla_obj, false);
+//  if (FLA_ERR(err, "fla_pool_set_root_object()"))
+//    goto obj_destroy;
 
   err = flan_md_get_usable_root_nelems(md, &num_elems);
   if(FLA_ERR(err, "flan_md_get_usable_root_nelems()"))
@@ -128,6 +131,7 @@ flan_md_root_object_create(struct flan_md const *md, struct flan_md_root_obj_buf
   if (FLA_ERR(err, "fla_flist_new()"))
     goto htbl_destroy;
 
+  root_obj->state = ACTIVE;
   return 0;
 
 htbl_destroy:
@@ -139,6 +143,28 @@ obj_destroy:
 
 free_buf:
   fla_buf_free(md->fs, root_obj->buf);
+
+  return err;
+}
+
+static int
+flan_md_first_root_object_create(struct flan_md *md)
+{
+  int err;
+  struct flan_md_root_obj_buf * first_root_obj = &md->r_objs[0];
+
+  err = flan_md_root_obj_initialize(md, first_root_obj, false);
+  if (FLA_ERR(err, "flan_md_root_obj_initialize()"))
+    return err;
+
+  err = fla_pool_set_root_object(md->fs, md->ph, &first_root_obj->fla_obj, false);
+  if (FLA_ERR(err, "fla_pool_set_root_object()"))
+    goto obj_destroy;
+
+
+obj_destroy:
+  err = fla_object_destroy(md->fs, md->ph, &first_root_obj->fla_obj);
+  FLA_ERR(err, "fla_object_destroy()");
 
   return err;
 }
@@ -364,14 +390,16 @@ flan_md_read_root_obj(struct flan_md const *md, struct flan_md_root_obj_buf *roo
   return 0;
 }
 
+
 static int
-flan_md_root_object_open(struct flan_md const *md, struct flan_md_root_obj_buf *root_obj)
+flan_md_first_root_object_open_or_create(struct flan_md *md)
 {
   int err;
+  struct flan_md_root_obj_buf * root_obj = &md->r_objs[0];
 
   err = fla_pool_get_root_object(md->fs, md->ph, &root_obj->fla_obj);
   if (err) // need to create root object
-    return flan_md_root_object_create(md, root_obj);
+    return flan_md_first_root_object_create(md);
 
   root_obj->buf_nbytes = fla_object_size_nbytes(md->fs, md->ph);
   root_obj->buf = fla_buf_alloc(md->fs, root_obj->buf_nbytes);
@@ -392,6 +420,7 @@ flan_md_root_object_open(struct flan_md const *md, struct flan_md_root_obj_buf *
   if (FLA_ERR(err, "fla_flist_new()"))
     goto free_htbl;
 
+  root_obj->state = ACTIVE;
   return 0;
 
 free_htbl:
@@ -423,11 +452,9 @@ flan_md_init_root(struct flan_md *md)
   int err;
 
   /* Initialize the first root object */
-  struct flan_md_root_obj_buf * first_root_obj = &md->r_objs[0];
-  err = flan_md_root_object_open(md, first_root_obj);
-  if (FLA_ERR(err, "flan_md_root_object_open()"))
+  err = flan_md_first_root_object_open_or_create(md);
+  if (FLA_ERR(err, "flan_md_first_root_object_open_or_create()"))
     return err;
-  first_root_obj->state = ACTIVE;
 
   /* Initialize the rest of root objects to 0 */
   for (int i = 1 ; i < FLAN_MD_MAX_OPEN_ROOT_OBJECTS ; ++i)
@@ -508,12 +535,12 @@ flan_md_get_usable_root_ndx(struct flan_md *md, struct flan_md_root_obj_buf **ro
       if (FLA_ERR(i < 1, "flan_md_get_usable_root()"))
         return -1;
 
-      err = flan_md_get_root_end(md, root_obj, &prev_root_obj_end);
+      err = flan_md_get_root_end(md, &md->r_objs[i-1], &prev_root_obj_end);
       if (FLA_ERR(err, "flan_md_get_root_end()"))
         return err;;
 
-      err = flan_md_root_object_create(md, root_obj);
-      if (FLA_ERR(err, "flan_md_root_object_create()"))
+      err = flan_md_root_obj_initialize(md, root_obj, false);
+      if (FLA_ERR(err, "flan_md_root_obj_initialize()"))
         return err;
 
       prev_root_obj_end->fla_next_root = root_obj->fla_obj;
