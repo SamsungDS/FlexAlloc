@@ -46,6 +46,15 @@ flan_has_key(char const *key, void const *ptr)
   return 0;
 }
 
+static void
+flan_print_elem(void * buf, uint32_t const ndx)
+{
+  struct flan_oinfo *tmp = (struct flan_oinfo*)buf;
+  fprintf(stderr, "`-> Object (%s)\n", tmp->name);
+  fprintf(stderr, "    Size : (%"PRIu64"\n", tmp->size);
+  fprintf(stderr, "    ndx : (%"PRIu32")\n" , ndx);
+}
+
 int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create_arg *pool_arg,
               uint64_t objsz, struct flan_handle **flanh)
 {
@@ -108,7 +117,7 @@ int flan_init(const char *dev_uri, const char *mddev_uri, struct fla_pool_create
     flan_obj_sz *= pool_arg->strp_nobjs;
 
   ret = flan_md_init((*flanh)->fs, (*flanh)->ph,
-                       flan_elem_nbytes, flan_has_key, &(*flanh)->md);
+                       flan_elem_nbytes, flan_has_key, flan_print_elem, &(*flanh)->md);
   open_opts.opts->sync = "io_uring";
   if (FLA_ERR(ret, "flan_md_init()"))
     goto out_free;

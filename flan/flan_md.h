@@ -66,10 +66,16 @@ struct flan_md
 
   uint32_t (*elem_nbytes)();
   bool (*has_key)(char const *key, void const *ptr);
+  /** print_elem - should print an element
+   * @buf is the buffer that holds the element to print
+   */
+  void (*print_elem)(void * buf, uint32_t const ndx);
 };
 
-int flan_md_init(struct flexalloc *fs, struct fla_pool *ph, uint32_t(*elem_nbytes)(),
+int flan_md_init(struct flexalloc *fs, struct fla_pool *ph,
+    uint32_t(*elem_nbytes)(),
     bool (*has_key)(char const *key, void const *ptr),
+    void (*print_elem)(void * buf, uint32_t const ndx),
     struct flan_md **md);
 int flan_md_fini(struct flan_md *md);
 int flan_md_find(struct flan_md *md, const char *key, void ** elem);

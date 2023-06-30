@@ -173,25 +173,14 @@ static int
 flan_md_print_root_obj_elem(const uint32_t ndx, va_list ag)
 {
   void * root_buf = va_arg(ag, void*);
-
-  struct tmp_{
-    uint64_t size;
-    struct fla_object fla_oh[2];
-    char name[112];
-    int pool_type;
-  } *tmp ;
-
-  tmp = (((struct tmp_*)root_buf) + ndx);
-  fprintf(stderr, "`-> Object (%s)\n", tmp->name);
-  fprintf(stderr, "    Size : (%"PRIu64"\n", tmp->size);
-  fprintf(stderr, "    Pool : (%d)\n", tmp->pool_type);
-  fprintf(stderr, "    ndx : (%"PRIu32")\n" , ndx);
+  struct flan_md const * md = va_arg(ag, struct flan_md*);
+  md->print_elem(root_buf, ndx);
 
   return FLA_FLIST_SEARCH_RET_FOUND_CONTINUE;
 }
 
 static void
-flan_md_print_root_obj(struct flan_md_root_obj_buf const * root_obj)
+flan_md_print_root_obj(struct flan_md_root_obj_buf const * root_obj, struct flan_md const * md)
 {
   fprintf(stderr, "Root Object\n");
   fprintf(stderr, "`-> buf ptr : %p\n", root_obj->buf);
@@ -229,7 +218,7 @@ flan_md_print_root_obj(struct flan_md_root_obj_buf const * root_obj)
   uint32_t found = 0;
   fprintf(stderr, "Elements in Root\n");
   int err = fla_flist_search_wfunc(root_obj->freelist, FLA_FLIST_SEARCH_FROM_START, &found,
-      flan_md_print_root_obj_elem, root_obj->buf);
+      flan_md_print_root_obj_elem, root_obj->buf, md);
   if (err)
     fprintf(stderr, "Found an error (%d) during freelist search\n", err);
 
@@ -245,7 +234,7 @@ flan_md_print_md(struct flan_md const * md)
     if (root_obj->state == INACTIVE)
       continue;
 
-    flan_md_print_root_obj(root_obj);
+    flan_md_print_root_obj(root_obj, md);
   }
 }
 
@@ -466,6 +455,7 @@ flan_md_init_root(struct flan_md *md)
 int flan_md_init(struct flexalloc *fs, struct fla_pool *ph,
     uint32_t(*elem_nbytes)(),
     bool (*has_key)(char const *key, void const *ptr),
+    void (*print_elem)(void * buf, uint32_t const ndx),
     struct flan_md **md)
 {
   int err = 0;
@@ -476,6 +466,7 @@ int flan_md_init(struct flexalloc *fs, struct fla_pool *ph,
   (*md)->ph = ph;
   (*md)->elem_nbytes = elem_nbytes;
   (*md)->has_key = has_key;
+  (*md)->print_elem = print_elem;
 
   err = flan_md_init_root(*md);
   if (FLA_ERR(err, "flan_md_init_root()"))
