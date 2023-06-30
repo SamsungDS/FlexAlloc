@@ -7,6 +7,7 @@
 #include "flexalloc_util.h"
 #include "flexalloc_mm.h"
 #include "flexalloc_cs_zns.h"
+#include "src/flexalloc_pool.h"
 
 // We write in maximum 1G steps
 #define WRITE_BUF_SIZE 1*1024*1024*1024
@@ -29,10 +30,13 @@ fill_up_object(struct flexalloc * fs, struct fla_pool * pool_handle,
   int ret = 0;
   uint64_t obj_nbytes = fla_object_size_nbytes(fs, pool_handle);
 
-
   size_t write_nbytes = fla_min(obj_nbytes, WRITE_BUF_SIZE);
   ret = fla_object_write(fs, pool_handle, obj, write_buf, 0, write_nbytes);
   if (FLA_ERR(ret, "fla_object_write()"))
+    goto exit;
+
+  ret = fla_object_seal(fs, pool_handle, obj);
+  if (FLA_ERR(ret, "fla_object_seal"))
     goto exit;
 
 exit:
@@ -71,11 +75,13 @@ fill(char const * dev, char const * md_dev, long int percent)
 
   // Calculate bytes to write
   uint64_t w_nlb = fs->geo.nlb / 100 * percent;
+  fprintf(stderr, "number of logical blocs to write %"PRIu64"\n", w_nlb);
 
   // We will allcoate write buffer
   write_buf = fla_buf_alloc(fs, WRITE_BUF_SIZE);
   if ((ret = FLA_ERR(write_buf == NULL, "fla_buf_alloc()")))
     goto exit;
+
 
   // Create/Open filler pool
   ret = fla_pool_open(fs, FILL_POOL_NAME, &fill_pool);
@@ -85,7 +91,11 @@ fill(char const * dev, char const * md_dev, long int percent)
     pool_arg.name_len = strlen(FILL_POOL_NAME);
     // -2 so we can fit the slab metadata
     pool_arg.obj_nlb = calc_best_object_size(fs);
+    pool_arg.strp_nobjs = 16;
+    pool_arg.strp_nbytes = 32768;
+    pool_arg.flags |= FLA_POOL_ENTRY_STRP;
 
+    fprintf(stderr, "creating pool\n");
     ret = fla_pool_create(fs, &pool_arg, &fill_pool);
     if (FLA_ERR(ret, "fla_pool_create()"))
       goto free_buf;
@@ -93,8 +103,13 @@ fill(char const * dev, char const * md_dev, long int percent)
   if (FLA_ERR(ret, "fla_pool_open()"))
     goto free_buf;
 
-  struct fla_pool_entry * fill_pool_entry = fs->pools.entries + fill_pool->ndx;
-  uint32_t nobj_to_write, nobj_to_write_ = w_nlb / fill_pool_entry->obj_nlb; //always round down
+  uint64_t strp_obj_nlb_internal
+    = (fs->pools.entrie_funcs + fill_pool->ndx)->fla_pool_obj_size_nbytes(fs, fill_pool)
+      /fs->geo.lb_nbytes;
+
+  uint32_t nobj_to_write, nobj_to_write_ = w_nlb / strp_obj_nlb_internal; //always round down
+  fprintf(stderr, "Number of objects to write %"PRIu32"\n", nobj_to_write_);
+
   for (nobj_to_write = nobj_to_write_; nobj_to_write > 0; --nobj_to_write)
   {
     struct fla_object obj = {0};
@@ -104,6 +119,10 @@ fill(char const * dev, char const * md_dev, long int percent)
 
     ret = fill_up_object(fs, fill_pool, &obj, write_buf);
     if (FLA_ERR(ret, "fill_up_object()"))
+      goto free_buf;
+
+    ret = fla_sync(fs);
+    if (FLA_ERR(ret, "fla_sync"))
       goto free_buf;
 
     fprintf(stderr, "\rObjects to go : %"PRIu32"", nobj_to_write);
