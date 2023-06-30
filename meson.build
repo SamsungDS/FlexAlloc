@@ -13,6 +13,7 @@ endif
 
 ### Dependencies ###
 xnvme_deps = dependency('xnvme', version : '>=0.6.0' )
+xnvme_lib_dir = xnvme_deps.get_variable('libdir')
 
 ### Files ###
 libflexalloc_header_dirs = include_directories('./src')
@@ -32,28 +33,41 @@ libflexalloc_set = [libflexalloc_files, fla_common_set]
 ### Executables ###
 executable('mkfs.flexalloc',
   ['src/flexalloc_mkfs.c', 'src/flexalloc_cli_common.c', fla_common_set],
+  build_rpath: xnvme_lib_dir,
+  install_rpath: xnvme_lib_dir,
   dependencies: xnvme_deps, install : true)
 executable('flexalloc_inspect',
   ['src/flexalloc_inspect.c', 'src/flexalloc_cli_common.c',
     fla_introspect_files, fla_common_set],
+  build_rpath: xnvme_lib_dir,
+  install_rpath: xnvme_lib_dir,
   dependencies: xnvme_deps)
 daemon_exe = executable('flexalloc_daemon',
   ['src/flexalloc_daemon.c', fla_common_set, 'src/flexalloc_cli_common.c',
     'src/flexalloc_daemon_base.c', libflexalloc_set],
+  build_rpath: xnvme_lib_dir,
+  install_rpath: xnvme_lib_dir,
   dependencies: xnvme_deps)
 executable('flexalloc_client',
   ['src/flexalloc_test_client.c', fla_common_set,
     'src/flexalloc_daemon_base.c', libflexalloc_set],
+  build_rpath: xnvme_lib_dir,
+  install_rpath: xnvme_lib_dir,
   dependencies: [xnvme_deps])
 
 executable('flexalloc_print',
   ['src/flexalloc_print.c', fla_common_set, libflexalloc_set],
   dependencies: [xnvme_deps],
+  build_rpath: xnvme_lib_dir,
+  install_rpath: xnvme_lib_dir,
   install : true)
 
 ### Libraries ###
 library = both_libraries('flexalloc', [libflexalloc_set, flexalloc_daemon_files],
-                         dependencies: xnvme_deps, install : true)
+  build_rpath: xnvme_lib_dir,
+  install_rpath: xnvme_lib_dir,
+  dependencies: xnvme_deps,
+  install : true)
 
 foreach header_file: [
   'libflexalloc.h',
