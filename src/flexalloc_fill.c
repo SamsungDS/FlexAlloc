@@ -29,11 +29,18 @@ fill_up_object(struct flexalloc * fs, struct fla_pool * pool_handle,
 {
   int ret = 0;
   uint64_t obj_nbytes = fla_object_size_nbytes(fs, pool_handle);
+  size_t nbytes_left_to_write = obj_nbytes;
+  size_t w_offset = 0;
 
-  size_t write_nbytes = fla_min(obj_nbytes, WRITE_BUF_SIZE);
-  ret = fla_object_write(fs, pool_handle, obj, write_buf, 0, write_nbytes);
-  if (FLA_ERR(ret, "fla_object_write()"))
-    goto exit;
+  size_t curr_write_nbytes = fla_min(nbytes_left_to_write, WRITE_BUF_SIZE);
+  do {
+    ret = fla_object_write(fs, pool_handle, obj, write_buf, w_offset, curr_write_nbytes);
+    if (FLA_ERR(ret, "fla_object_write()"))
+      goto exit;
+    nbytes_left_to_write -= curr_write_nbytes;
+    w_offset += curr_write_nbytes;
+    curr_write_nbytes = fla_min(nbytes_left_to_write, WRITE_BUF_SIZE);
+  } while (curr_write_nbytes != 0);
 
   ret = fla_object_seal(fs, pool_handle, obj);
   if (FLA_ERR(ret, "fla_object_seal"))
@@ -89,7 +96,6 @@ fill(char const * dev, char const * md_dev, long int percent)
   { // create the pool
     pool_arg.name = FILL_POOL_NAME;
     pool_arg.name_len = strlen(FILL_POOL_NAME);
-    // -2 so we can fit the slab metadata
     pool_arg.obj_nlb = calc_best_object_size(fs);
     pool_arg.strp_nobjs = 16;
     pool_arg.strp_nbytes = 32768;
