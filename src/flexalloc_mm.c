@@ -3,7 +3,6 @@
 // Copyright (C) 2021 Adam Manzanares <a.manzanares@samsung.com>
 #include <asm-generic/errno-base.h>
 #include <libxnvme.h>
-#include <libxnvmec.h>
 #include <stdint.h>
 #include <limits.h>
 #include <string.h>

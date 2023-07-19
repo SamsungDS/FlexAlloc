@@ -8,8 +8,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <libxnvme.h>
-#include <libxnvme_lba.h>
-#include <libxnvme_nvm.h>
 
 struct fla_strp_params
 {

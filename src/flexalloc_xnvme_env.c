@@ -3,15 +3,6 @@
 // Copyright (C) 2021 Adam Manzanares <a.manzanares@samsung.com>
 
 #include <libxnvme.h>
-#include <libxnvme_dev.h>
-#include <libxnvme_geo.h>
-#include <libxnvme_pp.h>
-#include <libxnvme_lba.h>
-#include <libxnvme_spec.h>
-#include <libxnvme_znd.h>
-#include <libxnvme_adm.h>
-#include <libxnvmec.h>
-
 #include <errno.h>
 #include <stdint.h>
 #include "flexalloc_xnvme_env.h"
@@ -77,7 +68,7 @@ fla_xne_dev_znd_send_mgmt(struct xnvme_dev *dev, uint64_t slba,
   err = xnvme_znd_mgmt_send(&ctx, nsid, slba, all, act, 0, NULL);
   if (err || xnvme_cmd_ctx_cpl_status(&ctx))
   {
-    xnvmec_perr("xnvme_nvme_znd_mgmt_send", err);
+    xnvme_cli_perr("xnvme_nvme_znd_mgmt_send", err);
     xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
     err = err ? err : -EIO;
   }
@@ -128,7 +119,7 @@ fla_xne_dev_send_deallocate(struct xnvme_dev *dev, const uint64_t slba, const ui
   if (!dsm_range)
   {
     err = -errno;
-    xnvmec_perr("xnvme_buf_alloc()", err);
+    xnvme_cli_perr("xnvme_buf_alloc()", err);
     return err;
   }
   dsm_range->cattr = 0;
@@ -167,7 +158,7 @@ fla_xne_sync_seq_w(const struct xnvme_lba_range * lba_range,
   err = xnvme_nvm_write(ctx, nsid, lba_range->slba, lba_range->naddrs - 1, wbuf, NULL);
   if (err || xnvme_cmd_ctx_cpl_status(ctx))
   {
-    xnvmec_perr("xnvme_nvm_write()", err);
+    xnvme_cli_perr("xnvme_nvm_write()", err);
     xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
     err = err ? err : -EIO;
     goto exit;
@@ -187,7 +178,7 @@ fla_xne_sync_seq_w(const struct xnvme_lba_range * lba_range,
     err = xnvme_nvm_write(ctx, nsid, slba, nlb, wbuf, NULL);
     if (err || xnvme_cmd_ctx_cpl_status(ctx))
     {
-      xnvmec_perr("xnvme_nvm_write()", err);
+      xnvme_cli_perr("xnvme_nvm_write()", err);
       xnvme_cmd_ctx_pr(ctx, XNVME_PR_DEF);
       err = err ? err : -EIO;
       goto exit;
@@ -492,7 +483,7 @@ fla_xne_sync_seq_r(const struct xnvme_lba_range * lba_range,
   err = xnvme_nvm_read(&ctx, nsid, lba_range->slba, lba_range->naddrs - 1, rbuf, NULL);
   if (err || xnvme_cmd_ctx_cpl_status(&ctx))
   {
-    xnvmec_perr("xnvme_nvm_read()", err);
+    xnvme_cli_perr("xnvme_nvm_read()", err);
     xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
     err = err ? err : -EIO;
     goto exit;
@@ -510,7 +501,7 @@ fla_xne_sync_seq_r(const struct xnvme_lba_range * lba_range,
     err = xnvme_nvm_read(&ctx, nsid, slba, nlb, rbuf, NULL);
     if (err || xnvme_cmd_ctx_cpl_status(&ctx))
     {
-      xnvmec_perr("xnvme_nvm_read()", err);
+      xnvme_cli_perr("xnvme_nvm_read()", err);
       xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
       err = err ? err : -EIO;
       goto exit;
@@ -636,7 +627,7 @@ fla_xne_ctrl_idfy(struct xnvme_dev *dev, struct xnvme_spec_idfy *idfy_ctrlr)
   if (err || xnvme_cmd_ctx_cpl_status(&ctx))
   {
     err = err ? err : -EIO;
-    xnvmec_perr("xnvme_adm_idfy_ctrlr(), err: %d", err);
+    xnvme_cli_perr("xnvme_adm_idfy_ctrlr(), err: %d", err);
   }
 
   return err;
@@ -656,7 +647,7 @@ fla_xne_feat_idfy(struct xnvme_dev *dev, uint32_t const endgid, uint32_t *dw0)
   err = xnvme_cmd_pass_admin(&ctx, NULL, 0x0, NULL, 0x0);
   if (err || xnvme_cmd_ctx_cpl_status(&ctx))
   {
-    xnvmec_perr("xnvme_adm_gfeat()", err);
+    xnvme_cli_perr("xnvme_adm_gfeat()", err);
     err = err ? err : -EIO;
     return err;
   }
@@ -680,7 +671,7 @@ fla_xne_get_usable_pids(struct xnvme_dev *dev, uint32_t npids, uint32_t **pids)
   if (!ruhs)
   {
     err = -errno;
-    xnvmec_perr("xnvme_buf_alloc()", err);
+    xnvme_cli_perr("xnvme_buf_alloc()", err);
     goto exit;
   }
   memset(ruhs, 0, ruhs_nbytes);
@@ -688,7 +679,7 @@ fla_xne_get_usable_pids(struct xnvme_dev *dev, uint32_t npids, uint32_t **pids)
   err = xnvme_nvm_mgmt_recv(&ctx, nsid, XNVME_SPEC_IO_MGMT_RECV_RUHS, 0, ruhs, ruhs_nbytes);
   if (err)
   {
-    xnvmec_perr("xnvme_nvm_mgmt_recv()", err);
+    xnvme_cli_perr("xnvme_nvm_mgmt_recv()", err);
     xnvme_cmd_ctx_pr(&ctx, XNVME_PR_DEF);
     err = err ? err : -EIO;
     goto free_ruh_buffer;

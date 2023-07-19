@@ -5,7 +5,7 @@
 #include "flexalloc_util.h"
 #include "flexalloc_xnvme_env.h"
 #include <unistd.h>
-#include <libxnvmec.h>
+//#include <libxnvmec.h>
 
 int test_to_stg(const int buf_size, const int blk_num, const int blk_size,
                 struct fla_ut_lpbk * lpbk, struct xnvme_dev * xnvme_dev, char * buf);
@@ -31,7 +31,7 @@ main(int argc, char ** argv)
   ret = fla_xne_dev_open(lpbk->dev_name, NULL, &xnvme_dev);
   if((ret = FLA_ERR(ret, "fla_xne_dev_open()")))
   {
-    xnvmec_perr("xnvme_dev_open()", errno);
+    xnvme_cli_perr("xnvme_dev_open()", errno);
     ret = -EIO;
     goto loop_free;
   }

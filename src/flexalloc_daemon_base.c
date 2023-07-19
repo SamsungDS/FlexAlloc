@@ -1,6 +1,6 @@
 #include <asm-generic/errno-base.h>
 #include <asm-generic/errno.h>
-#include <libxnvmec.h>
+//#include <libxnvmec.h>
 #include <stdint.h>
 #include <sys/socket.h>
 #include <sys/un.h>

@@ -4,6 +4,7 @@ pymod = import('python')
 #py = pymod.find_installation('python3', modules: ['pip', 'venv'], required: true)
 
 add_project_arguments('-DFLEXALLOC_VERBOSITY=' + get_option('FLEXALLOC_VERBOSITY').to_string(), language : 'c')
+add_project_arguments('-D_POSIX_C_SOURCE=199309L', language : 'c')
 if get_option('buildtype').startswith('debug')
   add_project_arguments('-DDEBUG', language : 'c')
 endif
@@ -12,7 +13,7 @@ if get_option('FLEXALLOC_XNVME_IGNORE_MDTS')
 endif
 
 ### Dependencies ###
-xnvme_deps = dependency('xnvme', version : '>=0.6.0' )
+xnvme_deps = dependency('xnvme', version : '>=0.7.0' )
 
 ### Files ###
 libflexalloc_header_dirs = include_directories('./src')
