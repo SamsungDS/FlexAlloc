@@ -1,7 +1,6 @@
 #ifndef __FLEXALLOC_CS_H_
 #define __FLEXALLOC_CS_H_
-#include <libxnvme_geo.h>
-#include <libxnvme_dev.h>
+#include <libxnvme.h>
 #include <stdint.h>
 struct flexalloc;
 struct fla_geo;
